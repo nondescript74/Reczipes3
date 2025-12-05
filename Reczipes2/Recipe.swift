@@ -16,6 +16,7 @@ final class Recipe {
     var recipeYield: String?
     var reference: String?
     var dateAdded: Date
+    var imageName: String? // Name of the image in Assets catalog
     
     // Store complex structures as JSON Data
     var ingredientSectionsData: Data?
@@ -28,6 +29,7 @@ final class Recipe {
          recipeYield: String? = nil,
          reference: String? = nil,
          dateAdded: Date = Date(),
+         imageName: String? = nil,
          ingredientSectionsData: Data? = nil,
          instructionSectionsData: Data? = nil,
          notesData: Data? = nil) {
@@ -37,6 +39,7 @@ final class Recipe {
         self.recipeYield = recipeYield
         self.reference = reference
         self.dateAdded = dateAdded
+        self.imageName = imageName
         self.ingredientSectionsData = ingredientSectionsData
         self.instructionSectionsData = instructionSectionsData
         self.notesData = notesData
@@ -57,6 +60,7 @@ final class Recipe {
             recipeYield: recipeModel.yield,
             reference: recipeModel.reference,
             dateAdded: Date(),
+            imageName: recipeModel.imageName,
             ingredientSectionsData: ingredientsData,
             instructionSectionsData: instructionsData,
             notesData: notesData
@@ -84,7 +88,8 @@ final class Recipe {
             ingredientSections: ingredients,
             instructionSections: instructions,
             notes: notes,
-            reference: reference
+            reference: reference,
+            imageName: imageName
         )
     }
 }

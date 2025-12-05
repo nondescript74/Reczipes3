@@ -45,6 +45,11 @@
 			path = Reczipes2UITests;
 			sourceTree = "<group>";
 		};
+		F8C80F8F2EE39DFE00AA52E7 /* Docs */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Docs;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +80,7 @@
 		F8C80F3B2EE246D200AA52E7 = {
 			isa = PBXGroup;
 			children = (
+				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
 				F8C80F462EE246D200AA52E7 /* Reczipes2 */,
 				F8C80F562EE246D300AA52E7 /* Reczipes2Tests */,
 				F8C80F602EE246D300AA52E7 /* Reczipes2UITests */,
@@ -109,6 +115,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F8C80F462EE246D200AA52E7 /* Reczipes2 */,
+				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
 			);
 			name = Reczipes2;
 			packageProductDependencies = (
@@ -391,7 +398,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -435,7 +442,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;

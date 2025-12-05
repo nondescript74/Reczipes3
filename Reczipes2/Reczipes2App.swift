@@ -13,6 +13,7 @@ struct Reczipes2App: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Recipe.self,
+            RecipeImageAssignment.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

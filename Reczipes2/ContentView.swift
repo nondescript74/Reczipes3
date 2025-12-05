@@ -11,22 +11,32 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Recipe.dateAdded, order: .reverse) private var savedRecipes: [Recipe]
+    @Query private var imageAssignments: [RecipeImageAssignment]
     
     @State private var selectedRecipe: RecipeModel?
+    @State private var showingImageAssignment = false
+    @State private var showingDebug = false
     
-    // All available recipe models from Extensions
-    private let availableRecipes: [RecipeModel] = [
-        .limePickleExample,
-        .ambliNiChutney,
-        .carrotPickle,
-        .corianderChutney,
-        .cucumberRaita,
-        .dhokraChutney,
-        .driedCarrots,
-        .eggplantRaita,
-        .garamMasala,
-        .ghee
-    ]
+    // Helper to get image name for a recipe
+    private func imageName(for recipeID: UUID) -> String? {
+        imageAssignments.first { $0.recipeID == recipeID }?.imageName
+    }
+    
+    // All available recipe models from RecipeCollection (stable UUIDs!)
+    // Merged with image assignments for real-time updates
+    private var availableRecipes: [RecipeModel] {
+        let recipes = RecipeCollection.shared.allRecipes.map { recipe in
+            if let assignedImageName = imageName(for: recipe.id) {
+                print("✅ Found image '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))")
+                return recipe.withImageName(assignedImageName)
+            } else {
+                print("❌ No image for '\(recipe.title)' (ID: \(recipe.id))")
+                return recipe
+            }
+        }
+        print("📊 Total assignments in DB: \(imageAssignments.count)")
+        return recipes
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -36,7 +46,27 @@ struct ContentView: View {
                         Button {
                             selectedRecipe = recipe
                         } label: {
-                            HStack {
+                            HStack(spacing: 12) {
+                                // Thumbnail or placeholder
+                                if let imageName = recipe.imageName {
+                                    RecipeImageView(
+                                        imageName: imageName,
+                                        size: CGSize(width: 50, height: 50),
+                                        cornerRadius: 6
+                                    )
+                                } else {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.gray.opacity(0.1))
+                                        .frame(width: 50, height: 50)
+                                        .overlay(
+                                            Text("Assign\nImage")
+                                                .font(.caption2)
+                                                .multilineTextAlignment(.center)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        )
+                                }
+                                
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(recipe.title)
                                         .font(.headline)
@@ -70,7 +100,27 @@ struct ContentView: View {
                                     selectedRecipe = recipeModel
                                 }
                             } label: {
-                                HStack {
+                                HStack(spacing: 12) {
+                                    // Thumbnail or placeholder
+                                    if let imageName = recipe.imageName ?? imageName(for: recipe.id) {
+                                        RecipeImageView(
+                                            imageName: imageName,
+                                            size: CGSize(width: 50, height: 50),
+                                            cornerRadius: 6
+                                        )
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color.gray.opacity(0.1))
+                                            .frame(width: 50, height: 50)
+                                            .overlay(
+                                                Text("Assign\nImage")
+                                                    .font(.caption2)
+                                                    .multilineTextAlignment(.center)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(2)
+                                            )
+                                    }
+                                    
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(recipe.title)
                                             .font(.headline)
@@ -102,7 +152,25 @@ struct ContentView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     EditButton()
                 }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingImageAssignment = true
+                    } label: {
+                        Label("Assign Images", systemImage: "photo.on.rectangle")
+                    }
+                }
+#else
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingImageAssignment = true
+                    } label: {
+                        Label("Assign Images", systemImage: "photo.on.rectangle")
+                    }
+                }
 #endif
+            }
+            .sheet(isPresented: $showingImageAssignment) {
+                RecipeImageAssignmentView()
             }
         } detail: {
             if let recipe = selectedRecipe {
@@ -127,7 +195,13 @@ struct ContentView: View {
     
     private func saveRecipe(_ recipe: RecipeModel) {
         withAnimation {
-            let newRecipe = Recipe(from: recipe)
+            // Include the current image name (if any) when saving
+            var recipeToSave = recipe
+            if let assignedImage = imageName(for: recipe.id) {
+                recipeToSave = recipe.withImageName(assignedImage)
+            }
+            
+            let newRecipe = Recipe(from: recipeToSave)
             modelContext.insert(newRecipe)
         }
     }
@@ -143,5 +217,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Recipe.self, inMemory: true)
+        .modelContainer(for: [Recipe.self, RecipeImageAssignment.self], inMemory: true)
 }

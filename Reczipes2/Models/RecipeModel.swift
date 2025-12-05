@@ -16,6 +16,7 @@ struct RecipeModel: Codable, Identifiable, Hashable {
     let instructionSections: [InstructionSection]
     let notes: [RecipeNote]
     let reference: String?
+    var imageName: String? // Name of the image in Assets catalog
     
     init(id: UUID = UUID(),
          title: String,
@@ -24,7 +25,8 @@ struct RecipeModel: Codable, Identifiable, Hashable {
          ingredientSections: [IngredientSection],
          instructionSections: [InstructionSection],
          notes: [RecipeNote] = [],
-         reference: String? = nil) {
+         reference: String? = nil,
+         imageName: String? = nil) {
         self.id = id
         self.title = title
         self.headerNotes = headerNotes
@@ -33,6 +35,7 @@ struct RecipeModel: Codable, Identifiable, Hashable {
         self.instructionSections = instructionSections
         self.notes = notes
         self.reference = reference
+        self.imageName = imageName
     }
 }
 

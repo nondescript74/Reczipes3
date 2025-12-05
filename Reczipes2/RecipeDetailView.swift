@@ -6,15 +6,34 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct RecipeDetailView: View {
     let recipe: RecipeModel
     let isSaved: Bool
     let onSave: () -> Void
     
+    @Query private var imageAssignments: [RecipeImageAssignment]
+    
+    // Get the current image for this recipe (real-time)
+    private var currentImageName: String? {
+        imageAssignments.first { $0.recipeID == recipe.id }?.imageName ?? recipe.imageName
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                // Recipe Image (if available)
+                if let imageName = currentImageName {
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        .padding(.horizontal)
+                }
+                
                 // Header Section
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top) {
