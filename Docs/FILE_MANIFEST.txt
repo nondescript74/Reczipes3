@@ -1,0 +1,162 @@
+# Claude Recipe Extractor - File Manifest
+
+## Production Files (Add to your Xcode project)
+
+### Core Implementation (Required)
+1. ImagePreprocessor.swift (3.9 KB)
+   - Image enhancement for better OCR
+   - Grayscale, contrast, sharpening filters
+   - Comparison view support
+
+2. ClaudeAPIClient.swift (11 KB)
+   - Claude API communication
+   - Request/response handling
+   - JSON parsing and conversion
+   - Error handling
+
+3. RecipeExtractorViewModel.swift (2.3 KB)
+   - MVVM state management
+   - Published properties for reactive UI
+   - Extraction flow coordination
+
+4. RecipeExtractorView.swift (11 KB)
+   - Main UI for recipe extraction
+   - Image picker integration
+   - Preprocessing controls
+   - Navigation and error display
+
+5. RecipeDetailView.swift (12 KB)
+   - Formatted recipe display
+   - Multiple section support
+   - Share functionality
+   - Color-coded notes
+
+6. ImagePicker.swift (1.5 KB)
+   - Camera/photo library wrapper
+   - UIKit bridge for SwiftUI
+
+7. RecipeExtractorConfig.swift (6.4 KB)
+   - Centralized configuration
+   - API key management (Keychain, Environment)
+   - Feature flags
+   - Preprocessing settings
+
+## Supporting Files (Optional but recommended)
+
+### Examples & Integration
+8. ExampleAppIntegration.swift (13 KB)
+   - Complete app integration example
+   - Tab bar setup
+   - API key setup flow
+   - Settings view
+   - Recipe store integration
+
+### Testing
+9. RecipeExtractorTests.swift (16 KB)
+   - Unit tests
+   - Integration tests
+   - Performance tests
+   - Mock data generators
+   - Manual testing checklist
+
+## Documentation
+
+### Quick Reference
+10. README.md
+    - Overview and features
+    - Quick start guide
+    - Cost information
+    - Troubleshooting
+
+11. QUICK_START.md
+    - 5-minute setup
+    - Basic usage
+    - Configuration options
+    - Common issues
+
+### Detailed Guides
+12. IMPLEMENTATION_GUIDE.md
+    - Detailed setup instructions
+    - Security best practices
+    - API key management strategies
+    - Advanced features
+    - Customization guide
+
+13. ARCHITECTURE.md
+    - System design
+    - Data flow diagrams
+    - Component dependencies
+    - Design patterns used
+    - Performance considerations
+
+## Your Existing Files (Already in your project)
+
+- RecipeModel.swift
+  Your existing model that the extractor outputs to
+
+- Extensions.swift
+  Your existing recipe extensions
+
+## Total Package
+
+Production Code: 7 files (48.4 KB)
+Examples/Tests: 2 files (29 KB)
+Documentation: 4 files (~25 KB)
+
+Total: 13 files, ~102 KB
+
+## Installation Order
+
+1. Add core files (1-7) to Xcode project
+2. Update Info.plist with camera/library permissions
+3. Configure API key (see QUICK_START.md)
+4. Optional: Add ExampleAppIntegration.swift for reference
+5. Optional: Add RecipeExtractorTests.swift to test target
+
+## Minimum Required Files
+
+For basic functionality, you only need:
+- ImagePreprocessor.swift
+- ClaudeAPIClient.swift  
+- RecipeExtractorViewModel.swift
+- RecipeExtractorView.swift
+- RecipeDetailView.swift
+- ImagePicker.swift
+
+You can skip RecipeExtractorConfig.swift if you directly pass API key 
+and use default settings.
+
+## File Dependencies
+
+RecipeExtractorView
+  ├─ RecipeExtractorViewModel
+  │    ├─ ClaudeAPIClient
+  │    └─ ImagePreprocessor
+  ├─ ImagePicker
+  └─ RecipeDetailView
+       └─ RecipeModel (your existing file)
+
+RecipeExtractorConfig (standalone utility)
+  └─ Used by: ClaudeAPIClient, ViewModel
+
+## Next Steps
+
+1. Read QUICK_START.md for setup
+2. Add files to your Xcode project  
+3. Configure API key
+4. Review ExampleAppIntegration.swift
+5. Test with sample images
+6. Customize as needed
+
+## Support
+
+All files include:
+- Inline documentation
+- Usage examples
+- Error handling
+- Type safety
+
+For questions:
+- Check documentation files
+- Review inline comments
+- Test with provided utilities

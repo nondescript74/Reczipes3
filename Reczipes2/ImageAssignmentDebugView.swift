@@ -10,6 +10,7 @@ import SwiftData
 
 struct ImageAssignmentDebugView: View {
     @Query private var assignments: [RecipeImageAssignment]
+    @Query private var savedRecipes: [Recipe]
     
     var body: some View {
         NavigationStack {
@@ -52,8 +53,8 @@ struct ImageAssignmentDebugView: View {
                     }
                 }
                 
-                Section("Recipe IDs from Extensions") {
-                    ForEach(RecipeCollection.shared.allRecipes) { recipe in
+                Section("All Recipes (Bundled + SwiftData)") {
+                    ForEach(RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)) { recipe in
                         VStack(alignment: .leading) {
                             Text(recipe.title)
                                 .font(.headline)

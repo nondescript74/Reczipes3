@@ -13,6 +13,7 @@ struct RecipeImageAssignmentView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Query private var assignments: [RecipeImageAssignment]
+    @Query private var savedRecipes: [Recipe]
     
     // List of all image names in your Assets catalog
     // Update this array with your actual image names
@@ -36,7 +37,7 @@ struct RecipeImageAssignmentView: View {
     
     // All recipes from RecipeCollection (stable UUIDs!)
     private var allRecipes: [RecipeModel] {
-        RecipeCollection.shared.allRecipes
+        RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
     }
     
     @State private var searchText = ""

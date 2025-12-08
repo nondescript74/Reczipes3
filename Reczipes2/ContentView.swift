@@ -22,10 +22,12 @@ struct ContentView: View {
         imageAssignments.first { $0.recipeID == recipeID }?.imageName
     }
     
-    // All available recipe models from RecipeCollection (stable UUIDs!)
+    // All available recipe models merged from bundled recipes and SwiftData
+    // SwiftData recipes take precedence (user-edited versions)
     // Merged with image assignments for real-time updates
     private var availableRecipes: [RecipeModel] {
-        let recipes = RecipeCollection.shared.allRecipes.map { recipe in
+        let allRecipes = RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
+        let recipes = allRecipes.map { recipe in
             if let assignedImageName = imageName(for: recipe.id) {
                 print("✅ Found image '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))")
                 return recipe.withImageName(assignedImageName)
@@ -41,7 +43,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedRecipe) {
-                Section("Available Recipes") {
+                Section {
                     ForEach(availableRecipes) { recipe in
                         Button {
                             selectedRecipe = recipe
@@ -82,64 +84,41 @@ struct ContentView: View {
                                 
                                 Spacer()
                                 
+                                // Show indicator if recipe has been saved/edited
                                 if isRecipeSaved(recipe) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
+                                    Image(systemName: "pencil.circle.fill")
+                                        .foregroundStyle(.blue)
+                                        .help("Edited & Saved")
                                 }
                             }
                         }
                         .buttonStyle(.plain)
-                    }
-                }
-                
-                if !savedRecipes.isEmpty {
-                    Section("Saved Recipes (\(savedRecipes.count))") {
-                        ForEach(savedRecipes) { recipe in
-                            Button {
-                                if let recipeModel = recipe.toRecipeModel() {
-                                    selectedRecipe = recipeModel
-                                }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    // Thumbnail or placeholder
-                                    if let imageName = recipe.imageName ?? imageName(for: recipe.id) {
-                                        RecipeImageView(
-                                            imageName: imageName,
-                                            size: CGSize(width: 50, height: 50),
-                                            cornerRadius: 6
-                                        )
-                                    } else {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(Color.gray.opacity(0.1))
-                                            .frame(width: 50, height: 50)
-                                            .overlay(
-                                                Text("Assign\nImage")
-                                                    .font(.caption2)
-                                                    .multilineTextAlignment(.center)
-                                                    .foregroundStyle(.secondary)
-                                                    .lineLimit(2)
-                                            )
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(recipe.title)
-                                            .font(.headline)
-                                            .foregroundStyle(.primary)
-                                        
-                                        Text("Added \(recipe.dateAdded, format: .dateTime.month().day().year())")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "bookmark.fill")
-                                        .foregroundStyle(.blue)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if isRecipeSaved(recipe) {
+                                Button(role: .destructive) {
+                                    deleteRecipe(recipe)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
-                            .buttonStyle(.plain)
                         }
-                        .onDelete(perform: deleteRecipes)
+                        .contextMenu {
+                            if isRecipeSaved(recipe) {
+                                Button(role: .destructive) {
+                                    deleteRecipe(recipe)
+                                } label: {
+                                    Label("Delete Saved Version", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("All Recipes (\(availableRecipes.count))")
+                } footer: {
+                    if savedRecipes.isEmpty {
+                        Text("Tap any recipe to view details. Use the save button to keep your changes.")
+                    } else {
+                        Text("\(savedRecipes.count) recipe(s) have been saved with your edits")
                     }
                 }
             }
@@ -149,9 +128,6 @@ struct ContentView: View {
             .navigationTitle("Recipes")
             .toolbar {
 #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showingImageAssignment = true
@@ -190,7 +166,15 @@ struct ContentView: View {
     }
     
     private func isRecipeSaved(_ recipe: RecipeModel) -> Bool {
-        savedRecipes.contains { $0.id == recipe.id }
+        RecipeCollection.shared.isRecipeSaved(recipe, savedRecipes: savedRecipes)
+    }
+    
+    private func deleteRecipe(_ recipe: RecipeModel) {
+        withAnimation {
+            if let savedRecipe = savedRecipes.first(where: { $0.id == recipe.id }) {
+                modelContext.delete(savedRecipe)
+            }
+        }
     }
     
     private func saveRecipe(_ recipe: RecipeModel) {
@@ -203,14 +187,6 @@ struct ContentView: View {
             
             let newRecipe = Recipe(from: recipeToSave)
             modelContext.insert(newRecipe)
-        }
-    }
-    
-    private func deleteRecipes(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(savedRecipes[index])
-            }
         }
     }
 }
