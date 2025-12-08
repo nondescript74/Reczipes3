@@ -266,7 +266,7 @@ struct RecipeDetailView: View {
 #Preview {
     NavigationStack {
         RecipeDetailView(
-            recipe: .limePickleExample,
+            recipe: .lassi,
             isSaved: false,
             onSave: {}
         )

@@ -17,26 +17,21 @@ struct RecipeImageAssignmentView: View {
     // List of all image names in your Assets catalog
     // Update this array with your actual image names
     @State private var availableImages: [String] = [
-        "AmNC",
-        "CaPi",
-        "CoCh",
-        "CuRa",
-        "DhCh",
-        "DrCa",
-        "EgRa",
-        "GaMa",
-        "GhCb",
-        "HiContrast",
-        "HoYo",
-        "Itc",
-        "Kach",
-        "KaSM",
-        "LaYS",
-        "LeCh",
-        "Mpio",
-        "Sher",
-        "VeSo",
-        "Vs"
+        "ambli_ni_chutney",
+        "chicken_soup",
+        "cucumber_raita",
+        "dhokra_chutney",
+        "eggplant_raita",
+        "garam_masala",
+        "ghee",
+        "homemade_yoghurt",
+        "kachumber",
+        "kadho",
+        "lassi",
+        "moong_bean_soup",
+        "sherbet",
+        "vegetable_sambar",
+        "vegetable_soup"
     ]
     
     // All recipes from RecipeCollection (stable UUIDs!)

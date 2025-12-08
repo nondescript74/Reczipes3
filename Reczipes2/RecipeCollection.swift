@@ -19,26 +19,21 @@ final class RecipeCollection {
         // Their UUIDs remain stable throughout the app's lifetime
         self.allRecipes = [
             // Import all recipes from Extensions
-            .limePickleExample,
-            .ambliNiChutney,
-            .carrotPickle,
-            .corianderChutney,
-            .cucumberRaita,
-            .dhokraChutney,
-            .driedCarrots,
-            .eggplantRaita,
-            .garamMasala,
+            .ambli_ni_chutney,
+            .chicken_soup,
+            .cucumber_raita,
+            .dhokra_chutney,
+            .eggplant_raita,
+            .garam_masala,
             .ghee,
-            .homemadeYogurt,
-            .instantTomatoChutney,
+            .homemade_yogurt,
             .kachumber,
             .kadho,
             .lassi,
-            .lemonChutney,
-            .mangoPickleInOil,
             .sherbet,
-            .vegetableSoup,
-            .vegetableSambhar
+            .vegetable_soup,
+            .vegetable_sambhar,
+            .moong_bean_soup
         ]
     }
     

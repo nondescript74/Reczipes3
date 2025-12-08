@@ -53,7 +53,7 @@ struct ImageAssignmentDebugView: View {
                 }
                 
                 Section("Recipe IDs from Extensions") {
-                    ForEach(RecipeModel.allRecipes.prefix(5)) { recipe in
+                    ForEach(RecipeCollection.shared.allRecipes) { recipe in
                         VStack(alignment: .leading) {
                             Text(recipe.title)
                                 .font(.headline)

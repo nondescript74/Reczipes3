@@ -200,7 +200,7 @@ struct RecipeCardView: View {
 
 #Preview {
     RecipeCardView(
-        recipe: .limePickleExample,
+        recipe: .lassi,
         isSaved: false,
         onSave: {}
     )
