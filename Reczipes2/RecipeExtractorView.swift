@@ -287,7 +287,12 @@ struct RecipeExtractorView: View {
             
             // Preview Navigation Link
             NavigationLink {
-                RecipeDetailView(recipe: recipe, isSaved: false, onSave: {})
+                RecipeDetailView(
+                    recipe: recipe, 
+                    isSaved: false, 
+                    onSave: {},
+                    previewImage: viewModel.selectedImage  // Pass the extracted image for preview
+                )
             } label: {
                 HStack {
                     VStack(alignment: .leading) {

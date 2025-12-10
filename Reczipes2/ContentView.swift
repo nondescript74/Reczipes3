@@ -61,6 +61,7 @@ struct ContentView: View {
                     isSaved: isRecipeSaved(recipe),
                     onSave: { saveRecipe(recipe) }
                 )
+                .id("\(recipe.id)-\(recipe.imageName ?? "no-image")")  // Force view refresh when recipe or image changes
             } else {
                 ContentUnavailableView(
                     "Select a Recipe",

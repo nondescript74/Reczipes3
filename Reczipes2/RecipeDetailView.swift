@@ -12,19 +12,45 @@ struct RecipeDetailView: View {
     let recipe: RecipeModel
     let isSaved: Bool
     let onSave: () -> Void
+    let previewImage: UIImage? // Optional image for unsaved recipes being previewed
     
-    @Query private var imageAssignments: [RecipeImageAssignment]
+    @Query private var savedRecipes: [Recipe]
     
-    // Get the current image for this recipe (real-time)
-    private var currentImageName: String? {
-        imageAssignments.first { $0.recipeID == recipe.id }?.imageName ?? recipe.imageName
+    @State private var showingEditor = false
+    
+    init(recipe: RecipeModel, 
+         isSaved: Bool, 
+         onSave: @escaping () -> Void,
+         previewImage: UIImage? = nil) {
+        self.recipe = recipe
+        self.isSaved = isSaved
+        self.onSave = onSave
+        self.previewImage = previewImage
+    }
+    
+    // Get the saved Recipe entity for editing
+    private var savedRecipe: Recipe? {
+        savedRecipes.first { $0.id == recipe.id }
     }
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Recipe Image (if available)
-                if let imageName = currentImageName {
+                // For unsaved recipes in preview, show the previewImage
+                // For saved recipes, use the imageName from the recipe model
+                if let previewImage = previewImage {
+                    // Show the temporary preview image (for extracted recipes not yet saved)
+                    Image(uiImage: previewImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: 400)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        .padding(.horizontal)
+                } else if let imageName = recipe.imageName {
+                    // Show the saved image (for saved recipes)
                     RecipeImageView(
                         imageName: imageName,
                         size: nil,  // No fixed size - let it adapt
@@ -247,6 +273,22 @@ struct RecipeDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .toolbar {
+            if isSaved {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        Label("Edit Recipe", systemImage: "pencil")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditor) {
+            if let savedRecipe = savedRecipe {
+                RecipeEditorView(recipe: savedRecipe)
+            }
+        }
     }
     
     private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {

@@ -137,5 +137,38 @@ The app is now significantly simpler and more focused on its core value proposit
 
 ---
 
+## Update: Recipe Editing Feature Added ✨
+
+**Date:** December 10, 2025
+
+### New Files Added:
+1. **RecipeEditorView.swift** - Full-featured recipe editor
+2. **RECIPE_EDITING_GUIDE.md** - Complete implementation documentation
+3. **ContentView+EditRecipe.swift** - Optional examples for list-based editing
+4. **RecipeEditingExamples.swift** - Code snippets for common scenarios
+
+### Modified Files:
+1. **RecipeDetailView.swift** - Added "Edit Recipe" button in toolbar
+
+### Feature Summary:
+Users can now edit all aspects of saved recipes including:
+- Basic information (title, notes, yield, reference)
+- Ingredient sections with full details
+- Instruction sections with numbered steps
+- Recipe notes with type selection
+- Add/remove/reorder sections
+
+The editor includes:
+- ✅ Unsaved changes warning
+- ✅ Form validation
+- ✅ SwiftData persistence
+- ✅ iOS and macOS support
+- ✅ Intuitive UI with reordering support
+
+See **RECIPE_EDITING_GUIDE.md** for complete documentation.
+
+---
+
 *Generated on: December 9, 2025*
-*Version: 2.0 - Claude API Only*
+*Updated on: December 10, 2025*
+*Version: 2.1 - Claude API Only + Recipe Editing*
