@@ -66,8 +66,16 @@ struct RecipeCardView: View {
                         HStack(alignment: .top, spacing: 4) {
                             Text("•")
                                 .foregroundStyle(.secondary)
-                            Text("\(ingredient.quantity) \(ingredient.unit) \(ingredient.name)")
-                                .font(.subheadline)
+                            HStack(spacing: 4) {
+                                if let quantity = ingredient.quantity, !quantity.isEmpty {
+                                    Text(quantity)
+                                }
+                                if let unit = ingredient.unit, !unit.isEmpty {
+                                    Text(unit)
+                                }
+                                Text(ingredient.name)
+                            }
+                            .font(.subheadline)
                             if let prep = ingredient.preparation {
                                 Text("(\(prep))")
                                     .font(.caption)
@@ -200,7 +208,35 @@ struct RecipeCardView: View {
 
 #Preview {
     RecipeCardView(
-        recipe: .lassi,
+        recipe: RecipeModel(
+            title: "Lassi",
+            headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
+            yield: "Serves 1 to 2",
+            ingredientSections: [
+                IngredientSection(
+                    ingredients: [
+                        Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt", metricQuantity: "175", metricUnit: "mL"),
+                        Ingredient(quantity: "1", unit: "cup", name: "water", metricQuantity: "250", metricUnit: "mL"),
+                        Ingredient(quantity: "⅛", unit: "tsp.", name: "salt", metricQuantity: "0.5", metricUnit: "mL"),
+                        Ingredient(quantity: "⅛", unit: "tsp.", name: "ground black pepper", metricQuantity: "0.5", metricUnit: "mL"),
+                        Ingredient(quantity: "⅛", unit: "tsp.", name: "cumin powder", metricQuantity: "0.5", metricUnit: "mL"),
+                        Ingredient(quantity: "", unit: "", name: "ice cubes")
+                    ]
+                )
+            ],
+            instructionSections: [
+                InstructionSection(
+                    steps: [
+                        InstructionStep(text: "Combine all ingredients in the blender and blend until smooth."),
+                        InstructionStep(text: "Serve cold. Sugar can be added instead of salt and pepper, if preferred.")
+                    ]
+                )
+            ],
+            notes: [
+                RecipeNote(type: .tip, text: "Very refreshing on a hot day!")
+            ],
+            reference: "Traditional Indian drink"
+        ),
         isSaved: false,
         onSave: {}
     )

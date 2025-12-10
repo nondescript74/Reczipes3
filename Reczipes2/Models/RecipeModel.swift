@@ -58,16 +58,16 @@ struct IngredientSection: Codable, Identifiable, Hashable {
 
 struct Ingredient: Codable, Identifiable, Hashable {
     let id: UUID
-    let quantity: String
-    let unit: String
+    let quantity: String?
+    let unit: String?
     let name: String
     let preparation: String?
     let metricQuantity: String?
     let metricUnit: String?
     
     init(id: UUID = UUID(),
-         quantity: String,
-         unit: String,
+         quantity: String? = nil,
+         unit: String? = nil,
          name: String,
          preparation: String? = nil,
          metricQuantity: String? = nil,

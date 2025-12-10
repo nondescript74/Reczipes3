@@ -7,19 +7,23 @@
 
 import SwiftUI
 import PhotosUI
+import SwiftData
 
 struct RecipeExtractorView: View {
     @StateObject private var viewModel: RecipeExtractorViewModel
     @State private var showImagePicker = false
     @State private var showCamera = false
     @State private var showImageComparison = false
+    @State private var showingSaveConfirmation = false
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     
     init(apiKey: String) {
         _viewModel = StateObject(wrappedValue: RecipeExtractorViewModel(apiKey: apiKey))
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     // Image Selection Section
@@ -55,11 +59,46 @@ struct RecipeExtractorView: View {
             .navigationTitle("Recipe Extractor")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if viewModel.extractedRecipe != nil {
-                        Button("Reset") {
-                            viewModel.reset()
+                    if let recipe = viewModel.extractedRecipe {
+                        Button {
+                            print("🔘 Save Recipe button tapped!")
+                            saveRecipe()
+                        } label: {
+                            Text("Save Recipe")
                         }
+                        .buttonStyle(.borderedProminent)
+                        .onAppear {
+                            print("✅ Save Recipe button is visible for: \(recipe.title)")
+                        }
+                    } else {
+                        Text("No recipe")
+                            .onAppear {
+                                print("⚠️ No recipe available to save")
+                            }
+                    }
+                }
+            }
+            .alert("Recipe Saved!", isPresented: $showingSaveConfirmation) {
+                Button("View in Collection") {
+                    // Dismiss and let the ContentView refresh
+                    dismiss()
+                }
+                Button("Extract Another") {
+                    viewModel.reset()
+                }
+            } message: {
+                if let recipe = viewModel.extractedRecipe {
+                    if viewModel.selectedImage != nil {
+                        Text("\"\(recipe.title)\" and its image have been added to your recipe collection.")
+                    } else {
+                        Text("\"\(recipe.title)\" has been added to your recipe collection.")
                     }
                 }
             }
@@ -229,6 +268,24 @@ struct RecipeExtractorView: View {
                     .font(.headline)
             }
             
+            // Save Button - Prominent and visible
+            Button {
+                print("🔘 INLINE Save button tapped!")
+                saveRecipe()
+            } label: {
+                Label("Save to Collection", systemImage: "square.and.arrow.down.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
+            
+            Divider()
+            
+            // Preview Navigation Link
             NavigationLink {
                 RecipeDetailView(recipe: recipe, isSaved: false, onSave: {})
             } label: {
@@ -261,6 +318,77 @@ struct RecipeExtractorView: View {
         .background(Color.green.opacity(0.1))
         .cornerRadius(16)
     }
+    
+    // MARK: - Save Recipe
+    
+    private func saveRecipe() {
+        print("🔘 Save button tapped!")
+        
+        guard let recipeModel = viewModel.extractedRecipe else {
+            print("❌ No recipe to save!")
+            return
+        }
+        
+        print("💾 Saving recipe: \(recipeModel.title)")
+        
+        // Convert RecipeModel to SwiftData Recipe
+        let recipe = Recipe(from: recipeModel)
+        
+        // Insert into SwiftData context
+        modelContext.insert(recipe)
+        print("📝 Recipe inserted into context")
+        
+        // Automatically save the extracted image and create assignment
+        if let sourceImage = viewModel.selectedImage {
+            saveRecipeImage(sourceImage, for: recipe.id)
+        }
+        
+        // Save the context
+        do {
+            try modelContext.save()
+            print("✅ Recipe saved successfully to SwiftData")
+            print("📊 Recipe ID: \(recipe.id)")
+            print("📊 Recipe Title: \(recipe.title)")
+            
+            // Small delay to ensure SwiftData propagates the change
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                showingSaveConfirmation = true
+            }
+        } catch {
+            print("❌ Failed to save recipe: \(error)")
+            print("❌ Error details: \(error.localizedDescription)")
+            // Optionally show an error alert here
+        }
+    }
+    
+    // MARK: - Image Management
+    
+    private func saveRecipeImage(_ image: UIImage, for recipeID: UUID) {
+        // Generate a unique filename
+        let filename = "recipe_\(recipeID.uuidString).jpg"
+        
+        // Save to documents directory
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("❌ Failed to convert image to JPEG data")
+            return
+        }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        do {
+            try imageData.write(to: fileURL)
+            print("✅ Saved recipe image to: \(fileURL.path)")
+            
+            // Create image assignment
+            let assignment = RecipeImageAssignment(recipeID: recipeID, imageName: filename)
+            modelContext.insert(assignment)
+            print("✅ Created image assignment for recipe: \(recipeID)")
+            
+        } catch {
+            print("❌ Error saving recipe image: \(error)")
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -271,7 +399,7 @@ struct ImageComparisonView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     VStack(alignment: .leading) {

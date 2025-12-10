@@ -25,13 +25,16 @@ struct RecipeDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Recipe Image (if available)
                 if let imageName = currentImageName {
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        .padding(.horizontal)
+                    RecipeImageView(
+                        imageName: imageName,
+                        size: nil,  // No fixed size - let it adapt
+                        aspectRatio: .fit,
+                        cornerRadius: 16
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 400)
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal)
                 }
                 
                 // Header Section
@@ -103,10 +106,14 @@ struct RecipeDetailView: View {
                                     
                                     VStack(alignment: .leading, spacing: 2) {
                                         HStack {
-                                            Text(ingredient.quantity)
-                                                .fontWeight(.semibold)
-                                            Text(ingredient.unit)
-                                                .fontWeight(.medium)
+                                            if let quantity = ingredient.quantity, !quantity.isEmpty {
+                                                Text(quantity)
+                                                    .fontWeight(.semibold)
+                                            }
+                                            if let unit = ingredient.unit, !unit.isEmpty {
+                                                Text(unit)
+                                                    .fontWeight(.medium)
+                                            }
                                             Text(ingredient.name)
                                         }
                                         
@@ -266,7 +273,32 @@ struct RecipeDetailView: View {
 #Preview {
     NavigationStack {
         RecipeDetailView(
-            recipe: .lassi,
+            recipe: RecipeModel(
+                title: "Lassi",
+                headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
+                yield: "Serves 1 to 2",
+                ingredientSections: [
+                    IngredientSection(
+                        ingredients: [
+                            Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt", metricQuantity: "175", metricUnit: "mL"),
+                            Ingredient(quantity: "1", unit: "cup", name: "water", metricQuantity: "250", metricUnit: "mL"),
+                            Ingredient(quantity: "⅛", unit: "tsp.", name: "salt", metricQuantity: "0.5", metricUnit: "mL"),
+                            Ingredient(quantity: "⅛", unit: "tsp.", name: "ground black pepper", metricQuantity: "0.5", metricUnit: "mL"),
+                            Ingredient(quantity: "⅛", unit: "tsp.", name: "cumin powder", metricQuantity: "0.5", metricUnit: "mL"),
+                            Ingredient(quantity: "", unit: "", name: "ice cubes")
+                        ]
+                    )
+                ],
+                instructionSections: [
+                    InstructionSection(
+                        steps: [
+                            InstructionStep(text: "Combine all ingredients in the blender and blend until smooth. Sugar can be added instead of salt and pepper, if preferred.")
+                        ]
+                    )
+                ],
+                notes: [],
+                reference: "See photograph, page 48."
+            ),
             isSaved: false,
             onSave: {}
         )

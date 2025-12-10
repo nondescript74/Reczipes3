@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Photos
 
 struct RecipeImageAssignmentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -15,57 +16,145 @@ struct RecipeImageAssignmentView: View {
     @Query private var assignments: [RecipeImageAssignment]
     @Query private var savedRecipes: [Recipe]
     
-    // List of all image names in your Assets catalog
-    // Update this array with your actual image names
-    @State private var availableImages: [String] = [
-        "ambli_ni_chutney",
-        "chicken_soup",
-        "cucumber_raita",
-        "dhokra_chutney",
-        "eggplant_raita",
-        "garam_masala",
-        "ghee",
-        "homemade_yoghurt",
-        "kachumber",
-        "kadho",
-        "lassi",
-        "moong_bean_soup",
-        "sherbet",
-        "vegetable_sambar",
-        "vegetable_soup"
-    ]
+    @StateObject private var photoLibrary = PhotoLibraryManager()
     
     // All recipes from RecipeCollection (stable UUIDs!)
     private var allRecipes: [RecipeModel] {
         RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
     }
     
-    @State private var searchText = ""
-    
     var body: some View {
         NavigationStack {
-            List {
-                Section("Recipe Image Assignments") {
+            Group {
+                if allRecipes.isEmpty {
+                    ContentUnavailableView(
+                        "No Recipes Yet",
+                        systemImage: "book.closed",
+                        description: Text("Extract recipes first before assigning images")
+                    )
+                } else {
+                    switch photoLibrary.authorizationStatus {
+                    case .notDetermined:
+                        permissionPromptView
+                    case .restricted, .denied:
+                        permissionDeniedView
+                    case .authorized, .limited:
+                        if photoLibrary.isLoading {
+                            loadingView
+                        } else {
+                            recipeListView
+                        }
+                    @unknown default:
+                        permissionPromptView
+                    }
+                }
+            }
+            .navigationTitle("Recipe Images")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("Recipe Images")
+                            .font(.headline)
+                        Text("Change or assign photos")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .task {
+                // Load photos if we already have permission
+                if photoLibrary.authorizationStatus == .authorized || photoLibrary.authorizationStatus == .limited {
+                    await photoLibrary.loadPhotos()
+                }
+            }
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var permissionPromptView: some View {
+        ContentUnavailableView {
+            Label("Photo Library Access", systemImage: "photo.on.rectangle.angled")
+        } description: {
+            Text("Allow access to your photo library to assign images to recipes")
+        } actions: {
+            Button("Grant Access") {
+                Task {
+                    await photoLibrary.requestPermission()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+    
+    private var permissionDeniedView: some View {
+        ContentUnavailableView {
+            Label("Photo Library Access Denied", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("Please enable photo library access in Settings to assign images to recipes")
+        } actions: {
+            if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                Link("Open Settings", destination: settingsUrl)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+    
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+            Text("Loading photos...")
+                .font(.headline)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private var recipeListView: some View {
+        List {
+            if photoLibrary.photoAssets.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        "No Photos Found",
+                        systemImage: "photo.on.rectangle.angled",
+                        description: Text("Your photo library appears to be empty or the app doesn't have access to any photos.")
+                    )
+                } footer: {
+                    if photoLibrary.authorizationStatus == .limited {
+                        Text("You've granted limited photo access. To see more photos, go to Settings and change photo access to 'Full Access'.")
+                    }
+                }
+            } else {
+                Section {
                     ForEach(allRecipes) { recipe in
-                        RecipeImageRow(
+                        RecipePhotoRow(
                             recipe: recipe,
                             currentImageName: assignedImage(for: recipe.id),
-                            availableImages: availableImagesForRecipe(recipe.id),
-                            onImageSelected: { imageName in
-                                assignImage(imageName, to: recipe.id)
+                            photoLibrary: photoLibrary,
+                            onPhotoSelected: { asset in
+                                Task {
+                                    await assignPhoto(asset, to: recipe.id)
+                                }
                             },
                             onImageRemoved: {
                                 removeImage(from: recipe.id)
                             }
                         )
                     }
-                }
-            }
-            .navigationTitle("Assign Recipe Images")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
+                } header: {
+                    Text("Your Recipes")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(photoLibrary.photoAssets.count) photo(s) available in library")
+                        Text("Tip: Images are automatically saved when extracting recipes. You can change them here anytime.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -78,77 +167,126 @@ struct RecipeImageAssignmentView: View {
         assignments.first { $0.recipeID == recipeID }?.imageName
     }
     
-    private func availableImagesForRecipe(_ recipeID: UUID) -> [String] {
-        let assignedImages = Set(assignments.map { $0.imageName })
-        let currentImage = assignedImage(for: recipeID)
-        
-        // Include images that are either unassigned or currently assigned to this recipe
-        return availableImages.filter { imageName in
-            !assignedImages.contains(imageName) || imageName == currentImage
-        }
-    }
-    
-    private func assignImage(_ imageName: String, to recipeID: UUID) {
-        // Remove existing assignment if any
-        if let existing = assignments.first(where: { $0.recipeID == recipeID }) {
-            modelContext.delete(existing)
+    private func assignPhoto(_ asset: PHAsset, to recipeID: UUID) async {
+        // Save the photo to documents directory and get a unique filename
+        guard let image = await photoLibrary.loadImage(for: asset, targetSize: PHImageManagerMaximumSize) else {
+            print("❌ Failed to load image")
+            return
         }
         
-        // Create new assignment
-        let assignment = RecipeImageAssignment(recipeID: recipeID, imageName: imageName)
-        modelContext.insert(assignment)
+        // Generate a unique filename
+        let filename = "recipe_\(recipeID.uuidString).jpg"
+        
+        // Save to documents directory
+        if let savedPath = saveImageToDocuments(image, filename: filename) {
+            print("✅ Saved image to: \(savedPath)")
+            
+            // Remove existing assignment if any
+            if let existing = assignments.first(where: { $0.recipeID == recipeID }) {
+                // Delete old image file if it exists
+                deleteImageFromDocuments(existing.imageName)
+                modelContext.delete(existing)
+            }
+            
+            // Create new assignment
+            let assignment = RecipeImageAssignment(recipeID: recipeID, imageName: filename)
+            modelContext.insert(assignment)
+            
+            try? modelContext.save()
+        }
     }
     
     private func removeImage(from recipeID: UUID) {
         if let existing = assignments.first(where: { $0.recipeID == recipeID }) {
+            // Delete the image file
+            deleteImageFromDocuments(existing.imageName)
+            // Remove the assignment
             modelContext.delete(existing)
         }
     }
+    
+    // MARK: - File Management
+    
+    private func saveImageToDocuments(_ image: UIImage, filename: String) -> String? {
+        guard let data = image.jpegData(compressionQuality: 0.8) else {
+            return nil
+        }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        do {
+            try data.write(to: fileURL)
+            return filename
+        } catch {
+            print("❌ Error saving image: \(error)")
+            return nil
+        }
+    }
+    
+    private func deleteImageFromDocuments(_ filename: String) {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        try? FileManager.default.removeItem(at: fileURL)
+    }
 }
 
-// MARK: - Recipe Image Row
+// MARK: - Recipe Photo Row
 
-struct RecipeImageRow: View {
+struct RecipePhotoRow: View {
     let recipe: RecipeModel
     let currentImageName: String?
-    let availableImages: [String]
-    let onImageSelected: (String) -> Void
+    let photoLibrary: PhotoLibraryManager
+    let onPhotoSelected: (PHAsset) -> Void
     let onImageRemoved: () -> Void
     
-    @State private var showingImagePicker = false
+    @State private var showingPhotoPicker = false
+    @State private var thumbnailImage: UIImage?
     
     var body: some View {
         HStack(spacing: 12) {
             // Recipe thumbnail or placeholder
-            if let imageName = currentImageName {
-                Image(imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 60, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    )
+            Group {
+                if let thumbnail = thumbnailImage {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else if let imageName = currentImageName,
+                          let image = loadImageFromDocuments(imageName) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundStyle(.secondary)
+                        )
+                }
             }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+            )
             
             // Recipe info
             VStack(alignment: .leading, spacing: 4) {
                 Text(recipe.title)
                     .font(.headline)
                 
-                if let imageName = currentImageName {
-                    Text(imageName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if currentImageName != nil {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        Text("Image assigned")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Text("No image assigned")
                         .font(.caption)
@@ -168,88 +306,69 @@ struct RecipeImageRow: View {
                     .buttonStyle(.plain)
                 }
                 
-                Button(action: { showingImagePicker = true }) {
+                Button(action: { showingPhotoPicker = true }) {
                     Image(systemName: currentImageName == nil ? "plus.circle.fill" : "pencil.circle.fill")
                         .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)
-                .disabled(availableImages.isEmpty && currentImageName == nil)
             }
         }
         .padding(.vertical, 4)
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePickerSheet(
+        .sheet(isPresented: $showingPhotoPicker) {
+            PhotoPickerSheet(
                 recipe: recipe,
-                availableImages: availableImages,
-                currentImageName: currentImageName,
-                onImageSelected: onImageSelected
+                photoLibrary: photoLibrary,
+                onPhotoSelected: onPhotoSelected
             )
         }
     }
+    
+    private func loadImageFromDocuments(_ filename: String) -> UIImage? {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        guard let data = try? Data(contentsOf: fileURL) else {
+            return nil
+        }
+        
+        return UIImage(data: data)
+    }
 }
 
-// MARK: - Image Picker Sheet
+// MARK: - Photo Picker Sheet
 
-struct ImagePickerSheet: View {
+struct PhotoPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     let recipe: RecipeModel
-    let availableImages: [String]
-    let currentImageName: String?
-    let onImageSelected: (String) -> Void
+    let photoLibrary: PhotoLibraryManager
+    let onPhotoSelected: (PHAsset) -> Void
     
-    @State private var searchText = ""
-    
-    private var filteredImages: [String] {
-        if searchText.isEmpty {
-            return availableImages
-        } else {
-            return availableImages.filter { $0.localizedCaseInsensitiveContains(searchText) }
-        }
-    }
+    private let columns = [
+        GridItem(.adaptive(minimum: 100), spacing: 12)
+    ]
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 100), spacing: 16)
-                ], spacing: 16) {
-                    ForEach(filteredImages, id: \.self) { imageName in
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(photoLibrary.photoAssets, id: \.localIdentifier) { asset in
                         Button {
-                            onImageSelected(imageName)
+                            onPhotoSelected(asset)
                             dismiss()
                         } label: {
-                            VStack(spacing: 8) {
-                                Image(imageName)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(
-                                                currentImageName == imageName ? Color.blue : Color.gray.opacity(0.3),
-                                                lineWidth: currentImageName == imageName ? 3 : 1
-                                            )
-                                    )
-                                    .shadow(radius: 2)
-                                
-                                Text(imageName)
-                                    .font(.caption2)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                                    .foregroundStyle(.primary)
-                            }
-                            .frame(width: 100)
+                            PhotoThumbnailView(
+                                asset: asset,
+                                photoLibrary: photoLibrary
+                            )
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Choose Image")
+            .navigationTitle("Choose Photo")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Search images")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -261,7 +380,40 @@ struct ImagePickerSheet: View {
     }
 }
 
+// MARK: - Photo Thumbnail View
+
+struct PhotoThumbnailView: View {
+    let asset: PHAsset
+    let photoLibrary: PhotoLibraryManager
+    
+    @State private var thumbnail: UIImage?
+    
+    var body: some View {
+        Group {
+            if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.gray.opacity(0.2)
+                    .overlay(
+                        ProgressView()
+                    )
+            }
+        }
+        .frame(width: 100, height: 100)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
+        .task {
+            thumbnail = await photoLibrary.loadThumbnail(for: asset)
+        }
+    }
+}
+
 #Preview {
     RecipeImageAssignmentView()
-        .modelContainer(for: [RecipeImageAssignment.self], inMemory: true)
+        .modelContainer(for: [RecipeImageAssignment.self, Recipe.self], inMemory: true)
 }

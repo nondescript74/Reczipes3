@@ -381,8 +381,8 @@ struct IngredientSectionResponse: Codable {
 }
 
 struct IngredientResponse: Codable {
-    let quantity: String
-    let unit: String
+    let quantity: String?
+    let unit: String?
     let name: String
     let preparation: String?
     let metricQuantity: String?

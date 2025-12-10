@@ -16,17 +16,22 @@ struct ContentView: View {
     @State private var selectedRecipe: RecipeModel?
     @State private var showingImageAssignment = false
     @State private var showingDebug = false
+    @State private var showingRecipeExtractor = false
     
     // Helper to get image name for a recipe
     private func imageName(for recipeID: UUID) -> String? {
         imageAssignments.first { $0.recipeID == recipeID }?.imageName
     }
     
-    // All available recipe models merged from bundled recipes and SwiftData
-    // SwiftData recipes take precedence (user-edited versions)
+    // All available recipe models from SwiftData (Claude API-extracted)
     // Merged with image assignments for real-time updates
     private var availableRecipes: [RecipeModel] {
+        print("🔄 Refreshing available recipes...")
+        print("📊 Saved recipes count: \(savedRecipes.count)")
+        
         let allRecipes = RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
+        print("📊 Available recipes count: \(allRecipes.count)")
+        
         let recipes = allRecipes.map { recipe in
             if let assignedImageName = imageName(for: recipe.id) {
                 print("✅ Found image '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))")
@@ -42,111 +47,12 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedRecipe) {
-                Section {
-                    ForEach(availableRecipes) { recipe in
-                        Button {
-                            selectedRecipe = recipe
-                        } label: {
-                            HStack(spacing: 12) {
-                                // Thumbnail or placeholder
-                                if let imageName = recipe.imageName {
-                                    RecipeImageView(
-                                        imageName: imageName,
-                                        size: CGSize(width: 50, height: 50),
-                                        cornerRadius: 6
-                                    )
-                                } else {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Color.gray.opacity(0.1))
-                                        .frame(width: 50, height: 50)
-                                        .overlay(
-                                            Text("Assign\nImage")
-                                                .font(.caption2)
-                                                .multilineTextAlignment(.center)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(2)
-                                        )
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(recipe.title)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    
-                                    if let headerNotes = recipe.headerNotes {
-                                        Text(headerNotes)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                // Show indicator if recipe has been saved/edited
-                                if isRecipeSaved(recipe) {
-                                    Image(systemName: "pencil.circle.fill")
-                                        .foregroundStyle(.blue)
-                                        .help("Edited & Saved")
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            if isRecipeSaved(recipe) {
-                                Button(role: .destructive) {
-                                    deleteRecipe(recipe)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                        .contextMenu {
-                            if isRecipeSaved(recipe) {
-                                Button(role: .destructive) {
-                                    deleteRecipe(recipe)
-                                } label: {
-                                    Label("Delete Saved Version", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                } header: {
-                    Text("All Recipes (\(availableRecipes.count))")
-                } footer: {
-                    if savedRecipes.isEmpty {
-                        Text("Tap any recipe to view details. Use the save button to keep your changes.")
-                    } else {
-                        Text("\(savedRecipes.count) recipe(s) have been saved with your edits")
-                    }
-                }
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 250, ideal: 300)
-#endif
-            .navigationTitle("Recipes")
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingImageAssignment = true
-                    } label: {
-                        Label("Assign Images", systemImage: "photo.on.rectangle")
-                    }
-                }
-#else
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingImageAssignment = true
-                    } label: {
-                        Label("Assign Images", systemImage: "photo.on.rectangle")
-                    }
-                }
-#endif
-            }
-            .sheet(isPresented: $showingImageAssignment) {
-                RecipeImageAssignmentView()
+            if availableRecipes.isEmpty {
+                // Empty state when no recipes exist
+                emptyStateView
+            } else {
+                // Recipe list when recipes are available
+                recipeListView
             }
         } detail: {
             if let recipe = selectedRecipe {
@@ -164,6 +70,150 @@ struct ContentView: View {
             }
         }
     }
+    
+    // MARK: - Empty State View
+    
+    private var emptyStateView: some View {
+        ContentUnavailableView {
+            Label("No Recipes Yet", systemImage: "book.closed")
+        } description: {
+            Text("Extract recipes from text or images using the Claude API to get started")
+        } actions: {
+            Button {
+                showingRecipeExtractor = true
+            } label: {
+                Label("Extract Recipe", systemImage: "plus.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .navigationTitle("Recipes")
+        .sheet(isPresented: $showingRecipeExtractor) {
+            RecipeExtractorView(apiKey: getAPIKey())
+        }
+    }
+    
+    // MARK: - Recipe List View
+    
+    private var recipeListView: some View {
+        List(selection: $selectedRecipe) {
+            Section {
+                ForEach(availableRecipes) { recipe in
+                    Button {
+                        selectedRecipe = recipe
+                    } label: {
+                        recipeRow(recipe: recipe)
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            deleteRecipe(recipe)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteRecipe(recipe)
+                        } label: {
+                            Label("Delete Recipe", systemImage: "trash")
+                        }
+                    }
+                }
+            } header: {
+                Text("All Recipes (\(availableRecipes.count))")
+            } footer: {
+                Text("\(savedRecipes.count) recipe(s) in your collection")
+            }
+        }
+#if os(macOS)
+        .navigationSplitViewColumnWidth(min: 250, ideal: 300)
+#endif
+        .navigationTitle("Recipes")
+        .toolbar {
+#if os(iOS)
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    showingImageAssignment = true
+                } label: {
+                    Label("Assign Images", systemImage: "photo.on.rectangle")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingRecipeExtractor = true
+                } label: {
+                    Label("Extract Recipe", systemImage: "plus.circle")
+                }
+            }
+#else
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingImageAssignment = true
+                } label: {
+                    Label("Assign Images", systemImage: "photo.on.rectangle")
+                }
+            }
+            
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingRecipeExtractor = true
+                } label: {
+                    Label("Extract Recipe", systemImage: "plus.circle")
+                }
+            }
+#endif
+        }
+        .sheet(isPresented: $showingImageAssignment) {
+            RecipeImageAssignmentView()
+        }
+        .sheet(isPresented: $showingRecipeExtractor) {
+            RecipeExtractorView(apiKey: getAPIKey())
+        }
+    }
+    
+    // MARK: - Recipe Row
+    
+    private func recipeRow(recipe: RecipeModel) -> some View {
+        HStack(spacing: 12) {
+            // Thumbnail or placeholder
+            if let imageName = recipe.imageName {
+                RecipeImageView(
+                    imageName: imageName,
+                    size: CGSize(width: 50, height: 50),
+                    cornerRadius: 6
+                )
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Text("Assign\nImage")
+                            .font(.caption2)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    )
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recipe.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                if let headerNotes = recipe.headerNotes {
+                    Text(headerNotes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer()
+        }
+    }
+    
+    // MARK: - Helper Methods
     
     private func isRecipeSaved(_ recipe: RecipeModel) -> Bool {
         RecipeCollection.shared.isRecipeSaved(recipe, savedRecipes: savedRecipes)
@@ -188,6 +238,12 @@ struct ContentView: View {
             let newRecipe = Recipe(from: recipeToSave)
             modelContext.insert(newRecipe)
         }
+    }
+    
+    private func getAPIKey() -> String {
+        // Get API key from keychain, or return empty string
+        // The RecipeExtractorView will handle the case when API key is missing
+        return APIKeyHelper.getAPIKey() ?? ""
     }
 }
 
