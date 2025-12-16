@@ -10,6 +10,7 @@ import SwiftUI
 struct SettingsView: View {
     @State private var showAPIKeyManager = false
     @State private var isAPIKeyConfigured = APIKeyHelper.isConfigured
+    @State private var showLicenseAgreement = false
     
     var body: some View {
         NavigationView {
@@ -38,6 +39,31 @@ struct SettingsView: View {
                            isOn: .constant(RecipeExtractorConfig.defaultUsePreprocessing))
                 }
                 
+                Section("Legal") {
+                    Button {
+                        showLicenseAgreement = true
+                    } label: {
+                        HStack {
+                            Label("View License Agreement", systemImage: "doc.text")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if let acceptanceDate = LicenseHelper.acceptanceDate {
+                        HStack {
+                            Text("Accepted On")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(acceptanceDate, style: .date)
+                                .foregroundColor(.secondary)
+                        }
+                        .font(.caption)
+                    }
+                }
+                
                 Section("About") {
                     HStack {
                         Text("Version")
@@ -57,9 +83,41 @@ struct SettingsView: View {
             }) {
                 APIKeyManagerView()
             }
+            .sheet(isPresented: $showLicenseAgreement) {
+                LicenseDisplayView()
+            }
             .onAppear {
                 // Refresh API key status when view appears
                 isAPIKeyConfigured = APIKeyHelper.isConfigured
+            }
+        }
+    }
+}
+
+// MARK: - License Display View (for viewing only, not for initial acceptance)
+
+struct LicenseDisplayView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(LicenseHelper.licenseText)
+                        .font(.system(.body, design: .default))
+                        .foregroundColor(.primary)
+                        .textSelection(.enabled)
+                }
+                .padding()
+            }
+            .navigationTitle("License Agreement")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
         }
     }

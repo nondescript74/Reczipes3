@@ -5,6 +5,9 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:RecipeEditorView.swift">
+      location = "group:LicenseHelper.swift">
+   </FileRef>
+   <FileRef
+      location = "group:LicenseAgreementView.swift">
    </FileRef>
 </Workspace>

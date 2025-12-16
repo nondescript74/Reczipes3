@@ -24,18 +24,31 @@ struct Reczipes2App: App {
         }
     }()
     
-    @State private var showAPIKeySetup = !APIKeyHelper.isConfigured
+    @State private var showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
+    @State private var showAPIKeySetup = false
 
     var body: some Scene {
         WindowGroup {
             MainTabView()
                 .modelContainer(sharedModelContainer)
+                .fullScreenCover(isPresented: $showLicenseAgreement) {
+                    LicenseAgreementView(isPresented: $showLicenseAgreement)
+                        .onDisappear {
+                            // After license is accepted, check if API key setup is needed
+                            if LicenseHelper.hasAcceptedLicense {
+                                showAPIKeySetup = !APIKeyHelper.isConfigured
+                            }
+                        }
+                }
                 .fullScreenCover(isPresented: $showAPIKeySetup) {
                     APIKeySetupView(isPresented: $showAPIKeySetup)
                 }
                 .onAppear {
-                    // Check API key status on appear
-                    showAPIKeySetup = !APIKeyHelper.isConfigured
+                    // Check license and API key status on appear
+                    showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
+                    if LicenseHelper.hasAcceptedLicense {
+                        showAPIKeySetup = !APIKeyHelper.isConfigured
+                    }
                 }
         }
     }
