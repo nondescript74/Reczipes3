@@ -80,9 +80,7 @@ class ClaudeAPIClient {
                 print("🔍 Response headers: \(httpResponse.allHeaderFields)")
                 
                 // Parse and log the response body for debugging
-                let responseBody: String
                 if let responseString = String(data: data, encoding: .utf8) {
-                    responseBody = responseString
                     print("🔍 Response body (\(responseString.count) chars): \(responseString)")
                     
                     // If it's an error response, parse it nicely
@@ -91,7 +89,6 @@ class ClaudeAPIClient {
                         print("🔍 Parsed error: \(parsedError)")
                     }
                 } else {
-                    responseBody = "Unable to decode response"
                     print("🔍 Unable to decode response body")
                 }
                 

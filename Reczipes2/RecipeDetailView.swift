@@ -17,6 +17,11 @@ struct RecipeDetailView: View {
     @Query private var savedRecipes: [Recipe]
     
     @State private var showingEditor = false
+    @State private var showingRemindersAlert = false
+    @State private var remindersAlertMessage = ""
+    @State private var isExportingToReminders = false
+    
+    private let remindersService = RemindersService()
     
     init(recipe: RecipeModel, 
          isSaved: Bool, 
@@ -274,8 +279,24 @@ struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .toolbar {
+            // Export to Reminders button
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task {
+                        await exportIngredientsToReminders()
+                    }
+                } label: {
+                    if isExportingToReminders {
+                        ProgressView()
+                    } else {
+                        Label("Add to Reminders", systemImage: "list.bullet.clipboard")
+                    }
+                }
+                .disabled(isExportingToReminders)
+            }
+            
             if isSaved {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .secondaryAction) {
                     Button {
                         showingEditor = true
                     } label: {
@@ -289,6 +310,35 @@ struct RecipeDetailView: View {
                 RecipeEditorView(recipe: savedRecipe)
             }
         }
+        .alert("Reminders", isPresented: $showingRemindersAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(remindersAlertMessage)
+        }
+    }
+    
+    // MARK: - Export to Reminders
+    
+    private func exportIngredientsToReminders() async {
+        isExportingToReminders = true
+        
+        do {
+            try await remindersService.addIngredientsToReminders(recipe: recipe)
+            
+            // Count total ingredients
+            let totalIngredients = recipe.ingredientSections.reduce(0) { $0 + $1.ingredients.count }
+            
+            remindersAlertMessage = "Successfully added \(totalIngredients) ingredient\(totalIngredients == 1 ? "" : "s") to your Reminders app in a list called '\(recipe.title)'."
+            showingRemindersAlert = true
+        } catch RemindersError.permissionDenied {
+            remindersAlertMessage = "Permission to access Reminders was denied. Please enable it in Settings > Privacy & Security > Reminders to use this feature."
+            showingRemindersAlert = true
+        } catch {
+            remindersAlertMessage = "Failed to add ingredients to Reminders: \(error.localizedDescription)"
+            showingRemindersAlert = true
+        }
+        
+        isExportingToReminders = false
     }
     
     private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
