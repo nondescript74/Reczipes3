@@ -13,6 +13,17 @@ class ClaudeAPIClient {
     private let baseURL = "https://api.anthropic.com/v1/messages"
     private let imagePreprocessor = ImagePreprocessor()
     
+    // Model fallback list - try these in order for validation
+    private let validationModels = [
+        "claude-sonnet-4-20250514",      // Latest Sonnet 4 (primary)
+        "claude-3-7-sonnet-20250219",    // Sonnet 3.7
+        "claude-3-5-sonnet-20241022",    // Sonnet 3.5 (Oct 2024)
+        "claude-3-5-sonnet-20240620"     // Sonnet 3.5 (June 2024)
+    ]
+    
+    // Primary model for recipe extraction
+    private let recipeExtractionModel = "claude-sonnet-4-20250514"
+    
     init(apiKey: String) {
         self.apiKey = apiKey
     }
@@ -20,64 +31,101 @@ class ClaudeAPIClient {
     /// Validate the API key by making a minimal test request to Anthropic
     /// - Returns: true if the API key is valid, false otherwise
     func validateAPIKey() async -> Bool {
-        print("🔍 Validating API key...")
+        print("🔍 ========== API KEY VALIDATION START ==========")
+        print("🔍 API key length: \(apiKey.count) characters")
         print("🔍 API key prefix: \(String(apiKey.prefix(15)))...")
+        print("🔍 API key suffix: ...\(String(apiKey.suffix(10)))")
         
-        let testPrompt = "Hello"
+        let testPrompt = "Hi"
         
-        // Use a stable model that's definitely available for validation
-        let requestBody: [String: Any] = [
-            "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 10,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": testPrompt
+        // Try each model in the fallback list
+        for (index, model) in validationModels.enumerated() {
+            print("🔍 Attempt \(index + 1)/\(validationModels.count): Trying model '\(model)'...")
+            
+            let requestBody: [String: Any] = [
+                "model": model,
+                "max_tokens": 10,
+                "messages": [
+                    [
+                        "role": "user",
+                        "content": testPrompt
+                    ]
                 ]
             ]
-        ]
-        
-        guard let url = URL(string: baseURL) else {
-            print("❌ Invalid URL")
-            return false
+            
+            guard let url = URL(string: baseURL) else {
+                print("❌ Invalid URL: \(baseURL)")
+                continue
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            request.setValue("application/json", forHTTPHeaderField: "content-type")
+            
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+                print("🔍 Request body size: \(request.httpBody?.count ?? 0) bytes")
+                print("🔍 Sending validation request to: \(baseURL)")
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("❌ Invalid response type (not HTTPURLResponse)")
+                    continue
+                }
+                
+                print("🔍 Response status code: \(httpResponse.statusCode)")
+                print("🔍 Response headers: \(httpResponse.allHeaderFields)")
+                
+                // Parse and log the response body for debugging
+                let responseBody: String
+                if let responseString = String(data: data, encoding: .utf8) {
+                    responseBody = responseString
+                    print("🔍 Response body (\(responseString.count) chars): \(responseString)")
+                    
+                    // If it's an error response, parse it nicely
+                    if httpResponse.statusCode != 200 {
+                        let parsedError = parseAPIError(from: data)
+                        print("🔍 Parsed error: \(parsedError)")
+                    }
+                } else {
+                    responseBody = "Unable to decode response"
+                    print("🔍 Unable to decode response body")
+                }
+                
+                // Status code 200 means the API key is valid
+                if httpResponse.statusCode == 200 {
+                    print("✅ API key is VALID! Successfully validated with model: \(model)")
+                    print("🔍 ========== API KEY VALIDATION SUCCESS ==========")
+                    return true
+                } else if httpResponse.statusCode == 404 {
+                    // Model not found, try next one
+                    print("⚠️ Model '\(model)' not found (404), trying next model...")
+                    continue
+                } else if httpResponse.statusCode == 401 {
+                    // Unauthorized - bad API key
+                    print("❌ API key is INVALID (401 Unauthorized)")
+                    print("🔍 ========== API KEY VALIDATION FAILED ==========")
+                    return false
+                } else {
+                    // Other error, try next model
+                    print("⚠️ Validation failed with status \(httpResponse.statusCode), trying next model...")
+                    continue
+                }
+            } catch {
+                print("❌ Validation error with model '\(model)': \(error.localizedDescription)")
+                print("❌ Full error: \(error)")
+                // Try next model
+                continue
+            }
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-            print("🔍 Sending validation request to Anthropic...")
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ Invalid response type")
-                return false
-            }
-            
-            print("🔍 Response status code: \(httpResponse.statusCode)")
-            
-            // Log the response body for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("🔍 Response body: \(responseString)")
-            }
-            
-            // Status code 200 means the API key is valid
-            if httpResponse.statusCode == 200 {
-                print("✅ API key is valid!")
-                return true
-            } else {
-                print("❌ API key validation failed with status: \(httpResponse.statusCode)")
-                return false
-            }
-        } catch {
-            print("❌ Validation error: \(error.localizedDescription)")
-            return false
-        }
+        // If we got here, none of the models worked
+        print("❌ All validation attempts failed. No models were successful.")
+        print("🔍 ========== API KEY VALIDATION FAILED ==========")
+        return false
     }
     
     /// Extract a recipe from an image using Claude's vision capabilities
@@ -180,8 +228,9 @@ class ClaudeAPIClient {
         """
         
         print("📸 Building API request...")
+        print("📸 Using model: \(recipeExtractionModel)")
         let requestBody: [String: Any] = [
-            "model": "claude-sonnet-4-20250514",
+            "model": recipeExtractionModel,
             "max_tokens": 8192,
             "system": systemPrompt,
             "messages": [
@@ -244,9 +293,26 @@ class ClaudeAPIClient {
         print("📸 Response Headers: \(httpResponse.allHeaderFields)")
         
         guard httpResponse.statusCode == 200 else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            let errorMessage = parseAPIError(from: data)
             print("📸 ❌ API Error Response: \(errorMessage)")
-            throw ClaudeAPIError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            print("📸 ❌ Status Code: \(httpResponse.statusCode)")
+            
+            // Provide more detailed error messages based on status code
+            let detailedMessage: String
+            switch httpResponse.statusCode {
+            case 401:
+                detailedMessage = "Authentication failed. Please check your API key."
+            case 404:
+                detailedMessage = "Model '\(recipeExtractionModel)' not found. It may have been deprecated."
+            case 429:
+                detailedMessage = "Rate limit exceeded. Please try again later."
+            case 500...599:
+                detailedMessage = "Anthropic server error. Please try again later."
+            default:
+                detailedMessage = errorMessage
+            }
+            
+            throw ClaudeAPIError.apiError(statusCode: httpResponse.statusCode, message: detailedMessage)
         }
         
         print("📸 Decoding Claude response...")
@@ -326,6 +392,21 @@ class ClaudeAPIClient {
         }
         
         return cleaned
+    }
+    
+    /// Parse Anthropic API error response for better debugging
+    private func parseAPIError(from data: Data) -> String {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return String(data: data, encoding: .utf8) ?? "Unable to parse error"
+        }
+        
+        if let error = json["error"] as? [String: Any] {
+            let type = error["type"] as? String ?? "unknown"
+            let message = error["message"] as? String ?? "No message"
+            return "[\(type)] \(message)"
+        }
+        
+        return String(data: data, encoding: .utf8) ?? "Unable to parse error"
     }
 }
 

@@ -16,12 +16,13 @@ struct APIKeyManagerView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isValidating = false
+    @State private var isAPIKeyConfigured = APIKeyHelper.isConfigured
     
     var body: some View {
         NavigationView {
             Form {
                 Section {
-                    if APIKeyHelper.isConfigured {
+                    if isAPIKeyConfigured {
                         HStack {
                             Text("Status")
                             Spacer()
@@ -94,6 +95,10 @@ struct APIKeyManagerView: View {
                     }
                 }
             }
+            .onAppear {
+                // Refresh the API key status when the view appears
+                isAPIKeyConfigured = APIKeyHelper.isConfigured
+            }
         }
     }
     
@@ -147,6 +152,7 @@ struct APIKeyManagerView: View {
             if APIKeyHelper.setAPIKey(cleanedKey) {
                 print("🔑 API key saved successfully!")
                 showSuccess = true
+                isAPIKeyConfigured = true
                 newAPIKey = ""
                 
                 // Dismiss after showing success
@@ -170,7 +176,8 @@ struct APIKeyManagerView: View {
     
     private func removeAPIKey() {
         _ = KeychainManager.shared.delete(key: "claudeAPIKey")
-        dismiss()
+        isAPIKeyConfigured = false
+        // Don't dismiss immediately - let user see the updated state
     }
 }
 

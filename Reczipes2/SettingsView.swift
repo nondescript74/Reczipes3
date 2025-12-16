@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @State private var showAPIKeyManager = false
+    @State private var isAPIKeyConfigured = APIKeyHelper.isConfigured
     
     var body: some View {
         NavigationView {
@@ -17,7 +18,7 @@ struct SettingsView: View {
                     HStack {
                         Text("API Key Status")
                         Spacer()
-                        if APIKeyHelper.isConfigured {
+                        if isAPIKeyConfigured {
                             Label("Configured", systemImage: "checkmark.circle.fill")
                                 .foregroundColor(.green)
                         } else {
@@ -50,8 +51,15 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .fullScreenCover(isPresented: $showAPIKeyManager) {
+            .fullScreenCover(isPresented: $showAPIKeyManager, onDismiss: {
+                // Refresh API key status when manager is dismissed
+                isAPIKeyConfigured = APIKeyHelper.isConfigured
+            }) {
                 APIKeyManagerView()
+            }
+            .onAppear {
+                // Refresh API key status when view appears
+                isAPIKeyConfigured = APIKeyHelper.isConfigured
             }
         }
     }

@@ -70,9 +70,15 @@ struct MainTabView: View {
 // MARK: - Recipe Extractor Tab Wrapper
 
 struct RecipeExtractorTabWrapper: View {
+    @State private var isAPIKeyConfigured = APIKeyHelper.isConfigured
+    
     var body: some View {
-        if let apiKey = APIKeyHelper.getAPIKey() {
+        if isAPIKeyConfigured, let apiKey = APIKeyHelper.getAPIKey() {
             RecipeExtractorView(apiKey: apiKey)
+                .onAppear {
+                    // Refresh API key status when tab appears
+                    isAPIKeyConfigured = APIKeyHelper.isConfigured
+                }
         } else {
             // Show a helpful message when API key isn't configured
             NavigationView {
@@ -105,6 +111,10 @@ struct RecipeExtractorTabWrapper: View {
                 }
                 .padding()
                 .navigationTitle("Extract Recipe")
+                .onAppear {
+                    // Refresh API key status when tab appears
+                    isAPIKeyConfigured = APIKeyHelper.isConfigured
+                }
             }
         }
     }
