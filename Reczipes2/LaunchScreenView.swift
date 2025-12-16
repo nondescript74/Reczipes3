@@ -31,7 +31,7 @@ struct LaunchScreenView: View {
                 // Replace "launch_recipe_image" with your actual asset name
                 Image("launch_recipe_image")
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
                     .opacity(imageOpacity)
@@ -50,10 +50,10 @@ struct LaunchScreenView: View {
                     Spacer()
                     
                     Text("Reczipes")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+//                        .font(Font.system(size: 34, weight: .bold, design: .rounded))
+//                        .foregroundColor(.white)
                         .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-                        .opacity(1 - wipeProgress * 0.7) // Gradually fade as wipe progresses
+//                        .opacity(1 - wipeProgress * 0.7)
                     
                     Spacer()
                 }
