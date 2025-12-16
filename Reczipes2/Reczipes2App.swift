@@ -24,32 +24,51 @@ struct Reczipes2App: App {
         }
     }()
     
+    @State private var showLaunchScreen = true
     @State private var showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
     @State private var showAPIKeySetup = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
-            MainTabView()
-                .modelContainer(sharedModelContainer)
-                .fullScreenCover(isPresented: $showLicenseAgreement) {
-                    LicenseAgreementView(isPresented: $showLicenseAgreement)
-                        .onDisappear {
-                            // After license is accepted, check if API key setup is needed
-                            if LicenseHelper.hasAcceptedLicense {
-                                showAPIKeySetup = !APIKeyHelper.isConfigured
+            ZStack {
+                MainTabView()
+                    .modelContainer(sharedModelContainer)
+                    .fullScreenCover(isPresented: $showLicenseAgreement) {
+                        LicenseAgreementView(isPresented: $showLicenseAgreement)
+                            .onDisappear {
+                                // After license is accepted, check if API key setup is needed
+                                if LicenseHelper.hasAcceptedLicense {
+                                    showAPIKeySetup = !APIKeyHelper.isConfigured
+                                }
                             }
-                        }
-                }
-                .fullScreenCover(isPresented: $showAPIKeySetup) {
-                    APIKeySetupView(isPresented: $showAPIKeySetup)
-                }
-                .onAppear {
-                    // Check license and API key status on appear
-                    showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
-                    if LicenseHelper.hasAcceptedLicense {
-                        showAPIKeySetup = !APIKeyHelper.isConfigured
                     }
+                    .fullScreenCover(isPresented: $showAPIKeySetup) {
+                        APIKeySetupView(isPresented: $showAPIKeySetup)
+                    }
+                    .onAppear {
+                        // Check license and API key status on appear
+                        showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
+                        if LicenseHelper.hasAcceptedLicense {
+                            showAPIKeySetup = !APIKeyHelper.isConfigured
+                        }
+                    }
+                
+                // Launch screen overlay - only shows on initial launch
+                if showLaunchScreen {
+                    LaunchScreenView {
+                        showLaunchScreen = false
+                    }
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
+            }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                // Don't show launch screen when returning from background
+                if newPhase == .active && oldPhase == .background {
+                    showLaunchScreen = false
+                }
+            }
         }
     }
 }
