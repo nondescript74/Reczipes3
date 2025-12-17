@@ -279,8 +279,13 @@ struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .toolbar {
-            // Export to Reminders button
+            // Share button
             ToolbarItem(placement: .primaryAction) {
+                RecipeShareButton(recipe: recipe)
+            }
+            
+            // Export to Reminders button
+            ToolbarItem(placement: .secondaryAction) {
                 Button {
                     Task {
                         await exportIngredientsToReminders()
