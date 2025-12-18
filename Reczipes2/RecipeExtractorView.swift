@@ -15,8 +15,17 @@ struct RecipeExtractorView: View {
     @State private var showCamera = false
     @State private var showImageComparison = false
     @State private var showingSaveConfirmation = false
+    @State private var showURLInput = false
+    @State private var extractionSource: ExtractionSource = .none
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    
+    enum ExtractionSource {
+        case none
+        case camera
+        case library
+        case url
+    }
     
     init(apiKey: String) {
         _viewModel = StateObject(wrappedValue: RecipeExtractorViewModel(apiKey: apiKey))
@@ -26,16 +35,21 @@ struct RecipeExtractorView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Image Selection Section
-                    imageSelectionSection
+                    // Source Selection Section
+                    sourceSelectionSection
                     
-                    // Preprocessing Toggle
-                    if viewModel.selectedImage != nil {
+                    // URL Input (if URL source selected)
+                    if extractionSource == .url {
+                        urlInputSection
+                    }
+                    
+                    // Preprocessing Toggle (only for images)
+                    if viewModel.selectedImage != nil && extractionSource != .url {
                         preprocessingToggle
                     }
                     
                     // Image Preview
-                    if let image = viewModel.selectedImage {
+                    if let image = viewModel.selectedImage, extractionSource != .url {
                         imagePreviewSection(image: image)
                     }
                     
@@ -92,6 +106,7 @@ struct RecipeExtractorView: View {
                 }
                 Button("Extract Another") {
                     viewModel.reset()
+                    extractionSource = .none
                 }
             } message: {
                 if let recipe = viewModel.extractedRecipe {
@@ -127,42 +142,83 @@ struct RecipeExtractorView: View {
     
     // MARK: - View Components
     
-    private var imageSelectionSection: some View {
+    private var sourceSelectionSection: some View {
         VStack(spacing: 16) {
-            Text("Select a recipe image to extract")
+            Text("Choose how to extract your recipe")
                 .font(.headline)
                 .multilineTextAlignment(.center)
             
-            HStack(spacing: 20) {
-                Button {
-                    showCamera = true
-                } label: {
-                    VStack {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 40))
-                        Text("Camera")
-                            .font(.caption)
+            VStack(spacing: 16) {
+                // Row 1: Camera and Library
+                HStack(spacing: 20) {
+                    Button {
+                        extractionSource = .camera
+                        showCamera = true
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 40))
+                            Text("Camera")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(extractionSource == .camera ? Color.blue.opacity(0.2) : Color.blue.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(extractionSource == .camera ? Color.blue : Color.clear, lineWidth: 2)
+                        )
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(12)
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        extractionSource = .library
+                        showImagePicker = true
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 40))
+                            Text("Library")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(extractionSource == .library ? Color.blue.opacity(0.2) : Color.blue.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(extractionSource == .library ? Color.blue : Color.clear, lineWidth: 2)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
                 
+                // Row 2: Web URL (full width)
                 Button {
-                    showImagePicker = true
+                    extractionSource = .url
+                    showURLInput = true
                 } label: {
-                    VStack {
-                        Image(systemName: "photo.on.rectangle")
+                    VStack(spacing: 8) {
+                        Image(systemName: "globe")
                             .font(.system(size: 40))
-                        Text("Library")
+                        Text("Web URL")
                             .font(.caption)
+                            .fontWeight(.medium)
+                        Text("Extract from a recipe website")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue.opacity(0.1))
+                    .background(extractionSource == .url ? Color.blue.opacity(0.2) : Color.blue.opacity(0.1))
                     .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(extractionSource == .url ? Color.blue : Color.clear, lineWidth: 2)
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -171,6 +227,45 @@ struct RecipeExtractorView: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(radius: 2)
+    }
+    
+    private var urlInputSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Enter Recipe URL")
+                .font(.headline)
+            
+            TextField("https://example.com/recipe", text: $viewModel.recipeURL)
+                .textFieldStyle(.roundedBorder)
+                .autocapitalization(.none)
+                .keyboardType(.URL)
+                .textContentType(.URL)
+            
+            Button {
+                Task {
+                    await viewModel.extractRecipe(from: viewModel.recipeURL)
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.down.circle.fill")
+                    Text("Extract Recipe from URL")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(viewModel.recipeURL.isEmpty ? Color.gray.opacity(0.3) : Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            .disabled(viewModel.recipeURL.isEmpty || viewModel.isLoading)
+            .buttonStyle(.plain)
+            
+            Text("Enter the full URL of a recipe webpage. The app will fetch and analyze the page to extract the recipe.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 1)
     }
     
     private var preprocessingToggle: some View {
@@ -219,11 +314,19 @@ struct RecipeExtractorView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
-            Text("Claude is analyzing your recipe...")
-                .font(.headline)
-            Text("This may take a few moments")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            if extractionSource == .url {
+                Text("Claude is analyzing the webpage...")
+                    .font(.headline)
+                Text("This may take a few moments")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("Claude is analyzing your recipe...")
+                    .font(.headline)
+                Text("This may take a few moments")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(32)
@@ -244,7 +347,11 @@ struct RecipeExtractorView: View {
                 .font(.body)
             
             Button("Try Again") {
-                if let image = viewModel.selectedImage {
+                if extractionSource == .url, !viewModel.recipeURL.isEmpty {
+                    Task {
+                        await viewModel.extractRecipe(from: viewModel.recipeURL)
+                    }
+                } else if let image = viewModel.selectedImage {
                     Task {
                         await viewModel.extractRecipe(from: image)
                     }

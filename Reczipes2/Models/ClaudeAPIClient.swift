@@ -128,6 +128,204 @@ class ClaudeAPIClient {
         return false
     }
     
+    /// Extract a recipe from web content using Claude's text capabilities
+    /// - Parameter htmlContent: The HTML or text content containing the recipe
+    /// - Returns: A RecipeModel parsed from the content
+    func extractRecipe(from htmlContent: String) async throws -> RecipeModel {
+        print("🌐 ========== WEB RECIPE EXTRACTION START ==========")
+        print("🌐 Content length: \(htmlContent.count) characters")
+        
+        let systemPrompt = """
+        You are an expert at extracting recipes from web pages and text content. 
+        Your task is to carefully analyze the HTML/text and extract ALL recipe information into a structured JSON format.
+        
+        PRIORITY: Look for JSON-LD structured data (application/ld+json) which may appear in sections marked "STRUCTURED RECIPE DATA".
+        This data is the authoritative source and should be used if available. It follows schema.org Recipe format.
+        
+        Pay special attention to:
+        - Recipe title and description
+        - Multiple ingredient sections (e.g., "For the dough", "For the filling")
+        - Multiple instruction sections (e.g., "Preparation", "Assembly", "Baking")
+        - Measurements in both imperial and metric units when available
+        - Preparation notes within ingredients (e.g., "finely chopped", "at room temperature")
+        - Recipe notes, tips, warnings, and variations
+        - Transition notes between sections
+        - Header notes or descriptions
+        - Yield/servings information
+        - Recipe source or author information
+        - Cook time, prep time, and total time information
+        
+        Web pages often have extra navigation, ads, and unrelated content. Focus ONLY on the recipe content.
+        If JSON-LD structured data is present, use it as your primary source. Otherwise, parse the HTML.
+        
+        CRITICAL: Return ONLY valid JSON with no markdown formatting, no preamble, and no explanation.
+        """
+        
+        let userPrompt = """
+        Extract the recipe from this web content and structure it according to this exact JSON schema:
+        
+        {
+          "title": "Recipe Title",
+          "headerNotes": "Optional description or subtitle (can include prep time, cook time, etc.)",
+          "yield": "Servings or yield information",
+          "ingredientSections": [
+            {
+              "title": "Optional section title (e.g., 'For the sauce')",
+              "ingredients": [
+                {
+                  "quantity": "1",
+                  "unit": "cup",
+                  "name": "flour",
+                  "preparation": "sifted",
+                  "metricQuantity": "250",
+                  "metricUnit": "mL"
+                }
+              ],
+              "transitionNote": "Optional note between sections"
+            }
+          ],
+          "instructionSections": [
+            {
+              "title": "Optional section title (e.g., 'Preparation')",
+              "steps": [
+                {
+                  "stepNumber": 1,
+                  "text": "Step instruction text"
+                }
+              ]
+            }
+          ],
+          "notes": [
+            {
+              "type": "tip",
+              "text": "Note text"
+            }
+          ],
+          "reference": "Optional reference like website URL or author"
+        }
+        
+        IMPORTANT INSTRUCTIONS:
+        - If you see JSON-LD structured data (marked with "STRUCTURED RECIPE DATA"), use that as your PRIMARY source
+        - JSON-LD data follows schema.org Recipe format with recipeIngredient, recipeInstructions, etc.
+        - Note types can be: "tip", "substitution", "warning", "timing", or "general"
+        - If the recipe has no section titles, leave "title" as null
+        - If step numbers aren't visible, leave "stepNumber" as null
+        - Include metric conversions when they're present in the original
+        - Extract ALL ingredients and instructions - don't truncate or summarize
+        - Extract ALL text including notes, variations, and tips
+        
+        Here's the web content:
+        
+        \(htmlContent)
+        """
+        
+        print("🌐 Building API request...")
+        print("🌐 Using model: \(recipeExtractionModel)")
+        let requestBody: [String: Any] = [
+            "model": recipeExtractionModel,
+            "max_tokens": 8192,
+            "system": systemPrompt,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": userPrompt
+                ]
+            ]
+        ]
+        
+        guard let url = URL(string: baseURL) else {
+            print("🌐 ❌ Invalid base URL: \(baseURL)")
+            throw ClaudeAPIError.invalidResponse
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.timeoutInterval = 120 // 2 minutes for processing
+        
+        print("🌐 Serializing request body...")
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+            print("🌐 ✅ Request body size: \(request.httpBody?.count ?? 0) bytes")
+        } catch {
+            print("🌐 ❌ Failed to serialize request body: \(error)")
+            throw ClaudeAPIError.invalidJSON
+        }
+        
+        print("🌐 Sending request to Anthropic...")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        print("🌐 ✅ Received response")
+        print("🌐 Response data size: \(data.count) bytes")
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("🌐 ❌ Response is not HTTPURLResponse")
+            throw ClaudeAPIError.invalidResponse
+        }
+        
+        print("🌐 HTTP Status Code: \(httpResponse.statusCode)")
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = parseAPIError(from: data)
+            print("🌐 ❌ API Error Response: \(errorMessage)")
+            
+            let detailedMessage: String
+            switch httpResponse.statusCode {
+            case 401:
+                detailedMessage = "Authentication failed. Please check your API key."
+            case 404:
+                detailedMessage = "Model '\(recipeExtractionModel)' not found. It may have been deprecated."
+            case 429:
+                detailedMessage = "Rate limit exceeded. Please try again later."
+            case 500...599:
+                detailedMessage = "Anthropic server error. Please try again later."
+            default:
+                detailedMessage = errorMessage
+            }
+            
+            throw ClaudeAPIError.apiError(statusCode: httpResponse.statusCode, message: detailedMessage)
+        }
+        
+        print("🌐 Decoding Claude response...")
+        let claudeResponse = try JSONDecoder().decode(ClaudeResponse.self, from: data)
+        print("🌐 ✅ Successfully decoded Claude response")
+        
+        // Extract JSON from Claude's response
+        print("🌐 Extracting recipe JSON from response...")
+        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
+            print("🌐 ❌ No text content found in response")
+            throw ClaudeAPIError.noRecipeFound
+        }
+        
+        print("🌐 Raw text content length: \(textContent.text.count) characters")
+        
+        guard let jsonString = extractJSON(from: textContent.text) else {
+            print("🌐 ❌ Failed to extract JSON from text")
+            throw ClaudeAPIError.noRecipeFound
+        }
+        
+        print("🌐 ✅ Extracted JSON string length: \(jsonString.count) characters")
+        
+        // Parse the recipe JSON
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            print("🌐 ❌ Failed to convert JSON string to Data")
+            throw ClaudeAPIError.invalidJSON
+        }
+        
+        print("🌐 Parsing recipe JSON...")
+        let recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
+        print("🌐 ✅ Successfully parsed recipe")
+        print("🌐 Recipe title: \(recipeResponse.title)")
+        
+        let recipeModel = recipeResponse.toRecipeModel()
+        print("🌐 ✅ Web recipe extraction complete!")
+        print("🌐 ========== WEB RECIPE EXTRACTION END ==========")
+        
+        return recipeModel
+    }
+    
     /// Extract a recipe from an image using Claude's vision capabilities
     /// - Parameters:
     ///   - image: The UIImage containing the recipe

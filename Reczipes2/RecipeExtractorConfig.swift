@@ -205,31 +205,3 @@ class APIKeyHelper {
         return true
     }
 }
-
-// MARK: - Example Usage
-
-/*
- 
- // In your app initialization or settings view:
- 
- // First-time setup (e.g., onboarding screen)
- if APIKeyHelper.setAPIKey("sk-ant-api03-...") {
-     print("API key saved successfully")
- }
- 
- // When creating the extractor view
- guard let apiKey = APIKeyHelper.getAPIKey() else {
-     // Show API key setup screen
-     return
- }
- 
- let extractorView = RecipeExtractorView(apiKey: apiKey)
- 
- // Check if configured
- if APIKeyHelper.isConfigured {
-     // Show recipe extractor
- } else {
-     // Show API key setup screen
- }
- 
- */

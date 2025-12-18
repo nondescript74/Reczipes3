@@ -19,12 +19,68 @@ class RecipeExtractorViewModel: ObservableObject {
     @Published var selectedImage: UIImage?
     @Published var processedImage: UIImage?
     @Published var usePreprocessing = true
+    @Published var recipeURL: String = ""
     
     private let apiClient: ClaudeAPIClient
     private let imagePreprocessor = ImagePreprocessor()
+    private let webExtractor = WebRecipeExtractor()
     
     init(apiKey: String) {
         self.apiClient = ClaudeAPIClient(apiKey: apiKey)
+    }
+    
+    /// Extract recipe from a web URL
+    func extractRecipe(from url: String) async {
+        isLoading = true
+        errorMessage = nil
+        extractedRecipe = nil
+        selectedImage = nil // Clear image when extracting from URL
+        processedImage = nil
+        
+        do {
+            // Fetch web content
+            let htmlContent = try await webExtractor.fetchWebContent(from: url)
+            
+            // Clean the HTML
+            let cleanedContent = webExtractor.cleanHTML(htmlContent)
+            
+            // Limit content size to avoid token limits (approximately 100k characters)
+            let contentToSend: String
+            if cleanedContent.count > 100_000 {
+                print("⚠️ Content too large, truncating to 100k characters")
+                contentToSend = String(cleanedContent.prefix(100_000))
+            } else {
+                contentToSend = cleanedContent
+            }
+            
+            // Extract recipe using Claude
+            var recipe = try await apiClient.extractRecipe(from: contentToSend)
+            
+            // Add the source URL to the reference field
+            if recipe.reference == nil || recipe.reference?.isEmpty == true {
+                recipe = RecipeModel(
+                    id: recipe.id,
+                    title: recipe.title,
+                    headerNotes: recipe.headerNotes,
+                    yield: recipe.yield,
+                    ingredientSections: recipe.ingredientSections,
+                    instructionSections: recipe.instructionSections,
+                    notes: recipe.notes,
+                    reference: url,
+                    imageName: recipe.imageName
+                )
+            }
+            
+            self.extractedRecipe = recipe
+        } catch let error as WebExtractionError {
+            self.errorMessage = error.errorDescription
+        } catch let error as ClaudeAPIError {
+            self.errorMessage = error.errorDescription
+        } catch {
+            self.errorMessage = "Unexpected error: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
     }
     
     /// Extract recipe from the selected image
@@ -70,6 +126,7 @@ class RecipeExtractorViewModel: ObservableObject {
         processedImage = nil
         errorMessage = nil
         isLoading = false
+        recipeURL = ""
     }
     
     /// Toggle preprocessing and re-extract if image is available
