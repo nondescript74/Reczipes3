@@ -14,6 +14,7 @@ struct Reczipes2App: App {
         let schema = Schema([
             Recipe.self,
             RecipeImageAssignment.self,
+            UserAllergenProfile.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

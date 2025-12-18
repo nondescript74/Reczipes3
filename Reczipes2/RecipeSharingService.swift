@@ -6,8 +6,8 @@
 //
 
 import SwiftUI
-import MessageUI
 #if os(iOS)
+import MessageUI
 import UIKit
 #endif
 import Combine

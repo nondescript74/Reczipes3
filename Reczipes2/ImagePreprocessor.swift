@@ -5,7 +5,9 @@
 //  Created for Claude-powered recipe extraction
 //
 
+#if os(iOS)
 import UIKit
+#endif
 import CoreImage
 import CoreImage.CIFilterBuiltins
 

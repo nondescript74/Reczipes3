@@ -131,3 +131,4 @@ struct RecipeNote: Codable, Identifiable, Hashable {
         case general
     }
 }
+

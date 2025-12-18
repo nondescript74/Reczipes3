@@ -15,11 +15,13 @@ struct RecipeDetailView: View {
     let previewImage: UIImage? // Optional image for unsaved recipes being previewed
     
     @Query private var savedRecipes: [Recipe]
+    @Query private var allergenProfiles: [UserAllergenProfile]
     
     @State private var showingEditor = false
     @State private var showingRemindersAlert = false
     @State private var remindersAlertMessage = ""
     @State private var isExportingToReminders = false
+    @State private var showingAllergenDetail = false
     
     private let remindersService = RemindersService()
     
@@ -36,6 +38,17 @@ struct RecipeDetailView: View {
     // Get the saved Recipe entity for editing
     private var savedRecipe: Recipe? {
         savedRecipes.first { $0.id == recipe.id }
+    }
+    
+    // Active allergen profile
+    private var activeProfile: UserAllergenProfile? {
+        allergenProfiles.first { $0.isActive }
+    }
+    
+    // Allergen score for this recipe
+    private var allergenScore: RecipeAllergenScore? {
+        guard let profile = activeProfile else { return nil }
+        return AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
     }
     
     var body: some View {
@@ -112,6 +125,45 @@ struct RecipeDetailView: View {
                 .padding(.bottom, 8)
                 
                 Divider()
+                
+                // Allergen Information Section (if profile is active)
+                if let score = allergenScore, let profile = activeProfile {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Label("Allergen Analysis", systemImage: "allergens")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Spacer()
+                            
+                            RecipeAllergenBadge(score: score)
+                        }
+                        
+                        Text("Based on \(profile.name)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        if !score.isSafe {
+                            Button {
+                                showingAllergenDetail = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "info.circle.fill")
+                                    Text("View Detailed Analysis")
+                                }
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.orange.opacity(0.1))
+                                .foregroundStyle(.orange)
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                }
                 
                 // Ingredients Section
                 VStack(alignment: .leading, spacing: 16) {
@@ -313,6 +365,11 @@ struct RecipeDetailView: View {
         .sheet(isPresented: $showingEditor) {
             if let savedRecipe = savedRecipe {
                 RecipeEditorView(recipe: savedRecipe)
+            }
+        }
+        .sheet(isPresented: $showingAllergenDetail) {
+            if let score = allergenScore {
+                RecipeAllergenDetailView(recipe: recipe, score: score)
             }
         }
         .alert("Reminders", isPresented: $showingRemindersAlert) {
