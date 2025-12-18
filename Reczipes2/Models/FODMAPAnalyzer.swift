@@ -38,6 +38,19 @@ enum FODMAPCategory: String, Codable, CaseIterable {
         case .polyols: return "🍎"          // Apples
         }
     }
+    
+    var examples: [String] {
+        switch self {
+        case .oligosaccharides:
+            return ["Onions", "Garlic", "Wheat", "Legumes", "Cashews"]
+        case .disaccharides:
+            return ["Milk", "Yogurt", "Soft Cheese", "Ice Cream"]
+        case .monosaccharides:
+            return ["Honey", "Apples", "Pears", "Mangoes"]
+        case .polyols:
+            return ["Mushrooms", "Cauliflower", "Stone Fruits", "Sugar Alcohols"]
+        }
+    }
 }
 
 /// FODMAP level classifications
@@ -529,21 +542,3 @@ extension AllergenAnalyzer {
         )
     }
 }
-
-//// MARK: - RecipeModel Protocol (placeholder)
-//// Note: Replace with your actual RecipeModel
-//
-//protocol RecipeModel {
-//    var id: UUID { get }
-//    var title: String { get }
-//    var ingredientSections: [IngredientSection] { get }
-//}
-//
-//protocol IngredientSection {
-//    var ingredients: [Ingredient] { get }
-//}
-//
-//protocol Ingredient {
-//    var name: String { get }
-//    var preparation: String? { get }
-//}

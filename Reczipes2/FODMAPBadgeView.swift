@@ -1,12 +1,207 @@
 //
-//  FODMAPAnalysisView.swift
+//  FODMAPBadgeView.swift
 //  Reczipes2
 //
-//  Comprehensive FODMAP analysis display with Monash University data
-//  Created on 12/17/25.
+//  Badge components for displaying FODMAP scores on recipes
+//  Created on 12/18/25.
 //
 
 import SwiftUI
+
+// MARK: - FODMAP Badge View (Compact - for Recipe List)
+
+struct FODMAPBadgeView: View {
+    let recommendation: FODMAPRecommendation
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: iconName)
+                .font(.caption)
+            Text(recommendation.rawValue)
+                .font(.caption2)
+                .bold()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(badgeColor.opacity(0.2))
+        .foregroundStyle(badgeColor)
+        .clipShape(Capsule())
+    }
+    
+    private var iconName: String {
+        switch recommendation {
+        case .safe: return "checkmark.circle.fill"
+        case .caution: return "exclamationmark.triangle.fill"
+        case .modify: return "wrench.fill"
+        case .avoid: return "xmark.circle.fill"
+        }
+    }
+    
+    private var badgeColor: Color {
+        switch recommendation.color {
+        case "green": return .green
+        case "yellow": return .yellow
+        case "orange": return .orange
+        case "red": return .red
+        default: return .gray
+        }
+    }
+}
+
+// MARK: - Standard Badge (for Detail Views)
+
+struct StandardFODMAPBadge: View {
+    let score: EnhancedFODMAPScore
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            // Icon
+            Image(systemName: iconName)
+                .font(.body)
+                .foregroundStyle(badgeColor)
+            
+            // Text
+            VStack(alignment: .leading, spacing: 2) {
+                Text("FODMAP")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                
+                Text(score.combinedRecommendation.rawValue.components(separatedBy: " - ").last ?? "Unknown")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(badgeColor)
+            }
+            
+            // Score
+            if score.basicAnalysis.overallScore > 0 {
+                Text("\(Int(score.basicAnalysis.overallScore))")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(badgeColor)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(badgeColor.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(badgeColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private var iconName: String {
+        switch score.combinedRecommendation {
+        case .safe: return "checkmark.circle.fill"
+        case .caution: return "exclamationmark.triangle.fill"
+        case .modify: return "wrench.and.screwdriver.fill"
+        case .avoid: return "xmark.circle.fill"
+        }
+    }
+    
+    private var badgeColor: Color {
+        switch score.combinedRecommendation.color {
+        case "green": return .green
+        case "yellow": return .yellow
+        case "orange": return .orange
+        case "red": return .red
+        default: return .gray
+        }
+    }
+}
+
+// MARK: - Compact Badge (Alternative)
+
+struct CompactFODMAPBadge: View {
+    let score: EnhancedFODMAPScore
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: iconName)
+                .font(.caption2)
+            
+            Text("FODMAP")
+                .font(.caption2)
+                .fontWeight(.medium)
+            
+            if score.basicAnalysis.overallScore > 0 {
+                Text("\(Int(score.basicAnalysis.overallScore))")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(badgeColor)
+                    .clipShape(Capsule())
+            }
+        }
+        .foregroundStyle(badgeColor)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(badgeColor.opacity(0.15))
+        .clipShape(Capsule())
+    }
+    
+    private var iconName: String {
+        switch score.combinedRecommendation {
+        case .safe: return "checkmark.circle.fill"
+        case .caution: return "exclamationmark.triangle.fill"
+        case .modify: return "wrench.fill"
+        case .avoid: return "xmark.circle.fill"
+        }
+    }
+    
+    private var badgeColor: Color {
+        switch score.combinedRecommendation.color {
+        case "green": return .green
+        case "yellow": return .yellow
+        case "orange": return .orange
+        case "red": return .red
+        default: return .gray
+        }
+    }
+}
+
+// MARK: - Loading Badges
+
+struct StandardLoadingBadge: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            
+            Text("Analyzing FODMAP...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct CompactLoadingBadge: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            ProgressView()
+                .controlSize(.mini)
+            
+            Text("FODMAP")
+                .font(.caption2)
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(.systemGray6))
+        .clipShape(Capsule())
+    }
+}
 
 // MARK: - FODMAP Analysis Detail View
 
@@ -155,6 +350,8 @@ struct FODMAPCategoryBreakdownView: View {
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
+
+// MARK: - Category Score Row
 
 struct FODMAPCategoryRow: View {
     let categoryScore: FODMAPCategoryScore
@@ -514,47 +711,20 @@ struct FlowLayoutFAV: Layout {
     }
 }
 
-// MARK: - Compact FODMAP Badge for Recipe List
 
-struct FODMAPBadgeView: View {
-    let recommendation: FODMAPRecommendation
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: iconName)
-                .font(.caption)
-            Text(recommendation.rawValue)
-                .font(.caption2)
-                .bold()
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(badgeColor.opacity(0.2))
-        .foregroundStyle(badgeColor)
-        .clipShape(Capsule())
-    }
-    
-    private var iconName: String {
-        switch recommendation {
-        case .safe: return "checkmark.circle.fill"
-        case .caution: return "exclamationmark.triangle.fill"
-        case .modify: return "wrench.fill"
-        case .avoid: return "xmark.circle.fill"
-        }
-    }
-    
-    private var badgeColor: Color {
-        switch recommendation.color {
-        case "green": return .green
-        case "yellow": return .yellow
-        case "orange": return .orange
-        case "red": return .red
-        default: return .gray
-        }
-    }
+// MARK: - Previews
+
+#Preview("FODMAP Badge - Safe") {
+    FODMAPBadgeView(recommendation: .safe)
+        .padding()
 }
 
-#Preview {
+#Preview("FODMAP Badge - Avoid") {
+    FODMAPBadgeView(recommendation: .avoid)
+        .padding()
+}
+
+#Preview("FODMAP Analysis Detail") {
     // Create sample data
     let sampleRecipe = RecipeModel(
         title: "Pasta with Garlic and Mushrooms",

@@ -295,67 +295,6 @@ struct UserSensitivity: Codable, Identifiable, Hashable {
     }
 }
 
-// MARK: - User Profile (SwiftData Model)
-
-@Model
-final class UserAllergenProfile {
-    var id: UUID
-    var name: String
-    var isActive: Bool
-    var sensitivitiesData: Data?
-    var dateCreated: Date
-    var dateModified: Date
-    
-    init(id: UUID = UUID(),
-         name: String,
-         isActive: Bool = false,
-         sensitivitiesData: Data? = nil,
-         dateCreated: Date = Date(),
-         dateModified: Date = Date()) {
-        self.id = id
-        self.name = name
-        self.isActive = isActive
-        self.sensitivitiesData = sensitivitiesData
-        self.dateCreated = dateCreated
-        self.dateModified = dateModified
-    }
-    
-    // Computed property to get sensitivities
-    var sensitivities: [UserSensitivity] {
-        get {
-            guard let data = sensitivitiesData else { return [] }
-            return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
-        }
-        set {
-            sensitivitiesData = try? JSONEncoder().encode(newValue)
-            dateModified = Date()
-        }
-    }
-    
-    // Add a sensitivity
-    func addSensitivity(_ sensitivity: UserSensitivity) {
-        var current = sensitivities
-        current.append(sensitivity)
-        sensitivities = current
-    }
-    
-    // Remove a sensitivity
-    func removeSensitivity(id: UUID) {
-        var current = sensitivities
-        current.removeAll { $0.id == id }
-        sensitivities = current
-    }
-    
-    // Update a sensitivity
-    func updateSensitivity(_ sensitivity: UserSensitivity) {
-        var current = sensitivities
-        if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
-            current[index] = sensitivity
-            sensitivities = current
-        }
-    }
-}
-
 // MARK: - Recipe Allergen Score
 
 struct RecipeAllergenScore: Identifiable {
@@ -387,4 +326,325 @@ struct DetectedAllergen: Identifiable {
     let sensitivity: UserSensitivity
     let matchedIngredients: [String] // Ingredient names that matched
     let matchedKeywords: [String] // Keywords that caused the match
+}
+
+// MARK: - User Sensitivity Model
+
+struct UserFoodSensitivity: Codable, Identifiable, Hashable {
+    let id: UUID
+    let intolerance: FoodIntoleranceType
+    let severity: AllergenSeverity
+    let notes: String?
+    let fodmapCategories: Set<FODMAPCategory>?  // Only used when intolerance == .fodmap
+    
+    init(id: UUID = UUID(),
+         intolerance: FoodIntoleranceType,
+         severity: AllergenSeverity = .moderate,
+         notes: String? = nil,
+         fodmapCategories: Set<FODMAPCategory>? = nil) {
+        self.id = id
+        self.intolerance = intolerance
+        self.severity = severity
+        self.notes = notes
+        self.fodmapCategories = fodmapCategories
+    }
+    
+    var name: String {
+        intolerance.name
+    }
+    
+    var keywords: [String] {
+        intolerance.keywords
+    }
+    
+    var isFODMAP: Bool {
+        intolerance == .fodmap
+    }
+    
+    /// Returns the specific FODMAP categories the user is sensitive to
+    /// Returns all categories if none specifically selected
+    var selectedFODMAPCategories: Set<FODMAPCategory> {
+        if isFODMAP {
+            return fodmapCategories ?? Set(FODMAPCategory.allCases)
+        }
+        return []
+    }
+    
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: UserFoodSensitivity, rhs: UserFoodSensitivity) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+// MARK: - Food Intolerance Types
+
+enum FoodIntoleranceType: String, Codable, CaseIterable {
+    case gluten
+    case dairy
+    case lactose
+    case eggs
+    case soy
+    case peanuts
+    case treeNuts
+    case fish
+    case shellfish
+    case wheat
+    case sesame
+    case sulfites
+    case fodmap  // Special case - has sub-categories
+    case nightshades
+    case corn
+    case yeast
+    
+    var name: String {
+        switch self {
+        case .gluten: return "Gluten"
+        case .dairy: return "Dairy"
+        case .lactose: return "Lactose"
+        case .eggs: return "Eggs"
+        case .soy: return "Soy"
+        case .peanuts: return "Peanuts"
+        case .treeNuts: return "Tree Nuts"
+        case .fish: return "Fish"
+        case .shellfish: return "Shellfish"
+        case .wheat: return "Wheat"
+        case .sesame: return "Sesame"
+        case .sulfites: return "Sulfites"
+        case .fodmap: return "FODMAP"
+        case .nightshades: return "Nightshades"
+        case .corn: return "Corn"
+        case .yeast: return "Yeast"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .gluten, .wheat: return "🌾"
+        case .dairy, .lactose: return "🥛"
+        case .eggs: return "🥚"
+        case .soy: return "🫘"
+        case .peanuts: return "🥜"
+        case .treeNuts: return "🌰"
+        case .fish: return "🐟"
+        case .shellfish: return "🦞"
+        case .sesame: return "🫘"
+        case .sulfites: return "🍷"
+        case .fodmap: return "🌱"
+        case .nightshades: return "🍅"
+        case .corn: return "🌽"
+        case .yeast: return "🍞"
+        }
+    }
+    
+    var keywords: [String] {
+        switch self {
+        case .gluten:
+            return ["wheat", "barley", "rye", "malt", "flour", "bread", "pasta", "noodles", "cereal",
+                    "couscous", "semolina", "durum", "spelt", "farro", "kamut", "seitan", "bulgur",
+                    "wheat germ", "bran", "graham", "triticale"]
+            
+        case .dairy:
+            return ["milk", "cream", "butter", "cheese", "yogurt", "whey", "casein", "lactose",
+                    "ghee", "buttermilk", "sour cream", "curd", "paneer", "cottage cheese",
+                    "ricotta", "mozzarella", "parmesan", "cheddar", "dairy"]
+            
+        case .lactose:
+            return ["milk", "cream", "lactose", "whey", "buttermilk", "sour cream",
+                    "ice cream", "yogurt", "soft cheese", "ricotta", "cottage cheese"]
+            
+        case .eggs:
+            return ["egg", "eggs", "mayonnaise", "meringue", "albumin", "egg white",
+                    "egg yolk", "egg wash", "eggnog"]
+            
+        case .soy:
+            return ["soy", "soya", "tofu", "tempeh", "miso", "edamame", "soy sauce",
+                    "tamari", "soybean", "lecithin", "soy protein", "soy milk"]
+            
+        case .peanuts:
+            return ["peanut", "peanuts", "peanut butter", "peanut oil", "groundnut", "arachis"]
+            
+        case .treeNuts:
+            return ["almond", "cashew", "walnut", "pecan", "pistachio", "macadamia",
+                    "hazelnut", "brazil nut", "pine nut", "chestnut", "nut", "nuts"]
+            
+        case .fish:
+            return ["fish", "salmon", "tuna", "cod", "halibut", "trout", "bass",
+                    "anchovy", "sardine", "herring", "mackerel", "fish sauce"]
+            
+        case .shellfish:
+            return ["shrimp", "crab", "lobster", "crayfish", "prawn", "clam", "mussel",
+                    "oyster", "scallop", "squid", "octopus", "shellfish"]
+            
+        case .wheat:
+            return ["wheat", "wheat flour", "whole wheat", "enriched flour",
+                    "all-purpose flour", "bread flour", "wheat bran", "wheat germ"]
+            
+        case .sesame:
+            return ["sesame", "tahini", "sesame oil", "sesame seeds"]
+            
+        case .sulfites:
+            return ["sulfite", "sulfur dioxide", "sodium sulfite", "sodium bisulfite",
+                    "dried fruit", "wine", "vinegar"]
+            
+        case .fodmap:
+            return [
+                // Oligosaccharides (Fructans & GOS)
+                "wheat", "rye", "barley", "onion", "onions", "garlic", "shallot", "leek",
+                "artichoke", "asparagus", "beetroot", "brussels sprout", "cabbage",
+                "chickpea", "kidney bean", "black bean", "lentil", "soy bean",
+                "cashew", "pistachio",
+                
+                // Disaccharides (Lactose)
+                "milk", "yogurt", "ice cream", "soft cheese", "cream", "custard",
+                "cottage cheese", "ricotta",
+                
+                // Monosaccharides (Excess Fructose)
+                "honey", "agave", "apple", "pear", "mango", "watermelon", "fig",
+                "high-fructose corn syrup",
+                
+                // Polyols (Sugar Alcohols)
+                "sorbitol", "mannitol", "xylitol", "maltitol", "isomalt",
+                "apricot", "avocado", "blackberry", "cherry", "nectarine", "peach",
+                "plum", "prune", "mushroom", "cauliflower", "snow pea", "sweet corn"
+            ]
+            
+        case .nightshades:
+            return ["tomato", "potato", "eggplant", "pepper", "bell pepper", "chili",
+                    "cayenne", "paprika", "goji berry", "nightshade"]
+            
+        case .corn:
+            return ["corn", "maize", "cornstarch", "corn syrup", "corn oil",
+                    "popcorn", "corn flour", "cornmeal", "hominy", "polenta"]
+            
+        case .yeast:
+            return ["yeast", "nutritional yeast", "brewer's yeast", "yeast extract"]
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .gluten:
+            return "Protein found in wheat, barley, and rye"
+        case .dairy:
+            return "All milk products and derivatives"
+        case .lactose:
+            return "Milk sugar found in dairy products"
+        case .eggs:
+            return "Chicken eggs and egg products"
+        case .soy:
+            return "Soybeans and soy-derived products"
+        case .peanuts:
+            return "Legume commonly causing allergic reactions"
+        case .treeNuts:
+            return "Nuts from trees (almonds, cashews, etc.)"
+        case .fish:
+            return "Finned fish species"
+        case .shellfish:
+            return "Crustaceans and mollusks"
+        case .wheat:
+            return "Wheat grain and wheat-based products"
+        case .sesame:
+            return "Sesame seeds and sesame oil"
+        case .sulfites:
+            return "Preservatives in wine, dried fruit, etc."
+        case .fodmap:
+            return "Fermentable carbohydrates (6 categories)"
+        case .nightshades:
+            return "Tomatoes, potatoes, peppers, eggplant"
+        case .corn:
+            return "Corn and corn-derived products"
+        case .yeast:
+            return "Baker's and brewer's yeast"
+        }
+    }
+    
+    /// Returns true if this intolerance has sub-categories (like FODMAP)
+    var hasSubCategories: Bool {
+        return self == .fodmap
+    }
+}
+
+// MARK: - Sensitivity Severity
+
+enum AllergenSeverity: String, Codable, CaseIterable {
+    case mild
+    case moderate
+    case severe
+    case lifeThreatening
+    
+    var displayName: String {
+        switch self {
+        case .mild: return "Mild"
+        case .moderate: return "Moderate"
+        case .severe: return "Severe"
+        case .lifeThreatening: return "Life-Threatening"
+        }
+    }
+    
+    var color: String {
+        switch self {
+        case .mild: return "yellow"
+        case .moderate: return "orange"
+        case .severe: return "red"
+        case .lifeThreatening: return "purple"
+        }
+    }
+    
+    var scoreMultiplier: Double {
+        switch self {
+        case .mild: return 1.0
+        case .moderate: return 2.0
+        case .severe: return 3.0
+        case .lifeThreatening: return 5.0
+        }
+    }
+}
+
+// MARK: - Detected Allergen Result
+
+struct DetectedAllergenMatch: Identifiable {
+    let id = UUID()
+    let sensitivity: UserFoodSensitivity
+    let matchedIngredients: [String]
+    let matchedKeywords: [String]
+    
+    var score: Double {
+        Double(matchedIngredients.count) * sensitivity.severity.scoreMultiplier
+    }
+}
+
+// MARK: - Recipe Allergen Score
+
+struct RecipeAllergenAnalysis: Identifiable {
+    let id = UUID()
+    let recipeID: UUID
+    let score: Double
+    let detectedAllergens: [DetectedAllergenMatch]
+    let isSafe: Bool
+    let severityLevel: AllergenSeverity?
+    
+    var displayScore: String {
+        if isSafe {
+            return "✓ Safe"
+        }
+        return String(format: "%.0f", score)
+    }
+    
+    var badgeColor: String {
+        if isSafe { return "green" }
+        if score < 5 { return "yellow" }
+        if score < 10 { return "orange" }
+        return "red"
+    }
+    
+    var riskLevel: String {
+        if isSafe { return "Safe" }
+        if score < 5 { return "Low Risk" }
+        if score < 10 { return "Moderate Risk" }
+        return "High Risk"
+    }
 }
