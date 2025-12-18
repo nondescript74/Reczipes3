@@ -195,7 +195,7 @@ struct FODMAPCategoryRow: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     
-                    FlowLayout(spacing: 6) {
+                    FlowLayoutFAV(spacing: 6) {
                         ForEach(categoryScore.detectedIngredients, id: \.self) { ingredient in
                             Text(ingredient)
                                 .font(.caption)
@@ -471,7 +471,7 @@ struct MonashAttributionView: View {
 
 // MARK: - Flow Layout for Tags
 
-struct FlowLayout: Layout {
+struct FlowLayoutFAV: Layout {
     var spacing: CGFloat = 8
     
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

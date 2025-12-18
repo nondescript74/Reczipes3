@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showAPIKeyManager = false
     @State private var isAPIKeyConfigured = APIKeyHelper.isConfigured
     @State private var showLicenseAgreement = false
+    @State private var showHelpBrowser = false
     
     var body: some View {
         NavigationView {
@@ -64,6 +65,40 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section("Help & Support") {
+                    Button {
+                        showHelpBrowser = true
+                    } label: {
+                        HStack {
+                            Label("Browse Help Topics", systemImage: "questionmark.circle")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Link(destination: URL(string: "https://www.monashfodmap.com")!) {
+                        HStack {
+                            Label("Monash FODMAP Research", systemImage: "link")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Link(destination: URL(string: "https://console.anthropic.com")!) {
+                        HStack {
+                            Label("Get Claude API Key", systemImage: "link")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
                 Section("About") {
                     HStack {
                         Text("Version")
@@ -85,6 +120,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showLicenseAgreement) {
                 LicenseDisplayView()
+            }
+            .sheet(isPresented: $showHelpBrowser) {
+                HelpBrowserView()
             }
             .onAppear {
                 // Refresh API key status when view appears
