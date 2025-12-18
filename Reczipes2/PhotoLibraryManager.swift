@@ -6,7 +6,9 @@
 //
 
 import Photos
+#if os(iOS)
 import UIKit
+#endif
 import SwiftUI
 import Combine
 
