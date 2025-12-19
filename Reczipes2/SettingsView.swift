@@ -14,6 +14,12 @@ struct SettingsView: View {
     @State private var showHelpBrowser = false
     @State private var showDiagnosticLog = false
     
+    private var versionString: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        return "\(version) (\(build))"
+    }
+    
     var body: some View {
         NavigationView {
             Form {
@@ -116,7 +122,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text(versionString)
                             .foregroundColor(.secondary)
                     }
                     

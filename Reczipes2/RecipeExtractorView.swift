@@ -79,24 +79,24 @@ struct RecipeExtractorView: View {
             .navigationTitle("Recipe Extractor")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
+//                ToolbarItem(placement: .navigationBarLeading) {
+//                    Button("Close") {
+//                        dismiss()
+//                    }
+//                }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if let recipe = viewModel.extractedRecipe {
-                        Button {
-                            logInfo("Save Recipe button tapped", category: "ui")
-                            saveRecipe()
-                        } label: {
-                            Text("Save Recipe")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .onAppear {
-                            logInfo("Save Recipe button is visible for: \(recipe.title)", category: "ui")
-                        }
+                    if viewModel.extractedRecipe != nil {
+//                        Button {
+//                            logInfo("Save Recipe button tapped", category: "ui")
+//                            saveRecipe()
+//                        } label: {
+//                            Text("Save Recipe")
+//                        }
+//                        .buttonStyle(.borderedProminent)
+//                        .onAppear {
+//                            logInfo("Save Recipe button is visible for: \(recipe.title)", category: "ui")
+//                        }
                     } else {
                         Text("No recipe")
                             .onAppear {
