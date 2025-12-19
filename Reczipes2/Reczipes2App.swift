@@ -10,6 +10,12 @@ import SwiftData
 
 @main
 struct Reczipes2App: App {
+    
+    init() {
+        // Suppress Auto Layout constraint warnings from UIKit internals
+        UserDefaults.standard.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
+    }
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Recipe.self,

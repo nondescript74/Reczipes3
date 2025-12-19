@@ -247,7 +247,7 @@ class WebRecipeExtractor {
         // Clean and validate URLs
         imageURLs = imageURLs.compactMap { urlString in
             // Handle relative URLs
-            var cleanURL = urlString.trimmingCharacters(in: .whitespaces)
+            let cleanURL = urlString.trimmingCharacters(in: .whitespaces)
             
             // Skip data URLs and very small images
             if cleanURL.hasPrefix("data:") || cleanURL.contains("1x1") {

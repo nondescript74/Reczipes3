@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var isAPIKeyConfigured = APIKeyHelper.isConfigured
     @State private var showLicenseAgreement = false
     @State private var showHelpBrowser = false
+    @State private var showDiagnosticLog = false
     
     var body: some View {
         NavigationView {
@@ -78,6 +79,18 @@ struct SettingsView: View {
                         }
                     }
                     
+                    Button {
+                        showDiagnosticLog = true
+                    } label: {
+                        HStack {
+                            Label("Diagnostic Log", systemImage: "doc.text")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
                     Link(destination: URL(string: "https://www.monashfodmap.com")!) {
                         HStack {
                             Label("Monash FODMAP Research", systemImage: "link")
@@ -123,6 +136,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showHelpBrowser) {
                 HelpBrowserView()
+            }
+            .sheet(isPresented: $showDiagnosticLog) {
+                DiagnosticLogView()
             }
             .onAppear {
                 // Refresh API key status when view appears
