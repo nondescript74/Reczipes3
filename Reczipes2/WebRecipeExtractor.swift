@@ -159,6 +159,111 @@ class WebRecipeExtractor {
         
         return cleaned
     }
+    
+    /// Extract image URLs from HTML content
+    /// Prioritizes JSON-LD structured data, then falls back to og:image and img tags
+    /// - Parameter html: The HTML content
+    /// - Returns: Array of image URLs found in the content
+    func extractImageURLs(from html: String) -> [String] {
+        print("🖼️ Extracting image URLs from HTML...")
+        var imageURLs: [String] = []
+        
+        // 1. Try to extract from JSON-LD structured data (most reliable)
+        let jsonLDPattern = "<script[^>]*type=[\"']application/ld\\+json[\"'][^>]*>(.*?)</script>"
+        if let regex = try? NSRegularExpression(pattern: jsonLDPattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) {
+            let nsString = html as NSString
+            let matches = regex.matches(in: html, range: NSRange(location: 0, length: nsString.length))
+            
+            for match in matches {
+                if match.numberOfRanges > 1 {
+                    let jsonContent = nsString.substring(with: match.range(at: 1))
+                    if let jsonData = jsonContent.data(using: .utf8),
+                       let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                        
+                        // Handle both single Recipe and array of recipes
+                        let recipes: [[String: Any]]
+                        if let recipeArray = jsonObject["@graph"] as? [[String: Any]] {
+                            recipes = recipeArray.filter { ($0["@type"] as? String) == "Recipe" }
+                        } else if (jsonObject["@type"] as? String) == "Recipe" {
+                            recipes = [jsonObject]
+                        } else {
+                            recipes = []
+                        }
+                        
+                        for recipe in recipes {
+                            // Extract image from various formats
+                            if let imageString = recipe["image"] as? String {
+                                imageURLs.append(imageString)
+                            } else if let imageArray = recipe["image"] as? [String] {
+                                imageURLs.append(contentsOf: imageArray)
+                            } else if let imageDict = recipe["image"] as? [String: Any],
+                                      let imageURL = imageDict["url"] as? String {
+                                imageURLs.append(imageURL)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 2. Extract Open Graph image (common fallback)
+        let ogImagePattern = "<meta[^>]*property=[\"']og:image[\"'][^>]*content=[\"']([^\"']+)[\"'][^>]*>"
+        if let ogRegex = try? NSRegularExpression(pattern: ogImagePattern, options: [.caseInsensitive]) {
+            let nsString = html as NSString
+            let matches = ogRegex.matches(in: html, range: NSRange(location: 0, length: nsString.length))
+            for match in matches {
+                if match.numberOfRanges > 1 {
+                    let imageURL = nsString.substring(with: match.range(at: 1))
+                    if !imageURLs.contains(imageURL) {
+                        imageURLs.append(imageURL)
+                    }
+                }
+            }
+        }
+        
+        // 3. Extract from img tags with recipe-related classes/attributes (last resort)
+        let imgPattern = "<img[^>]*src=[\"']([^\"']+)[\"'][^>]*>"
+        if let imgRegex = try? NSRegularExpression(pattern: imgPattern, options: [.caseInsensitive]) {
+            let nsString = html as NSString
+            let matches = imgRegex.matches(in: html, range: NSRange(location: 0, length: nsString.length))
+            
+            // Limit to first 5-10 images to avoid thumbnails/icons
+            let limitedMatches = Array(matches.prefix(10))
+            for match in limitedMatches {
+                if match.numberOfRanges > 1 {
+                    let imageURL = nsString.substring(with: match.range(at: 1))
+                    // Filter out likely thumbnails, icons, and tracking pixels
+                    if !imageURL.contains("icon") &&
+                       !imageURL.contains("logo") &&
+                       !imageURL.contains("tracking") &&
+                       !imageURL.hasSuffix(".svg") &&
+                       !imageURLs.contains(imageURL) {
+                        imageURLs.append(imageURL)
+                    }
+                }
+            }
+        }
+        
+        // Clean and validate URLs
+        imageURLs = imageURLs.compactMap { urlString in
+            // Handle relative URLs
+            var cleanURL = urlString.trimmingCharacters(in: .whitespaces)
+            
+            // Skip data URLs and very small images
+            if cleanURL.hasPrefix("data:") || cleanURL.contains("1x1") {
+                return nil
+            }
+            
+            return cleanURL
+        }
+        
+        print("🖼️ ✅ Found \(imageURLs.count) image URL(s)")
+        for (index, url) in imageURLs.prefix(5).enumerated() {
+            print("🖼️   [\(index + 1)] \(url)")
+        }
+        
+        return imageURLs
+    }
 }
 
 // MARK: - Error Types

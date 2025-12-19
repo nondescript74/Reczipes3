@@ -50,8 +50,14 @@ struct ContentView: View {
         print("📊 Available recipes count: \(allRecipes.count)")
         
         let recipes = allRecipes.map { recipe in
-            if let assignedImageName = imageName(for: recipe.id) {
-                print("✅ Found image '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))")
+            // First check if the recipe model itself has an imageName (directly from Recipe object)
+            if let existingImageName = recipe.imageName {
+                print("✅ Recipe '\(recipe.title)' already has imageName: '\(existingImageName)' (ID: \(recipe.id))")
+                return recipe
+            }
+            // Fallback to checking RecipeImageAssignment (for legacy support)
+            else if let assignedImageName = imageName(for: recipe.id) {
+                print("✅ Found image assignment '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))")
                 return recipe.withImageName(assignedImageName)
             } else {
                 print("❌ No image for '\(recipe.title)' (ID: \(recipe.id))")
@@ -282,7 +288,33 @@ struct ContentView: View {
     private func deleteRecipe(_ recipe: RecipeModel) {
         withAnimation {
             if let savedRecipe = savedRecipes.first(where: { $0.id == recipe.id }) {
+                print("🗑️ Deleting recipe: \(savedRecipe.title) (ID: \(savedRecipe.id))")
+                
+                // Delete associated image file if it exists
+                if let imageName = savedRecipe.imageName {
+                    let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    let fileURL = documentsPath.appendingPathComponent(imageName)
+                    try? FileManager.default.removeItem(at: fileURL)
+                    print("🗑️ Deleted image file: \(imageName)")
+                }
+                
+                // Delete any RecipeImageAssignments for this recipe
+                let assignmentsToDelete = imageAssignments.filter { $0.recipeID == recipe.id }
+                for assignment in assignmentsToDelete {
+                    modelContext.delete(assignment)
+                    print("🗑️ Deleted image assignment for recipe")
+                }
+                
+                // Delete the recipe itself
                 modelContext.delete(savedRecipe)
+                
+                // Save the context to persist the deletion
+                do {
+                    try modelContext.save()
+                    print("✅ Recipe deleted and changes saved")
+                } catch {
+                    print("❌ Failed to save deletion: \(error)")
+                }
             }
         }
     }
@@ -297,6 +329,14 @@ struct ContentView: View {
             
             let newRecipe = Recipe(from: recipeToSave)
             modelContext.insert(newRecipe)
+            
+            // Save the context
+            do {
+                try modelContext.save()
+                print("✅ Recipe saved: \(newRecipe.title)")
+            } catch {
+                print("❌ Failed to save recipe: \(error)")
+            }
         }
     }
     

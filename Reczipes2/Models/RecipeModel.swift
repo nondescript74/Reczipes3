@@ -17,6 +17,7 @@ struct RecipeModel: Codable, Identifiable, Hashable {
     let notes: [RecipeNote]
     let reference: String?
     var imageName: String? // Name of the image in Assets catalog
+    var imageURLs: [String]? // URLs of images from web extraction
     
     init(id: UUID = UUID(),
          title: String,
@@ -26,7 +27,8 @@ struct RecipeModel: Codable, Identifiable, Hashable {
          instructionSections: [InstructionSection],
          notes: [RecipeNote] = [],
          reference: String? = nil,
-         imageName: String? = nil) {
+         imageName: String? = nil,
+         imageURLs: [String]? = nil) {
         self.id = id
         self.title = title
         self.headerNotes = headerNotes
@@ -36,6 +38,7 @@ struct RecipeModel: Codable, Identifiable, Hashable {
         self.notes = notes
         self.reference = reference
         self.imageName = imageName
+        self.imageURLs = imageURLs
     }
 }
 

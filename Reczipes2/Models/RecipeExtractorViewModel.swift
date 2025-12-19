@@ -41,6 +41,10 @@ class RecipeExtractorViewModel: ObservableObject {
             // Fetch web content
             let htmlContent = try await webExtractor.fetchWebContent(from: url)
             
+            // Extract image URLs BEFORE cleaning (to preserve all HTML)
+            let imageURLs = webExtractor.extractImageURLs(from: htmlContent)
+            print("🖼️ Found \(imageURLs.count) image URL(s) in webpage")
+            
             // Clean the HTML
             let cleanedContent = webExtractor.cleanHTML(htmlContent)
             
@@ -67,7 +71,22 @@ class RecipeExtractorViewModel: ObservableObject {
                     instructionSections: recipe.instructionSections,
                     notes: recipe.notes,
                     reference: url,
-                    imageName: recipe.imageName
+                    imageName: recipe.imageName,
+                    imageURLs: imageURLs.isEmpty ? nil : imageURLs
+                )
+            } else {
+                // Just add image URLs to existing recipe
+                recipe = RecipeModel(
+                    id: recipe.id,
+                    title: recipe.title,
+                    headerNotes: recipe.headerNotes,
+                    yield: recipe.yield,
+                    ingredientSections: recipe.ingredientSections,
+                    instructionSections: recipe.instructionSections,
+                    notes: recipe.notes,
+                    reference: recipe.reference,
+                    imageName: recipe.imageName,
+                    imageURLs: imageURLs.isEmpty ? nil : imageURLs
                 )
             }
             

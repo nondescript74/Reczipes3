@@ -20,7 +20,16 @@ final class RecipeCollection {
     /// Returns all recipes from SwiftData (extracted via Claude API)
     func allRecipes(savedRecipes: [Recipe]) -> [RecipeModel] {
         // Convert saved Recipe objects to RecipeModels
-        return savedRecipes.compactMap { $0.toRecipeModel() }
+        print("📚 RecipeCollection.allRecipes called with \(savedRecipes.count) saved recipes")
+        let models = savedRecipes.compactMap { recipe -> RecipeModel? in
+            let model = recipe.toRecipeModel()
+            if let model = model {
+                print("📚 Converting Recipe '\(recipe.title)' - imageName in Recipe: '\(recipe.imageName ?? "nil")' -> imageName in Model: '\(model.imageName ?? "nil")'")
+            }
+            return model
+        }
+        print("📚 RecipeCollection.allRecipes returning \(models.count) models")
+        return models
     }
     
     /// Returns all recipes with their save status
