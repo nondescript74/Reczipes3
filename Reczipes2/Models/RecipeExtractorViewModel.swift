@@ -43,7 +43,7 @@ class RecipeExtractorViewModel: ObservableObject {
             
             // Extract image URLs BEFORE cleaning (to preserve all HTML)
             let imageURLs = webExtractor.extractImageURLs(from: htmlContent)
-            print("🖼️ Found \(imageURLs.count) image URL(s) in webpage")
+            logInfo("Found \(imageURLs.count) image URL(s) in webpage", category: "extraction")
             
             // Clean the HTML
             let cleanedContent = webExtractor.cleanHTML(htmlContent)
@@ -51,7 +51,7 @@ class RecipeExtractorViewModel: ObservableObject {
             // Limit content size to avoid token limits (approximately 100k characters)
             let contentToSend: String
             if cleanedContent.count > 100_000 {
-                print("⚠️ Content too large, truncating to 100k characters")
+                logWarning("Content too large (\(cleanedContent.count) chars), truncating to 100k characters", category: "extraction")
                 contentToSend = String(cleanedContent.prefix(100_000))
             } else {
                 contentToSend = cleanedContent

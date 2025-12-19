@@ -426,7 +426,7 @@ struct EnhancedAllergenDetailView: View {
                  isAnalyzing = false
              }
          } catch {
-             print("Enhanced analysis failed: \(error)")
+             logError("Enhanced analysis failed: \(error)", category: "allergen")
              isAnalyzing = false
          }
      }

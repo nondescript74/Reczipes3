@@ -531,7 +531,7 @@ extension AllergenAnalyzer {
                 )
             }
         } catch {
-            print("Claude FODMAP analysis failed: \(error)")
+            logError("Claude FODMAP analysis failed: \(error)", category: "fodmap")
         }
         
         // Return basic analysis if Claude fails

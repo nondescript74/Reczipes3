@@ -34,16 +34,16 @@ class ClaudeAPIClient {
     /// Validate the API key by making a minimal test request to Anthropic
     /// - Returns: true if the API key is valid, false otherwise
     func validateAPIKey() async -> Bool {
-        print("🔍 ========== API KEY VALIDATION START ==========")
-        print("🔍 API key length: \(apiKey.count) characters")
-        print("🔍 API key prefix: \(String(apiKey.prefix(15)))...")
-        print("🔍 API key suffix: ...\(String(apiKey.suffix(10)))")
+        logInfo("API KEY VALIDATION START", category: "network")
+        logDebug("API key length: \(apiKey.count) characters", category: "network")
+        logDebug("API key prefix: \(String(apiKey.prefix(15)))...", category: "network")
+        logDebug("API key suffix: ...\(String(apiKey.suffix(10)))", category: "network")
         
         let testPrompt = "Hi"
         
         // Try each model in the fallback list
         for (index, model) in validationModels.enumerated() {
-            print("🔍 Attempt \(index + 1)/\(validationModels.count): Trying model '\(model)'...")
+            logInfo("Attempt \(index + 1)/\(validationModels.count): Trying model '\(model)'", category: "network")
             
             let requestBody: [String: Any] = [
                 "model": model,
@@ -57,7 +57,7 @@ class ClaudeAPIClient {
             ]
             
             guard let url = URL(string: baseURL) else {
-                print("❌ Invalid URL: \(baseURL)")
+                logError("Invalid URL: \(baseURL)", category: "network")
                 continue
             }
             
@@ -69,62 +69,62 @@ class ClaudeAPIClient {
             
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-                print("🔍 Request body size: \(request.httpBody?.count ?? 0) bytes")
-                print("🔍 Sending validation request to: \(baseURL)")
+                logDebug("Request body size: \(request.httpBody?.count ?? 0) bytes", category: "network")
+                logInfo("Sending validation request to: \(baseURL)", category: "network")
                 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    print("❌ Invalid response type (not HTTPURLResponse)")
+                    logError("Invalid response type (not HTTPURLResponse)", category: "network")
                     continue
                 }
                 
-                print("🔍 Response status code: \(httpResponse.statusCode)")
-                print("🔍 Response headers: \(httpResponse.allHeaderFields)")
+                logDebug("Response status code: \(httpResponse.statusCode)", category: "network")
+                logDebug("Response headers: \(httpResponse.allHeaderFields)", category: "network")
                 
                 // Parse and log the response body for debugging
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("🔍 Response body (\(responseString.count) chars): \(responseString)")
+                    logDebug("Response body (\(responseString.count) chars): \(responseString)", category: "network")
                     
                     // If it's an error response, parse it nicely
                     if httpResponse.statusCode != 200 {
                         let parsedError = parseAPIError(from: data)
-                        print("🔍 Parsed error: \(parsedError)")
+                        logDebug("Parsed error: \(parsedError)", category: "network")
                     }
                 } else {
-                    print("🔍 Unable to decode response body")
+                    logWarning("Unable to decode response body", category: "network")
                 }
                 
                 // Status code 200 means the API key is valid
                 if httpResponse.statusCode == 200 {
-                    print("✅ API key is VALID! Successfully validated with model: \(model)")
-                    print("🔍 ========== API KEY VALIDATION SUCCESS ==========")
+                    logInfo("API key is VALID! Successfully validated with model: \(model)", category: "network")
+                    logInfo("API KEY VALIDATION SUCCESS", category: "network")
                     return true
                 } else if httpResponse.statusCode == 404 {
                     // Model not found, try next one
-                    print("⚠️ Model '\(model)' not found (404), trying next model...")
+                    logWarning("Model '\(model)' not found (404), trying next model", category: "network")
                     continue
                 } else if httpResponse.statusCode == 401 {
                     // Unauthorized - bad API key
-                    print("❌ API key is INVALID (401 Unauthorized)")
-                    print("🔍 ========== API KEY VALIDATION FAILED ==========")
+                    logError("API key is INVALID (401 Unauthorized)", category: "network")
+                    logError("API KEY VALIDATION FAILED", category: "network")
                     return false
                 } else {
                     // Other error, try next model
-                    print("⚠️ Validation failed with status \(httpResponse.statusCode), trying next model...")
+                    logWarning("Validation failed with status \(httpResponse.statusCode), trying next model", category: "network")
                     continue
                 }
             } catch {
-                print("❌ Validation error with model '\(model)': \(error.localizedDescription)")
-                print("❌ Full error: \(error)")
+                logError("Validation error with model '\(model)': \(error.localizedDescription)", category: "network")
+                logError("Full error: \(error)", category: "network")
                 // Try next model
                 continue
             }
         }
         
         // If we got here, none of the models worked
-        print("❌ All validation attempts failed. No models were successful.")
-        print("🔍 ========== API KEY VALIDATION FAILED ==========")
+        logError("All validation attempts failed. No models were successful", category: "network")
+        logError("API KEY VALIDATION FAILED", category: "network")
         return false
     }
     
@@ -132,8 +132,8 @@ class ClaudeAPIClient {
     /// - Parameter htmlContent: The HTML or text content containing the recipe
     /// - Returns: A RecipeModel parsed from the content
     func extractRecipe(from htmlContent: String) async throws -> RecipeModel {
-        print("🌐 ========== WEB RECIPE EXTRACTION START ==========")
-        print("🌐 Content length: \(htmlContent.count) characters")
+        logInfo("WEB RECIPE EXTRACTION START", category: "extraction")
+        logDebug("Content length: \(htmlContent.count) characters", category: "extraction")
         
         let systemPrompt = """
         You are an expert at extracting recipes from web pages and text content. 
@@ -219,8 +219,8 @@ class ClaudeAPIClient {
         \(htmlContent)
         """
         
-        print("🌐 Building API request...")
-        print("🌐 Using model: \(recipeExtractionModel)")
+        logInfo("Building API request", category: "extraction")
+        logDebug("Using model: \(recipeExtractionModel)", category: "extraction")
         let requestBody: [String: Any] = [
             "model": recipeExtractionModel,
             "max_tokens": 8192,
@@ -234,7 +234,7 @@ class ClaudeAPIClient {
         ]
         
         guard let url = URL(string: baseURL) else {
-            print("🌐 ❌ Invalid base URL: \(baseURL)")
+            logError("Invalid base URL: \(baseURL)", category: "extraction")
             throw ClaudeAPIError.invalidResponse
         }
         
@@ -245,31 +245,31 @@ class ClaudeAPIClient {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.timeoutInterval = 120 // 2 minutes for processing
         
-        print("🌐 Serializing request body...")
+        logDebug("Serializing request body", category: "extraction")
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-            print("🌐 ✅ Request body size: \(request.httpBody?.count ?? 0) bytes")
+            logDebug("Request body size: \(request.httpBody?.count ?? 0) bytes", category: "extraction")
         } catch {
-            print("🌐 ❌ Failed to serialize request body: \(error)")
+            logError("Failed to serialize request body: \(error)", category: "extraction")
             throw ClaudeAPIError.invalidJSON
         }
         
-        print("🌐 Sending request to Anthropic...")
+        logInfo("Sending request to Anthropic", category: "network")
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        print("🌐 ✅ Received response")
-        print("🌐 Response data size: \(data.count) bytes")
+        logInfo("Received response", category: "network")
+        logDebug("Response data size: \(data.count) bytes", category: "network")
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("🌐 ❌ Response is not HTTPURLResponse")
+            logError("Response is not HTTPURLResponse", category: "network")
             throw ClaudeAPIError.invalidResponse
         }
         
-        print("🌐 HTTP Status Code: \(httpResponse.statusCode)")
+        logDebug("HTTP Status Code: \(httpResponse.statusCode)", category: "network")
         
         guard httpResponse.statusCode == 200 else {
             let errorMessage = parseAPIError(from: data)
-            print("🌐 ❌ API Error Response: \(errorMessage)")
+            logError("API Error Response: \(errorMessage)", category: "network")
             
             let detailedMessage: String
             switch httpResponse.statusCode {
@@ -288,40 +288,40 @@ class ClaudeAPIClient {
             throw ClaudeAPIError.apiError(statusCode: httpResponse.statusCode, message: detailedMessage)
         }
         
-        print("🌐 Decoding Claude response...")
+        logDebug("Decoding Claude response", category: "extraction")
         let claudeResponse = try JSONDecoder().decode(ClaudeResponse.self, from: data)
-        print("🌐 ✅ Successfully decoded Claude response")
+        logInfo("Successfully decoded Claude response", category: "extraction")
         
         // Extract JSON from Claude's response
-        print("🌐 Extracting recipe JSON from response...")
+        logDebug("Extracting recipe JSON from response", category: "extraction")
         guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
-            print("🌐 ❌ No text content found in response")
+            logError("No text content found in response", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
-        print("🌐 Raw text content length: \(textContent.text.count) characters")
+        logDebug("Raw text content length: \(textContent.text.count) characters", category: "extraction")
         
         guard let jsonString = extractJSON(from: textContent.text) else {
-            print("🌐 ❌ Failed to extract JSON from text")
+            logError("Failed to extract JSON from text", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
-        print("🌐 ✅ Extracted JSON string length: \(jsonString.count) characters")
+        logDebug("Extracted JSON string length: \(jsonString.count) characters", category: "extraction")
         
         // Parse the recipe JSON
         guard let jsonData = jsonString.data(using: .utf8) else {
-            print("🌐 ❌ Failed to convert JSON string to Data")
+            logError("Failed to convert JSON string to Data", category: "extraction")
             throw ClaudeAPIError.invalidJSON
         }
         
-        print("🌐 Parsing recipe JSON...")
+        logDebug("Parsing recipe JSON", category: "extraction")
         let recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
-        print("🌐 ✅ Successfully parsed recipe")
-        print("🌐 Recipe title: \(recipeResponse.title)")
+        logInfo("Successfully parsed recipe", category: "extraction")
+        logDebug("Recipe title: \(recipeResponse.title)", category: "extraction")
         
         let recipeModel = recipeResponse.toRecipeModel()
-        print("🌐 ✅ Web recipe extraction complete!")
-        print("🌐 ========== WEB RECIPE EXTRACTION END ==========")
+        logInfo("Web recipe extraction complete", category: "extraction")
+        logInfo("WEB RECIPE EXTRACTION END", category: "extraction")
         
         return recipeModel
     }
@@ -332,29 +332,29 @@ class ClaudeAPIClient {
     ///   - usePreprocessing: Whether to apply image preprocessing for better OCR results
     /// - Returns: A RecipeModel parsed from the image
     func extractRecipe(from imageData: Data, usePreprocessing: Bool = true) async throws -> RecipeModel {
-        print("📸 ========== RECIPE EXTRACTION START ==========")
-        print("📸 Original image data size: \(imageData.count) bytes")
-        print("📸 Use preprocessing: \(usePreprocessing)")
+        logInfo("RECIPE EXTRACTION START", category: "extraction")
+        logDebug("Original image data size: \(imageData.count) bytes", category: "extraction")
+        logDebug("Use preprocessing: \(usePreprocessing)", category: "extraction")
         
         // Preprocess the image if requested
         let finalImageData: Data
         if usePreprocessing, let uiImage = UIImage(data: imageData) {
-            print("📸 Converting to UIImage for preprocessing...")
+            logDebug("Converting to UIImage for preprocessing", category: "extraction")
             if let processedData = imagePreprocessor.preprocessForOCR(uiImage) {
                 finalImageData = processedData
-                print("📸 ✅ Image preprocessed - new size: \(finalImageData.count) bytes")
+                logInfo("Image preprocessed - new size: \(finalImageData.count) bytes", category: "extraction")
             } else {
-                print("📸 ⚠️ Preprocessing failed, using original")
+                logWarning("Preprocessing failed, using original", category: "extraction")
                 finalImageData = imageData
             }
         } else {
-            print("📸 Using original image data without preprocessing")
+            logDebug("Using original image data without preprocessing", category: "extraction")
             finalImageData = imageData
         }
         
-        print("📸 Converting image to base64...")
+        logDebug("Converting image to base64", category: "extraction")
         let base64Image = finalImageData.base64EncodedString()
-        print("📸 Base64 string length: \(base64Image.count) characters")
+        logDebug("Base64 string length: \(base64Image.count) characters", category: "extraction")
         
         let systemPrompt = """
         You are an expert at extracting recipes from images of recipe cards, cookbooks, and handwritten notes. 
@@ -425,8 +425,8 @@ class ClaudeAPIClient {
         Extract ALL text including notes, variations, and tips.
         """
         
-        print("📸 Building API request...")
-        print("📸 Using model: \(recipeExtractionModel)")
+        logInfo("Building API request", category: "extraction")
+        logDebug("Using model: \(recipeExtractionModel)", category: "extraction")
         let requestBody: [String: Any] = [
             "model": recipeExtractionModel,
             "max_tokens": 8192,
@@ -453,7 +453,7 @@ class ClaudeAPIClient {
         ]
         
         guard let url = URL(string: baseURL) else {
-            print("📸 ❌ Invalid base URL: \(baseURL)")
+            logError("Invalid base URL: \(baseURL)", category: "extraction")
             throw ClaudeAPIError.invalidResponse
         }
         
@@ -464,36 +464,36 @@ class ClaudeAPIClient {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.timeoutInterval = 120 // 2 minutes for image processing
         
-        print("📸 Serializing request body...")
+        logDebug("Serializing request body", category: "extraction")
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-            print("📸 ✅ Request body size: \(request.httpBody?.count ?? 0) bytes")
+            logDebug("Request body size: \(request.httpBody?.count ?? 0) bytes", category: "extraction")
         } catch {
-            print("📸 ❌ Failed to serialize request body: \(error)")
+            logError("Failed to serialize request body: \(error)", category: "extraction")
             throw ClaudeAPIError.invalidJSON
         }
         
-        print("📸 Sending request to Anthropic...")
-        print("📸 URL: \(baseURL)")
-        print("📸 Headers: \(request.allHTTPHeaderFields ?? [:])")
+        logInfo("Sending request to Anthropic", category: "network")
+        logDebug("URL: \(baseURL)", category: "network")
+        logDebug("Headers: \(request.allHTTPHeaderFields ?? [:])", category: "network")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        print("📸 ✅ Received response")
-        print("📸 Response data size: \(data.count) bytes")
+        logInfo("Received response", category: "network")
+        logDebug("Response data size: \(data.count) bytes", category: "network")
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("📸 ❌ Response is not HTTPURLResponse")
+            logError("Response is not HTTPURLResponse", category: "network")
             throw ClaudeAPIError.invalidResponse
         }
         
-        print("📸 HTTP Status Code: \(httpResponse.statusCode)")
-        print("📸 Response Headers: \(httpResponse.allHeaderFields)")
+        logDebug("HTTP Status Code: \(httpResponse.statusCode)", category: "network")
+        logDebug("Response Headers: \(httpResponse.allHeaderFields)", category: "network")
         
         guard httpResponse.statusCode == 200 else {
             let errorMessage = parseAPIError(from: data)
-            print("📸 ❌ API Error Response: \(errorMessage)")
-            print("📸 ❌ Status Code: \(httpResponse.statusCode)")
+            logError("API Error Response: \(errorMessage)", category: "network")
+            logError("Status Code: \(httpResponse.statusCode)", category: "network")
             
             // Provide more detailed error messages based on status code
             let detailedMessage: String
@@ -513,65 +513,65 @@ class ClaudeAPIClient {
             throw ClaudeAPIError.apiError(statusCode: httpResponse.statusCode, message: detailedMessage)
         }
         
-        print("📸 Decoding Claude response...")
+        logDebug("Decoding Claude response", category: "extraction")
         let claudeResponse: ClaudeResponse
         do {
             claudeResponse = try JSONDecoder().decode(ClaudeResponse.self, from: data)
-            print("📸 ✅ Successfully decoded Claude response")
-            print("📸 Response model: \(claudeResponse.model ?? "unknown")")
-            print("📸 Response role: \(claudeResponse.role ?? "unknown")")
-            print("📸 Content blocks: \(claudeResponse.content.count)")
+            logInfo("Successfully decoded Claude response", category: "extraction")
+            logDebug("Response model: \(claudeResponse.model ?? "unknown")", category: "extraction")
+            logDebug("Response role: \(claudeResponse.role ?? "unknown")", category: "extraction")
+            logDebug("Content blocks: \(claudeResponse.content.count)", category: "extraction")
         } catch {
-            print("📸 ❌ Failed to decode Claude response: \(error)")
+            logError("Failed to decode Claude response: \(error)", category: "extraction")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("📸 Raw response: \(responseString)")
+                logDebug("Raw response: \(responseString)", category: "extraction")
             }
             throw ClaudeAPIError.invalidResponse
         }
         
         // Extract JSON from Claude's response
-        print("📸 Extracting recipe JSON from response...")
+        logDebug("Extracting recipe JSON from response", category: "extraction")
         guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
-            print("📸 ❌ No text content found in response")
+            logError("No text content found in response", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
-        print("📸 Raw text content length: \(textContent.text.count) characters")
-        print("📸 Raw text preview: \(String(textContent.text.prefix(200)))...")
+        logDebug("Raw text content length: \(textContent.text.count) characters", category: "extraction")
+        logDebug("Raw text preview: \(String(textContent.text.prefix(200)))...", category: "extraction")
         
         guard let jsonString = extractJSON(from: textContent.text) else {
-            print("📸 ❌ Failed to extract JSON from text")
-            print("📸 Full text: \(textContent.text)")
+            logError("Failed to extract JSON from text", category: "extraction")
+            logDebug("Full text: \(textContent.text)", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
-        print("📸 ✅ Extracted JSON string length: \(jsonString.count) characters")
-        print("📸 JSON preview: \(String(jsonString.prefix(200)))...")
+        logDebug("Extracted JSON string length: \(jsonString.count) characters", category: "extraction")
+        logDebug("JSON preview: \(String(jsonString.prefix(200)))...", category: "extraction")
         
         // Parse the recipe JSON
         guard let jsonData = jsonString.data(using: .utf8) else {
-            print("📸 ❌ Failed to convert JSON string to Data")
+            logError("Failed to convert JSON string to Data", category: "extraction")
             throw ClaudeAPIError.invalidJSON
         }
         
-        print("📸 Parsing recipe JSON...")
+        logDebug("Parsing recipe JSON", category: "extraction")
         let recipeResponse: RecipeResponse
         do {
             recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
-            print("📸 ✅ Successfully parsed recipe")
-            print("📸 Recipe title: \(recipeResponse.title)")
-            print("📸 Ingredient sections: \(recipeResponse.ingredientSections.count)")
-            print("📸 Instruction sections: \(recipeResponse.instructionSections.count)")
+            logInfo("Successfully parsed recipe", category: "extraction")
+            logDebug("Recipe title: \(recipeResponse.title)", category: "extraction")
+            logDebug("Ingredient sections: \(recipeResponse.ingredientSections.count)", category: "extraction")
+            logDebug("Instruction sections: \(recipeResponse.instructionSections.count)", category: "extraction")
         } catch {
-            print("📸 ❌ Failed to decode recipe JSON: \(error)")
-            print("📸 JSON data: \(jsonString)")
+            logError("Failed to decode recipe JSON: \(error)", category: "extraction")
+            logDebug("JSON data: \(jsonString)", category: "extraction")
             throw ClaudeAPIError.invalidJSON
         }
         
         // Convert to RecipeModel
         let recipeModel = recipeResponse.toRecipeModel()
-        print("📸 ✅ Recipe extraction complete!")
-        print("📸 ========== RECIPE EXTRACTION END ==========")
+        logInfo("Recipe extraction complete", category: "extraction")
+        logInfo("RECIPE EXTRACTION END", category: "extraction")
         
         return recipeModel
     }

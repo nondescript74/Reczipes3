@@ -43,28 +43,28 @@ struct ContentView: View {
     // All available recipe models from SwiftData (Claude API-extracted)
     // Merged with image assignments for real-time updates
     private var availableRecipesBeforeFilter: [RecipeModel] {
-        print("🔄 Refreshing available recipes...")
-        print("📊 Saved recipes count: \(savedRecipes.count)")
+        logDebug("Refreshing available recipes", category: "recipe")
+        logDebug("Saved recipes count: \(savedRecipes.count)", category: "recipe")
         
         let allRecipes = RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
-        print("📊 Available recipes count: \(allRecipes.count)")
+        logDebug("Available recipes count: \(allRecipes.count)", category: "recipe")
         
         let recipes = allRecipes.map { recipe in
             // First check if the recipe model itself has an imageName (directly from Recipe object)
             if let existingImageName = recipe.imageName {
-                print("✅ Recipe '\(recipe.title)' already has imageName: '\(existingImageName)' (ID: \(recipe.id))")
+                logDebug("Recipe '\(recipe.title)' already has imageName: '\(existingImageName)' (ID: \(recipe.id))", category: "recipe")
                 return recipe
             }
             // Fallback to checking RecipeImageAssignment (for legacy support)
             else if let assignedImageName = imageName(for: recipe.id) {
-                print("✅ Found image assignment '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))")
+                logDebug("Found image assignment '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))", category: "recipe")
                 return recipe.withImageName(assignedImageName)
             } else {
-                print("❌ No image for '\(recipe.title)' (ID: \(recipe.id))")
+                logWarning("No image for '\(recipe.title)' (ID: \(recipe.id))", category: "recipe")
                 return recipe
             }
         }
-        print("📊 Total assignments in DB: \(imageAssignments.count)")
+        logDebug("Total assignments in DB: \(imageAssignments.count)", category: "storage")
         return recipes
     }
     
@@ -288,21 +288,21 @@ struct ContentView: View {
     private func deleteRecipe(_ recipe: RecipeModel) {
         withAnimation {
             if let savedRecipe = savedRecipes.first(where: { $0.id == recipe.id }) {
-                print("🗑️ Deleting recipe: \(savedRecipe.title) (ID: \(savedRecipe.id))")
+                logInfo("Deleting recipe: \(savedRecipe.title) (ID: \(savedRecipe.id))", category: "recipe")
                 
                 // Delete associated image file if it exists
                 if let imageName = savedRecipe.imageName {
                     let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                     let fileURL = documentsPath.appendingPathComponent(imageName)
                     try? FileManager.default.removeItem(at: fileURL)
-                    print("🗑️ Deleted image file: \(imageName)")
+                    logInfo("Deleted image file: \(imageName)", category: "storage")
                 }
                 
                 // Delete any RecipeImageAssignments for this recipe
                 let assignmentsToDelete = imageAssignments.filter { $0.recipeID == recipe.id }
                 for assignment in assignmentsToDelete {
                     modelContext.delete(assignment)
-                    print("🗑️ Deleted image assignment for recipe")
+                    logDebug("Deleted image assignment for recipe", category: "storage")
                 }
                 
                 // Delete the recipe itself
@@ -311,9 +311,9 @@ struct ContentView: View {
                 // Save the context to persist the deletion
                 do {
                     try modelContext.save()
-                    print("✅ Recipe deleted and changes saved")
+                    logInfo("Recipe deleted and changes saved", category: "recipe")
                 } catch {
-                    print("❌ Failed to save deletion: \(error)")
+                    logError("Failed to save deletion: \(error)", category: "storage")
                 }
             }
         }
@@ -333,9 +333,9 @@ struct ContentView: View {
             // Save the context
             do {
                 try modelContext.save()
-                print("✅ Recipe saved: \(newRecipe.title)")
+                logInfo("Recipe saved: \(newRecipe.title)", category: "recipe")
             } catch {
-                print("❌ Failed to save recipe: \(error)")
+                logError("Failed to save recipe: \(error)", category: "storage")
             }
         }
     }

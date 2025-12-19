@@ -88,19 +88,19 @@ struct RecipeExtractorView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if let recipe = viewModel.extractedRecipe {
                         Button {
-                            print("🔘 Save Recipe button tapped!")
+                            logInfo("Save Recipe button tapped", category: "ui")
                             saveRecipe()
                         } label: {
                             Text("Save Recipe")
                         }
                         .buttonStyle(.borderedProminent)
                         .onAppear {
-                            print("✅ Save Recipe button is visible for: \(recipe.title)")
+                            logInfo("Save Recipe button is visible for: \(recipe.title)", category: "ui")
                         }
                     } else {
                         Text("No recipe")
                             .onAppear {
-                                print("⚠️ No recipe available to save")
+                                logWarning("No recipe available to save", category: "ui")
                             }
                     }
                 }
@@ -114,10 +114,10 @@ struct RecipeExtractorView: View {
                             predicate: #Predicate { $0.id == recipe.id }
                         )
                         if let savedRecipe = try? modelContext.fetch(descriptor).first {
-                            print("✅ Verified recipe in DB: '\(savedRecipe.title)'")
-                            print("✅ Recipe imageName in DB: '\(savedRecipe.imageName ?? "nil")'")
+                            logInfo("Verified recipe in DB: '\(savedRecipe.title)'", category: "storage")
+                            logInfo("Recipe imageName in DB: '\(savedRecipe.imageName ?? "nil")'", category: "storage")
                         } else {
-                            print("⚠️ Could not find recipe in DB after save!")
+                            logWarning("Could not find recipe in DB after save", category: "storage")
                         }
                     }
                     // Dismiss and let the ContentView refresh
@@ -594,7 +594,7 @@ struct RecipeExtractorView: View {
     
     private var saveButton: some View {
         Button {
-            print("🔘 INLINE Save button tapped!")
+            logInfo("INLINE Save button tapped", category: "ui")
             // If there are selected web image URLs and we haven't downloaded them yet
             if !selectedWebImageURLs.isEmpty && downloadedWebImages.isEmpty {
                 Task {
@@ -758,32 +758,32 @@ struct RecipeExtractorView: View {
         
         for (index, imageURL) in imageURLs.enumerated() {
             do {
-                print("🖼️ Downloading image \(index + 1)/\(imageURLs.count) from: \(imageURL)")
+                logInfo("Downloading image \(index + 1)/\(imageURLs.count) from: \(imageURL)", category: "network")
                 let image = try await imageDownloader.downloadImage(from: imageURL)
                 downloadedImages.append(image)
             } catch {
-                print("❌ Failed to download image \(index + 1): \(error)")
+                logError("Failed to download image \(index + 1): \(error)", category: "network")
                 // Continue with other images
             }
         }
         
         await MainActor.run {
             self.downloadedWebImages = downloadedImages
-            print("✅ Downloaded \(downloadedImages.count) images successfully")
+            logInfo("Downloaded \(downloadedImages.count) images successfully", category: "network")
             self.saveRecipe()
             self.isDownloadingImage = false
         }
     }
     
     private func saveRecipe() {
-        print("🔘 Save button tapped!")
+        logInfo("Save button tapped", category: "recipe")
         
         guard let recipeModel = viewModel.extractedRecipe else {
-            print("❌ No recipe to save!")
+            logError("No recipe to save", category: "recipe")
             return
         }
         
-        print("💾 Saving recipe: \(recipeModel.title)")
+        logInfo("Saving recipe: \(recipeModel.title)", category: "recipe")
         
         // Determine which images we'll save
         let imagesToSave: [UIImage]
@@ -799,18 +799,18 @@ struct RecipeExtractorView: View {
         let recipe = Recipe(from: recipeModel)
         
         // Generate image filename for the first image (main thumbnail) and set it directly
-        if let firstImage = imagesToSave.first {
+        if !imagesToSave.isEmpty {
             let imageName = "recipe_\(recipeModel.id.uuidString).jpg"
             recipe.imageName = imageName  // ✅ Set the image name directly on the Recipe object
-            print("📸 Will save \(imagesToSave.count) image(s), main image: \(imageName)")
-            print("📸 Recipe.imageName is now: \(recipe.imageName ?? "nil")")
+            logInfo("Will save \(imagesToSave.count) image(s), main image: \(imageName)", category: "recipe")
+            logInfo("Recipe.imageName is now: \(recipe.imageName ?? "nil")", category: "recipe")
         }
         
         // Insert into SwiftData context
         modelContext.insert(recipe)
-        print("📝 Recipe inserted into context")
-        print("📝 Recipe ID: \(recipe.id)")
-        print("📝 Recipe imageName before save: \(recipe.imageName ?? "nil")")
+        logDebug("Recipe inserted into context", category: "storage")
+        logDebug("Recipe ID: \(recipe.id)", category: "storage")
+        logDebug("Recipe imageName before save: \(recipe.imageName ?? "nil")", category: "storage")
         
         // Save all images
         for (index, image) in imagesToSave.enumerated() {
@@ -826,22 +826,22 @@ struct RecipeExtractorView: View {
         // Save the context
         do {
             try modelContext.save()
-            print("✅ Recipe saved successfully to SwiftData")
-            print("📊 Recipe ID: \(recipe.id)")
-            print("📊 Recipe Title: \(recipe.title)")
-            print("📊 Recipe imageName (after context save): \(recipe.imageName ?? "nil")")
+            logInfo("Recipe saved successfully to SwiftData", category: "storage")
+            logDebug("Recipe ID: \(recipe.id)", category: "storage")
+            logDebug("Recipe Title: \(recipe.title)", category: "storage")
+            logDebug("Recipe imageName (after context save): \(recipe.imageName ?? "nil")", category: "storage")
             
             // Verify the image file exists
             if let imageName = recipe.imageName {
                 let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 let fileURL = documentsPath.appendingPathComponent(imageName)
                 if FileManager.default.fileExists(atPath: fileURL.path) {
-                    print("✅ Image file verified to exist at: \(fileURL.path)")
+                    logInfo("Image file verified to exist at: \(fileURL.path)", category: "storage")
                 } else {
-                    print("❌ WARNING: Image file NOT found at: \(fileURL.path)")
+                    logWarning("Image file NOT found at: \(fileURL.path)", category: "storage")
                 }
             } else {
-                print("⚠️ WARNING: Recipe has no imageName after save!")
+                logWarning("Recipe has no imageName after save", category: "storage")
             }
             
             // Small delay to ensure SwiftData propagates the change
@@ -849,8 +849,8 @@ struct RecipeExtractorView: View {
                 showingSaveConfirmation = true
             }
         } catch {
-            print("❌ Failed to save recipe: \(error)")
-            print("❌ Error details: \(error.localizedDescription)")
+            logError("Failed to save recipe: \(error)", category: "storage")
+            logError("Error details: \(error.localizedDescription)", category: "storage")
             // Optionally show an error alert here
         }
     }
@@ -868,7 +868,7 @@ struct RecipeExtractorView: View {
         
         // Save to documents directory
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            print("❌ Failed to convert image to JPEG data")
+            logError("Failed to convert image to JPEG data", category: "storage")
             return
         }
         
@@ -877,19 +877,19 @@ struct RecipeExtractorView: View {
         
         do {
             try imageData.write(to: fileURL)
-            print("✅ Saved recipe image to: \(fileURL.path)")
+            logInfo("Saved recipe image to: \(fileURL.path)", category: "storage")
             
             // Create image assignment (only for main image to maintain compatibility)
             if isMainImage {
                 let assignment = RecipeImageAssignment(recipeID: recipeID, imageName: filename)
                 modelContext.insert(assignment)
-                print("✅ Created image assignment for recipe: \(recipeID)")
+                logDebug("Created image assignment for recipe: \(recipeID)", category: "storage")
             } else {
-                print("✅ Saved additional image \(imageIndex) for recipe: \(recipeID)")
+                logDebug("Saved additional image \(imageIndex) for recipe: \(recipeID)", category: "storage")
             }
             
         } catch {
-            print("❌ Error saving recipe image: \(error)")
+            logError("Error saving recipe image: \(error)", category: "storage")
         }
     }
 }
