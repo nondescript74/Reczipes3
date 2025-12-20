@@ -13,6 +13,23 @@ struct LaunchScreenView: View {
     @State private var isComplete = false
     let onComplete: () -> Void
     
+    // App version information
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+    
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    }
+    
+    private var appName: String {
+        Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "Reczipes"
+    }
+    
+    private var logFileSize: String {
+        DiagnosticLogger.shared.getFormattedLogFileSize()
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -32,6 +49,7 @@ struct LaunchScreenView: View {
                 Image("launch_recipe_image")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
+                    .padding(.horizontal, 40) // Add margins on left and right
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
                     .opacity(imageOpacity)
@@ -45,17 +63,63 @@ struct LaunchScreenView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 }
                 
-                // Optional: Add app title or logo that fades out as wipe progresses
-                VStack {
+                // App information overlay
+                VStack(spacing: 0) {
+                    // App name at the top with background
+                    Text(appName)
+                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
+                        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.black.opacity(0.5))
+                                .blur(radius: 10)
+                        )
+                        .padding(.top, 60)
+                        .padding(.horizontal, 40)
+                    
                     Spacer()
                     
-                    Text("Reczipes")
-//                        .font(Font.system(size: 34, weight: .bold, design: .rounded))
-//                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-//                        .opacity(1 - wipeProgress * 0.7)
-                    
-                    Spacer()
+                    // Version and diagnostic info at the bottom with background
+                    VStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Text("Version")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                            Text(appVersion)
+                                .font(.system(size: 14, weight: .regular, design: .monospaced))
+                        }
+                        .foregroundStyle(.white)
+                        
+                        HStack(spacing: 4) {
+                            Text("Build")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                            Text(buildNumber)
+                                .font(.system(size: 14, weight: .regular, design: .monospaced))
+                        }
+                        .foregroundStyle(.white)
+                        
+                        HStack(spacing: 4) {
+                            Text("Diagnostic Log")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                            Text(logFileSize)
+                                .font(.system(size: 14, weight: .regular, design: .monospaced))
+                        }
+                        .foregroundStyle(.white)
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(.black.opacity(0.5))
+                            .blur(radius: 10)
+                    )
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
+                    .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 3)
+                    .padding(.bottom, 40)
+                    .padding(.horizontal, 40)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -74,8 +138,8 @@ struct LaunchScreenView: View {
                 }
             }
             
-            // Complete after 1.5 seconds total
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // Complete after 2.0 seconds total
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 isComplete = true
                 onComplete()
             }
