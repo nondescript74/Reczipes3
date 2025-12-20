@@ -124,7 +124,7 @@ struct DiagnosticLogView: View {
             }
             .sheet(isPresented: $showShareSheet) {
                 if let url = DiagnosticLogger.shared.getLogFileURL() {
-                    ShareSheet(items: [url])
+                    ShareSheet_DLV(items: [url])
                 }
             }
         }
@@ -173,7 +173,7 @@ struct DiagnosticLogView: View {
 
 // MARK: - Share Sheet
 
-struct ShareSheet: UIViewControllerRepresentable {
+struct ShareSheet_DLV: UIViewControllerRepresentable {
     let items: [Any]
     
     func makeUIViewController(context: Context) -> UIActivityViewController {

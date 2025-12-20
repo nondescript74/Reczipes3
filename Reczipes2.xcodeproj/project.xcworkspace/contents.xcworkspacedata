@@ -5,6 +5,9 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:LaunchScreenView.swift">
+      location = "group:RecipeBackup.swift">
+   </FileRef>
+   <FileRef
+      location = "group:RecipeBackupManager.swift">
    </FileRef>
 </Workspace>

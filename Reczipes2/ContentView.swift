@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showingDebug = false
     @State private var showingRecipeExtractor = false
     @State private var showingAllergenProfiles = false
+    @State private var showingBackup = false
     @State private var allergenFilterEnabled = false
     @State private var showOnlySafe = false
     
@@ -189,10 +190,20 @@ struct ContentView: View {
             .toolbar {
 #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingImageAssignment = true
+                    Menu {
+                        Button {
+                            showingImageAssignment = true
+                        } label: {
+                            Label("Assign Images", systemImage: "photo.on.rectangle")
+                        }
+                        
+                        Button {
+                            showingBackup = true
+                        } label: {
+                            Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
+                        }
                     } label: {
-                        Label("Assign Images", systemImage: "photo.on.rectangle")
+                        Label("More", systemImage: "ellipsis.circle")
                     }
                 }
                 
@@ -214,6 +225,14 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        showingBackup = true
+                    } label: {
+                        Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
+                    }
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
                         showingRecipeExtractor = true
                     } label: {
                         Label("Extract Recipe", systemImage: "plus.circle")
@@ -229,6 +248,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingAllergenProfiles) {
                 AllergenProfileView()
+            }
+            .sheet(isPresented: $showingBackup) {
+                RecipeBackupView()
             }
         }
     }
