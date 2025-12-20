@@ -16,7 +16,8 @@ final class Recipe {
     var recipeYield: String?
     var reference: String?
     var dateAdded: Date
-    var imageName: String? // Name of the image in Assets catalog
+    var imageName: String? // Main/primary image (set during extraction, immutable in UI)
+    var additionalImageNames: [String]? // Additional images added by user
     
     // Store complex structures as JSON Data
     var ingredientSectionsData: Data?
@@ -30,6 +31,7 @@ final class Recipe {
          reference: String? = nil,
          dateAdded: Date = Date(),
          imageName: String? = nil,
+         additionalImageNames: [String]? = nil,
          ingredientSectionsData: Data? = nil,
          instructionSectionsData: Data? = nil,
          notesData: Data? = nil) {
@@ -40,9 +42,29 @@ final class Recipe {
         self.reference = reference
         self.dateAdded = dateAdded
         self.imageName = imageName
+        self.additionalImageNames = additionalImageNames
         self.ingredientSectionsData = ingredientSectionsData
         self.instructionSectionsData = instructionSectionsData
         self.notesData = notesData
+    }
+    
+    // Helper computed properties
+    var allImageNames: [String] {
+        var images: [String] = []
+        if let mainImage = imageName {
+            images.append(mainImage)
+        }
+        if let additional = additionalImageNames {
+            images.append(contentsOf: additional)
+        }
+        return images
+    }
+    
+    var imageCount: Int {
+        var count = 0
+        if imageName != nil { count += 1 }
+        count += additionalImageNames?.count ?? 0
+        return count
     }
     
     // Convenience initializer from RecipeModel
@@ -89,7 +111,8 @@ final class Recipe {
             instructionSections: instructions,
             notes: notes,
             reference: reference,
-            imageName: imageName
+            imageName: imageName,
+            additionalImageNames: additionalImageNames
         )
     }
 }

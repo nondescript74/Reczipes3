@@ -16,7 +16,8 @@ struct RecipeModel: Codable, Identifiable, Hashable {
     let instructionSections: [InstructionSection]
     let notes: [RecipeNote]
     let reference: String?
-    var imageName: String? // Name of the image in Assets catalog
+    var imageName: String? // Main/primary image from extraction
+    var additionalImageNames: [String]? // Additional images added by user
     var imageURLs: [String]? // URLs of images from web extraction
     
     init(id: UUID = UUID(),
@@ -28,6 +29,7 @@ struct RecipeModel: Codable, Identifiable, Hashable {
          notes: [RecipeNote] = [],
          reference: String? = nil,
          imageName: String? = nil,
+         additionalImageNames: [String]? = nil,
          imageURLs: [String]? = nil) {
         self.id = id
         self.title = title
@@ -38,7 +40,27 @@ struct RecipeModel: Codable, Identifiable, Hashable {
         self.notes = notes
         self.reference = reference
         self.imageName = imageName
+        self.additionalImageNames = additionalImageNames
         self.imageURLs = imageURLs
+    }
+    
+    // Helper computed properties
+    var allImageNames: [String] {
+        var images: [String] = []
+        if let mainImage = imageName {
+            images.append(mainImage)
+        }
+        if let additional = additionalImageNames {
+            images.append(contentsOf: additional)
+        }
+        return images
+    }
+    
+    var imageCount: Int {
+        var count = 0
+        if imageName != nil { count += 1 }
+        count += additionalImageNames?.count ?? 0
+        return count
     }
 }
 

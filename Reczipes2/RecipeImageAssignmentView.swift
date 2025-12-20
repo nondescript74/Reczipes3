@@ -13,7 +13,6 @@ struct RecipeImageAssignmentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    @Query private var assignments: [RecipeImageAssignment]
     @Query private var savedRecipes: [Recipe]
     
     @StateObject private var photoLibrary = PhotoLibraryManager()
@@ -21,6 +20,11 @@ struct RecipeImageAssignmentView: View {
     // All recipes from RecipeCollection (stable UUIDs!)
     private var allRecipes: [RecipeModel] {
         RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
+    }
+    
+    // Helper to get Recipe entity from RecipeModel
+    private func getRecipe(for recipeModel: RecipeModel) -> Recipe? {
+        savedRecipes.first { $0.id == recipeModel.id }
     }
     
     var body: some View {
@@ -133,26 +137,21 @@ struct RecipeImageAssignmentView: View {
             } else {
                 Section {
                     ForEach(allRecipes) { recipe in
-                        RecipePhotoRow(
-                            recipe: recipe,
-                            currentImageName: assignedImage(for: recipe.id),
-                            photoLibrary: photoLibrary,
-                            onPhotoSelected: { asset in
-                                Task {
-                                    await assignPhoto(asset, to: recipe.id)
-                                }
-                            },
-                            onImageRemoved: {
-                                removeImage(from: recipe.id)
-                            }
-                        )
+                        if let recipeEntity = getRecipe(for: recipe) {
+                            RecipePhotoRow(
+                                recipe: recipe,
+                                recipeEntity: recipeEntity,
+                                photoLibrary: photoLibrary,
+                                modelContext: modelContext
+                            )
+                        }
                     }
                 } header: {
                     Text("Your Recipes")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(photoLibrary.photoAssets.count) photo(s) available in library")
-                        Text("Tip: Images are automatically saved when extracting recipes. You can change them here anytime.")
+                        Text("Tip: The main image is set during extraction. You can add additional images here.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -161,164 +160,138 @@ struct RecipeImageAssignmentView: View {
         }
     }
     
-    // MARK: - Helper Methods
-    
-    private func assignedImage(for recipeID: UUID) -> String? {
-        assignments.first { $0.recipeID == recipeID }?.imageName
-    }
-    
-    private func assignPhoto(_ asset: PHAsset, to recipeID: UUID) async {
-        // Save the photo to documents directory and get a unique filename
-        guard let image = await photoLibrary.loadImage(for: asset, targetSize: PHImageManagerMaximumSize) else {
-            print("❌ Failed to load image")
-            return
-        }
-        
-        // Generate a unique filename
-        let filename = "recipe_\(recipeID.uuidString).jpg"
-        
-        // Save to documents directory
-        if let savedPath = saveImageToDocuments(image, filename: filename) {
-            print("✅ Saved image to: \(savedPath)")
-            
-            // Remove existing assignment if any
-            if let existing = assignments.first(where: { $0.recipeID == recipeID }) {
-                // Delete old image file if it exists
-                deleteImageFromDocuments(existing.imageName)
-                modelContext.delete(existing)
-            }
-            
-            // Create new assignment
-            let assignment = RecipeImageAssignment(recipeID: recipeID, imageName: filename)
-            modelContext.insert(assignment)
-            
-            try? modelContext.save()
-        }
-    }
-    
-    private func removeImage(from recipeID: UUID) {
-        if let existing = assignments.first(where: { $0.recipeID == recipeID }) {
-            // Delete the image file
-            deleteImageFromDocuments(existing.imageName)
-            // Remove the assignment
-            modelContext.delete(existing)
-        }
-    }
-    
-    // MARK: - File Management
-    
-    private func saveImageToDocuments(_ image: UIImage, filename: String) -> String? {
-        guard let data = image.jpegData(compressionQuality: 0.8) else {
-            return nil
-        }
-        
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        do {
-            try data.write(to: fileURL)
-            return filename
-        } catch {
-            print("❌ Error saving image: \(error)")
-            return nil
-        }
-    }
-    
-    private func deleteImageFromDocuments(_ filename: String) {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        try? FileManager.default.removeItem(at: fileURL)
-    }
 }
 
 // MARK: - Recipe Photo Row
 
 struct RecipePhotoRow: View {
     let recipe: RecipeModel
-    let currentImageName: String?
+    let recipeEntity: Recipe
     let photoLibrary: PhotoLibraryManager
-    let onPhotoSelected: (PHAsset) -> Void
-    let onImageRemoved: () -> Void
+    let modelContext: ModelContext
     
     @State private var showingPhotoPicker = false
-    @State private var thumbnailImage: UIImage?
+    @State private var thumbnailImages: [UIImage] = []
+    
+    private var additionalImageCount: Int {
+        recipeEntity.additionalImageNames?.count ?? 0
+    }
+    
+    private var hasMainImage: Bool {
+        recipeEntity.imageName != nil
+    }
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Recipe thumbnail or placeholder
-            Group {
-                if let thumbnail = thumbnailImage {
-                    Image(uiImage: thumbnail)
-                        .resizable()
-                        .scaledToFill()
-                } else if let imageName = currentImageName,
-                          let image = loadImageFromDocuments(imageName) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
+        VStack(alignment: .leading, spacing: 8) {
+            // Recipe header with title
+            HStack(spacing: 12) {
+                // Main image thumbnail (read-only)
+                Group {
+                    if let imageName = recipeEntity.imageName,
+                       let image = loadImageFromDocuments(imageName) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.gray.opacity(0.2))
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundStyle(.secondary)
+                            )
+                    }
+                }
+                .frame(width: 60, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.2))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundStyle(.secondary)
-                        )
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+                .overlay(alignment: .topLeading) {
+                    if hasMainImage {
+                        Text("MAIN")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(2)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .padding(2)
+                    }
                 }
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-            )
-            
-            // Recipe info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title)
-                    .font(.headline)
                 
-                if currentImageName != nil {
+                // Recipe info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(recipe.title)
+                        .font(.headline)
+                    
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        Text("Image assigned")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if hasMainImage {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                            Text("Main image + \(additionalImageCount) more")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("No main image · \(additionalImageCount) additional")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
-                } else {
-                    Text("No image assigned")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            
-            Spacer()
-            
-            // Action buttons
-            HStack(spacing: 8) {
-                if currentImageName != nil {
-                    Button(action: { onImageRemoved() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
                 }
                 
+                Spacer()
+                
+                // Add button
                 Button(action: { showingPhotoPicker = true }) {
-                    Image(systemName: currentImageName == nil ? "plus.circle.fill" : "pencil.circle.fill")
+                    Label("Add", systemImage: "plus.circle.fill")
+                        .labelStyle(.iconOnly)
                         .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)
             }
+            
+            // Additional images grid (if any)
+            if let additionalImages = recipeEntity.additionalImageNames, !additionalImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(additionalImages.enumerated()), id: \.offset) { index, imageName in
+                            if let image = loadImageFromDocuments(imageName) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                    )
+                                    .overlay(alignment: .topTrailing) {
+                                        Button(action: {
+                                            removeAdditionalImage(at: index)
+                                        }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.white)
+                                                .background(Circle().fill(Color.red))
+                                        }
+                                        .buttonStyle(.plain)
+                                        .padding(2)
+                                    }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
         }
         .padding(.vertical, 4)
         .sheet(isPresented: $showingPhotoPicker) {
-            PhotoPickerSheet(
+            MultiPhotoPickerSheet(
                 recipe: recipe,
+                recipeEntity: recipeEntity,
                 photoLibrary: photoLibrary,
-                onPhotoSelected: onPhotoSelected
+                modelContext: modelContext
             )
         }
     }
@@ -333,16 +306,40 @@ struct RecipePhotoRow: View {
         
         return UIImage(data: data)
     }
+    
+    private func removeAdditionalImage(at index: Int) {
+        guard var additionalImages = recipeEntity.additionalImageNames,
+              index < additionalImages.count else {
+            return
+        }
+        
+        let imageName = additionalImages[index]
+        
+        // Delete the file
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(imageName)
+        try? FileManager.default.removeItem(at: fileURL)
+        
+        // Remove from array
+        additionalImages.remove(at: index)
+        recipeEntity.additionalImageNames = additionalImages.isEmpty ? nil : additionalImages
+        
+        try? modelContext.save()
+    }
 }
 
-// MARK: - Photo Picker Sheet
+// MARK: - Multi Photo Picker Sheet
 
-struct PhotoPickerSheet: View {
+struct MultiPhotoPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     let recipe: RecipeModel
+    let recipeEntity: Recipe
     let photoLibrary: PhotoLibraryManager
-    let onPhotoSelected: (PHAsset) -> Void
+    let modelContext: ModelContext
+    
+    @State private var selectedAssets: Set<String> = []
+    @State private var isSelecting = false
     
     private let columns = [
         GridItem(.adaptive(minimum: 100), spacing: 12)
@@ -353,21 +350,19 @@ struct PhotoPickerSheet: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(photoLibrary.photoAssets, id: \.localIdentifier) { asset in
-                        Button {
-                            onPhotoSelected(asset)
-                            dismiss()
-                        } label: {
-                            PhotoThumbnailView(
-                                asset: asset,
-                                photoLibrary: photoLibrary
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        SelectablePhotoThumbnailView(
+                            asset: asset,
+                            photoLibrary: photoLibrary,
+                            isSelected: selectedAssets.contains(asset.localIdentifier),
+                            onToggle: {
+                                toggleSelection(for: asset)
+                            }
+                        )
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Choose Photo")
+            .navigationTitle("Add Photos")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -375,38 +370,134 @@ struct PhotoPickerSheet: View {
                         dismiss()
                     }
                 }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add \(selectedAssets.count)") {
+                        Task {
+                            await addSelectedPhotos()
+                            dismiss()
+                        }
+                    }
+                    .disabled(selectedAssets.isEmpty)
+                }
             }
+            .safeAreaInset(edge: .bottom) {
+                if !selectedAssets.isEmpty {
+                    HStack {
+                        Text("\(selectedAssets.count) photo(s) selected")
+                            .font(.headline)
+                        Spacer()
+                        Button("Clear") {
+                            selectedAssets.removeAll()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding()
+                    .background(.ultraThinMaterial)
+                }
+            }
+        }
+    }
+    
+    private func toggleSelection(for asset: PHAsset) {
+        if selectedAssets.contains(asset.localIdentifier) {
+            selectedAssets.remove(asset.localIdentifier)
+        } else {
+            selectedAssets.insert(asset.localIdentifier)
+        }
+    }
+    
+    private func addSelectedPhotos() async {
+        var newImageNames: [String] = []
+        
+        for identifier in selectedAssets {
+            guard let asset = photoLibrary.photoAssets.first(where: { $0.localIdentifier == identifier }),
+                  let image = await photoLibrary.loadImage(for: asset, targetSize: PHImageManagerMaximumSize) else {
+                continue
+            }
+            
+            // Generate a unique filename for each additional image
+            let timestamp = Int(Date().timeIntervalSince1970)
+            let random = Int.random(in: 1000...9999)
+            let filename = "recipe_\(recipe.id.uuidString)_additional_\(timestamp)_\(random).jpg"
+            
+            // Save to documents directory
+            if saveImageToDocuments(image, filename: filename) {
+                newImageNames.append(filename)
+            }
+        }
+        
+        // Update the recipe entity
+        if !newImageNames.isEmpty {
+            var currentAdditional = recipeEntity.additionalImageNames ?? []
+            currentAdditional.append(contentsOf: newImageNames)
+            recipeEntity.additionalImageNames = currentAdditional
+            
+            try? modelContext.save()
+            print("✅ Added \(newImageNames.count) additional images to recipe '\(recipe.title)'")
+        }
+    }
+    
+    private func saveImageToDocuments(_ image: UIImage, filename: String) -> Bool {
+        guard let data = image.jpegData(compressionQuality: 0.8) else {
+            return false
+        }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        do {
+            try data.write(to: fileURL)
+            return true
+        } catch {
+            print("❌ Error saving image: \(error)")
+            return false
         }
     }
 }
 
-// MARK: - Photo Thumbnail View
+// MARK: - Selectable Photo Thumbnail View
 
-struct PhotoThumbnailView: View {
+struct SelectablePhotoThumbnailView: View {
     let asset: PHAsset
     let photoLibrary: PhotoLibraryManager
+    let isSelected: Bool
+    let onToggle: () -> Void
     
     @State private var thumbnail: UIImage?
     
     var body: some View {
-        Group {
-            if let thumbnail {
-                Image(uiImage: thumbnail)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Color.gray.opacity(0.2)
-                    .overlay(
-                        ProgressView()
-                    )
+        Button(action: onToggle) {
+            Group {
+                if let thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Color.gray.opacity(0.2)
+                        .overlay(
+                            ProgressView()
+                        )
+                }
             }
+            .frame(width: 100, height: 100)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 3 : 1)
+            )
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .background(Circle().fill(Color.blue))
+                        .padding(6)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
-        .frame(width: 100, height: 100)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
         .task {
             thumbnail = await photoLibrary.loadThumbnail(for: asset)
         }
@@ -415,5 +506,5 @@ struct PhotoThumbnailView: View {
 
 #Preview {
     RecipeImageAssignmentView()
-        .modelContainer(for: [RecipeImageAssignment.self, Recipe.self], inMemory: true)
+        .modelContainer(for: [Recipe.self], inMemory: true)
 }

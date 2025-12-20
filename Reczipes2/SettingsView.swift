@@ -47,6 +47,14 @@ struct SettingsView: View {
                            isOn: .constant(RecipeExtractorConfig.defaultUsePreprocessing))
                 }
                 
+                Section("Dietary Preferences") {
+                    NavigationLink {
+                        FODMAPSettingsView()
+                    } label: {
+                        Label("FODMAP Settings", systemImage: "leaf.circle")
+                    }
+                }
+                
                 Section("Legal") {
                     Button {
                         showLicenseAgreement = true

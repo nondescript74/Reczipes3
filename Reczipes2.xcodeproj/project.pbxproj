@@ -6,6 +6,10 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F89D3B622EF60B9700B52212 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		F8C80F542EE246D300AA52E7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F89D3B622EF60B9700B52212 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F8C80F442EE246D200AA52E7 /* Reczipes2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reczipes2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8C80F532EE246D300AA52E7 /* Reczipes2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8C80F5D2EE246D300AA52E7 /* Reczipes2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -97,6 +102,7 @@
 		F8C80F3B2EE246D200AA52E7 = {
 			isa = PBXGroup;
 			children = (
+				F89D3B622EF60B9700B52212 /* Assets.xcassets */,
 				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
 				F8C80F462EE246D200AA52E7 /* Reczipes2 */,
 				F8C80F562EE246D300AA52E7 /* Reczipes2Tests */,
@@ -227,6 +233,7 @@
 		F8C80F422EE246D200AA52E7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */,
 			);
 		};
 		F8C80F512EE246D300AA52E7 /* Resources */ = {
@@ -400,7 +407,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -453,7 +460,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;

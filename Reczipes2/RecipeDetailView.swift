@@ -17,13 +17,22 @@ struct RecipeDetailView: View {
     @Query private var savedRecipes: [Recipe]
     @Query private var allergenProfiles: [UserAllergenProfile]
     
+    @StateObject private var fodmapSettings = UserFODMAPSettings.shared
+    
     @State private var showingEditor = false
     @State private var showingRemindersAlert = false
     @State private var remindersAlertMessage = ""
     @State private var isExportingToReminders = false
     @State private var showingAllergenDetail = false
+    @State private var showingFODMAPSubstitutions = true // Default to showing substitutions
+    @State private var showingFODMAPGuide = false
     
     private let remindersService = RemindersService()
+    
+    // FODMAP analysis
+    private var fodmapAnalysis: RecipeFODMAPSubstitutions {
+        FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
+    }
     
     init(recipe: RecipeModel, 
          isSaved: Bool, 
@@ -165,6 +174,41 @@ struct RecipeDetailView: View {
                     Divider()
                 }
                 
+                // FODMAP Substitutions Section (if there are any high FODMAP ingredients)
+                if fodmapSettings.isFODMAPEnabled && fodmapAnalysis.hasSubstitutions {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Label("FODMAP Friendly Options", systemImage: "leaf.circle.fill")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.orange)
+                            
+                            Spacer()
+                            
+                            Button {
+                                withAnimation {
+                                    showingFODMAPSubstitutions.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(showingFODMAPSubstitutions ? "Hide" : "Show")
+                                        .font(.subheadline)
+                                    Image(systemName: showingFODMAPSubstitutions ? "chevron.up" : "chevron.down")
+                                        .font(.caption)
+                                }
+                                .foregroundStyle(.blue)
+                            }
+                        }
+                        
+                        if showingFODMAPSubstitutions {
+                            FODMAPSubstitutionSection(analysis: fodmapAnalysis)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                }
+                
                 // Ingredients Section
                 VStack(alignment: .leading, spacing: 16) {
                     Label("Ingredients", systemImage: "list.bullet")
@@ -181,40 +225,15 @@ struct RecipeDetailView: View {
                             }
                             
                             ForEach(section.ingredients) { ingredient in
-                                HStack(alignment: .top, spacing: 8) {
-                                    Circle()
-                                        .fill(Color.blue)
-                                        .frame(width: 6, height: 6)
-                                        .padding(.top, 6)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        HStack {
-                                            if let quantity = ingredient.quantity, !quantity.isEmpty {
-                                                Text(quantity)
-                                                    .fontWeight(.semibold)
-                                            }
-                                            if let unit = ingredient.unit, !unit.isEmpty {
-                                                Text(unit)
-                                                    .fontWeight(.medium)
-                                            }
-                                            Text(ingredient.name)
-                                        }
-                                        
-                                        if let prep = ingredient.preparation {
-                                            Text(prep)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .italic()
-                                        }
-                                        
-                                        if let metricQuantity = ingredient.metricQuantity,
-                                           let metricUnit = ingredient.metricUnit {
-                                            Text("(\(metricQuantity) \(metricUnit))")
-                                                .font(.caption2)
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                    }
-                                }
+                                // Check if this ingredient has a FODMAP substitution
+                                let substitution = fodmapSettings.isFODMAPEnabled && fodmapSettings.showInlineIndicators
+                                    ? FODMAPSubstitutionDatabase.shared.getSubstitutions(for: ingredient.name)
+                                    : nil
+                                
+                                IngredientRowWithFODMAP(
+                                    ingredient: ingredient,
+                                    substitution: substitution
+                                )
                             }
                             
                             if let transitionNote = section.transitionNote {
@@ -352,6 +371,16 @@ struct RecipeDetailView: View {
                 .disabled(isExportingToReminders)
             }
             
+            // FODMAP Guide button
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    showingFODMAPGuide = true
+                } label: {
+                    Label("FODMAP Guide", systemImage: "book.circle")
+                }
+            }
+            
+            // Edit button (only for saved recipes)
             if isSaved {
                 ToolbarItem(placement: .secondaryAction) {
                     Button {
@@ -371,6 +400,9 @@ struct RecipeDetailView: View {
             if let score = allergenScore {
                 RecipeAllergenDetailView(recipe: recipe, score: score)
             }
+        }
+        .sheet(isPresented: $showingFODMAPGuide) {
+            FODMAPQuickReferenceView()
         }
         .alert("Reminders", isPresented: $showingRemindersAlert) {
             Button("OK", role: .cancel) { }
