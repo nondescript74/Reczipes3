@@ -14,10 +14,13 @@ struct RecipeDetailView: View {
     let onSave: () -> Void
     let previewImage: UIImage? // Optional image for unsaved recipes being previewed
     
+    @Environment(\.modelContext) private var modelContext
+    
     @Query private var savedRecipes: [Recipe]
     @Query private var allergenProfiles: [UserAllergenProfile]
     
     @StateObject private var fodmapSettings = UserFODMAPSettings.shared
+    @StateObject private var diabeticSettings = UserDiabeticSettings.shared
     
     @State private var showingEditor = false
     @State private var showingRemindersAlert = false
@@ -26,6 +29,10 @@ struct RecipeDetailView: View {
     @State private var showingAllergenDetail = false
     @State private var showingFODMAPSubstitutions = true // Default to showing substitutions
     @State private var showingFODMAPGuide = false
+    
+    // Diabetic analysis
+    @State private var diabeticInfo: DiabeticInfo?
+    @State private var isLoadingDiabeticInfo = false
     
     private let remindersService = RemindersService()
     
@@ -202,6 +209,54 @@ struct RecipeDetailView: View {
                         
                         if showingFODMAPSubstitutions {
                             FODMAPSubstitutionSection(analysis: fodmapAnalysis)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                }
+                
+                // Diabetic-Friendly Analysis Section
+                if diabeticSettings.isDiabeticEnabled {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Label("Diabetic-Friendly Analysis", systemImage: "heart.text.square")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.red)
+                            
+                            Spacer()
+                        }
+                        
+                        if let info = diabeticInfo {
+                            DiabeticInfoView(info: info)
+                        } else if isLoadingDiabeticInfo {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 8)
+                                Text("Analyzing recipe...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
+                        } else {
+                            Button {
+                                Task {
+                                    await loadDiabeticInfo()
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "waveform.path.ecg")
+                                    Text("Analyze for Diabetic-Friendly Info")
+                                }
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red.opacity(0.1))
+                                .foregroundStyle(.red)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
                         }
                     }
                     .padding(.vertical, 8)
@@ -433,6 +488,36 @@ struct RecipeDetailView: View {
         }
         
         isExportingToReminders = false
+    }
+    
+    // MARK: - Diabetic Analysis
+    
+    private func loadDiabeticInfo() async {
+        isLoadingDiabeticInfo = true
+        defer { isLoadingDiabeticInfo = false }
+        
+        do {
+            // Get the model container from the context
+            let modelContainer = modelContext.container
+            
+            // For saved recipes, use the saved Recipe entity
+            if let savedRecipe = savedRecipe {
+                diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
+                    for: savedRecipe,
+                    modelContainer: modelContainer
+                )
+            } else {
+                // For unsaved recipes, use RecipeModel
+                diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
+                    for: recipe,
+                    modelContainer: modelContainer
+                )
+            }
+        } catch {
+            // Handle error - show alert to user
+            remindersAlertMessage = "Failed to analyze recipe: \(error.localizedDescription)"
+            showingRemindersAlert = true
+        }
     }
     
     private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {

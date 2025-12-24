@@ -47,11 +47,32 @@ struct SettingsView: View {
                            isOn: .constant(RecipeExtractorConfig.defaultUsePreprocessing))
                 }
                 
-                Section("Dietary Preferences") {
+                Section {
                     NavigationLink {
                         FODMAPSettingsView()
                     } label: {
                         Label("FODMAP Settings", systemImage: "leaf.circle")
+                    }
+                    
+                    NavigationLink {
+                        DiabeticSettingsView()
+                    } label: {
+                        HStack {
+                            Label("Diabetic-Friendly Analysis", systemImage: "heart.text.square")
+                            Spacer()
+                            if UserDiabeticSettings.shared.isDiabeticEnabled {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Dietary Preferences")
+                } footer: {
+                    if UserDiabeticSettings.shared.isDiabeticEnabled {
+                        Text("Diabetic-friendly analysis is enabled. Recipes can show glycemic load, carb counts, and substitution suggestions.")
+                            .font(.caption)
                     }
                 }
                 
@@ -80,7 +101,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                Section("Help & Support") {
+                Section {
                     Button {
                         showHelpBrowser = true
                     } label: {
@@ -115,6 +136,16 @@ struct SettingsView: View {
                         }
                     }
                     
+                    Link(destination: URL(string: "https://diabetes.org")!) {
+                        HStack {
+                            Label("American Diabetes Association", systemImage: "link")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
                     Link(destination: URL(string: "https://console.anthropic.com")!) {
                         HStack {
                             Label("Get Claude API Key", systemImage: "link")
@@ -124,6 +155,11 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                } header: {
+                    Text("Help & Support")
+                } footer: {
+                    Text("External resources for FODMAP information, diabetes management, and API access.")
+                        .font(.caption)
                 }
                 
                 Section("About") {

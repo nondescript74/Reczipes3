@@ -69,13 +69,24 @@ The Settings view now includes a "Legal" section where users can:
 
 The license specifically addresses:
 
-1. **User Responsibility for Content** - Users assume full responsibility for all recipes, text, and images
-2. **Content Usage and IP** - Users must have rights to use and share content
-3. **AI-Powered Extraction** - Disclaimers about AI accuracy
-4. **Privacy and Data** - How data is handled (locally + Claude API)
-5. **No Warranty** - App provided "as is"
-6. **Limitation of Liability** - Developer not liable for content issues
-7. **Acceptance** - Clear acknowledgment of terms
+1. **No Medical, Dietary, or Nutritional Advice** - Clear statement that app provides information only, not professional guidance
+2. **User Responsibility for Content** - Users assume full responsibility for all recipes, text, and images
+3. **Content Usage and IP** - Users must have rights to use and share content
+4. **AI-Powered Extraction** - Disclaimers about AI accuracy in recipe extraction
+5. **Allergen Detection and Food Safety** - Warnings about limitations of allergen detection
+6. **Diabetic-Friendly Analysis and Nutritional Information** - Comprehensive disclaimers about:
+   - Informational nature only (not medical advice)
+   - AI-generated analysis limitations
+   - Glycemic load and carbohydrate calculation accuracy
+   - Individual metabolic response variations
+   - Need for healthcare professional consultation
+   - 30-day caching policy
+   - Source transparency and verification responsibility
+7. **Privacy and Data** - How data is handled (locally + Claude API), including diabetic analysis caching
+8. **No Warranty** - App provided "as is", including nutritional analysis features
+9. **Limitation of Liability** - Developer not liable for content issues, health complications, or blood sugar management issues
+10. **Third-Party Content and Sources** - Disclaimers about recipe sources and medical source aggregation
+11. **Acceptance** - Clear acknowledgment of all terms including health-related features
 
 ## Testing
 
@@ -97,9 +108,14 @@ LicenseHelper.resetLicenseAcceptance()
 If license terms need to be updated:
 
 1. Update `LicenseHelper.licenseText` with new terms
-2. Update `LicenseHelper.currentLicenseVersion` (e.g., "1.1")
+2. Update `LicenseHelper.currentLicenseVersion` (e.g., "2.1" for diabetic analysis additions, "2.2" for next update)
 3. Update the "Last Updated" date in the license text
 4. Users will be prompted to re-accept on next launch
+
+**Version History:**
+- **v1.0** - Initial license with recipe extraction, allergen detection
+- **v2.0** - Enhanced medical disclaimers and IP protections
+- **v2.1** - Added diabetic-friendly analysis comprehensive disclaimers and guidelines compliance
 
 ## Platform Support
 
