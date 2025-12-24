@@ -875,15 +875,30 @@ struct RecipeExtractorView: View {
         logDebug("Recipe ID: \(recipe.id)", category: "storage")
         logDebug("Recipe imageName before save: \(recipe.imageName ?? "nil")", category: "storage")
         
-        // Save all images
+        // Save all images and build additionalImageNames array
+        var additionalImageFilenames: [String] = []
         for (index, image) in imagesToSave.enumerated() {
+            let filename: String
             if index == 0 {
                 // First image is the main thumbnail
-                saveRecipeImage(image, for: recipe.id, isMainImage: true)
+                filename = "recipe_\(recipe.id.uuidString).jpg"
+                saveImageToDisk(image, filename: filename)
+                
+                // Create image assignment for compatibility
+                let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
+                modelContext.insert(assignment)
             } else {
                 // Additional images
-                saveRecipeImage(image, for: recipe.id, imageIndex: index)
+                filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
+                saveImageToDisk(image, filename: filename)
+                additionalImageFilenames.append(filename)
             }
+        }
+        
+        // Set additionalImageNames on the recipe BEFORE saving context
+        if !additionalImageFilenames.isEmpty {
+            recipe.additionalImageNames = additionalImageFilenames
+            logInfo("Set recipe.additionalImageNames to \(additionalImageFilenames.count) images: \(additionalImageFilenames)", category: "storage")
         }
         
         // Save the context
@@ -920,6 +935,23 @@ struct RecipeExtractorView: View {
     
     // MARK: - Image Management
     
+    private func saveImageToDisk(_ image: UIImage, filename: String) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            logError("Failed to convert image to JPEG data", category: "storage")
+            return
+        }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        do {
+            try imageData.write(to: fileURL)
+            logInfo("Saved recipe image to: \(fileURL.path)", category: "storage")
+        } catch {
+            logError("Error saving recipe image: \(error)", category: "storage")
+        }
+    }
+    
     private func saveRecipeImage(_ image: UIImage, for recipeID: UUID, isMainImage: Bool = false, imageIndex: Int = 0) {
         // Generate a unique filename
         let filename: String
@@ -949,6 +981,20 @@ struct RecipeExtractorView: View {
                 logDebug("Created image assignment for recipe: \(recipeID)", category: "storage")
             } else {
                 logDebug("Saved additional image \(imageIndex) for recipe: \(recipeID)", category: "storage")
+                
+                // ✅ FIX: Add the filename to the recipe's additionalImageNames array
+                // Find the recipe we just inserted
+                let descriptor = FetchDescriptor<Recipe>(
+                    predicate: #Predicate { $0.id == recipeID }
+                )
+                if let recipe = try? modelContext.fetch(descriptor).first {
+                    var additionalImages = recipe.additionalImageNames ?? []
+                    additionalImages.append(filename)
+                    recipe.additionalImageNames = additionalImages
+                    logInfo("Added '\(filename)' to recipe.additionalImageNames (now \(additionalImages.count) additional images)", category: "storage")
+                } else {
+                    logError("Could not find recipe \(recipeID) to update additionalImageNames", category: "storage")
+                }
             }
             
         } catch {

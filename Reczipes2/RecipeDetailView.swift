@@ -82,22 +82,46 @@ struct RecipeDetailView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity)
-                        .frame(maxHeight: 400)
+                        .frame(maxHeight: 200)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                         .padding(.horizontal)
                 } else if let imageName = recipe.imageName {
-                    // Show the saved image (for saved recipes)
-                    RecipeImageView(
-                        imageName: imageName,
-                        size: nil,  // No fixed size - let it adapt
-                        aspectRatio: .fit,
-                        cornerRadius: 16
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: 400)
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                    .padding(.horizontal)
+                    // Get all image names (main + additional + imageURLs)
+                    let allImageNames = getAllImageNames(for: recipe)
+                    
+                    if allImageNames.count > 1 {
+                        // Show scrollable gallery for multiple images
+                        TabView {
+                            ForEach(allImageNames, id: \.self) { imageNameItem in
+                                RecipeImageView(
+                                    imageName: imageNameItem,
+                                    size: nil,
+                                    aspectRatio: .fit,
+                                    cornerRadius: 16
+                                )
+                                .frame(maxWidth: .infinity)
+                                .frame(maxHeight: 200)
+                                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                .padding(.horizontal)
+                            }
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .always))
+                        .frame(height: 220) // Slightly taller to accommodate page indicator
+                        .indexViewStyle(.page(backgroundDisplayMode: .always))
+                    } else {
+                        // Show single image (saved recipes)
+                        RecipeImageView(
+                            imageName: imageName,
+                            size: nil,  // No fixed size - let it adapt
+                            aspectRatio: .fit,
+                            cornerRadius: 16
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: 200)
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        .padding(.horizontal)
+                    }
                 }
                 
                 // Header Section
@@ -594,6 +618,39 @@ struct RecipeDetailView: View {
         
         // Continue analysis from where it left off
         await loadDiabeticInfo()
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func getAllImageNames(for recipe: RecipeModel) -> [String] {
+        var names: [String] = []
+        
+        // Add main image
+        if let imageName = recipe.imageName {
+            names.append(imageName)
+        }
+        
+        // Add additionalImageNames if available
+        if let additionalNames = recipe.additionalImageNames {
+            names.append(contentsOf: additionalNames)
+        }
+        
+        // Add imageURLs if available (these might be local file names)
+        if let imageURLs = recipe.imageURLs {
+            names.append(contentsOf: imageURLs)
+        }
+        
+        // Remove duplicates while preserving order
+        let uniqueNames = names.reduce(into: [String]()) { result, item in
+            if !result.contains(item) {
+                result.append(item)
+            }
+        }
+        
+        // Debug: Log image count
+        logDebug("Recipe '\(recipe.title)' has \(uniqueNames.count) images: \(uniqueNames)", category: "images")
+        
+        return uniqueNames
     }
     
     private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
