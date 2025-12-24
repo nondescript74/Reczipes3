@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var showingRecipeExtractor = false
     @State private var showingAllergenProfiles = false
     @State private var showingBackup = false
+    @State private var showingSearch = false
     @State private var allergenFilterEnabled = false
     @State private var showOnlySafe = false
     
@@ -218,6 +219,14 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        showingSearch = true
+                    } label: {
+                        Label("Search Recipes", systemImage: "magnifyingglass")
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
                         showingRecipeExtractor = true
                     } label: {
                         Label("Extract Recipe", systemImage: "plus.circle")
@@ -242,6 +251,14 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        showingSearch = true
+                    } label: {
+                        Label("Search Recipes", systemImage: "magnifyingglass")
+                    }
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
                         showingRecipeExtractor = true
                     } label: {
                         Label("Extract Recipe", systemImage: "plus.circle")
@@ -260,6 +277,12 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingBackup) {
                 RecipeBackupView()
+            }
+            .sheet(isPresented: $showingSearch) {
+                RecipeSearchModalView(
+                    recipes: .constant(availableRecipes),
+                    selectedRecipe: $selectedRecipe
+                )
             }
         }
     }
