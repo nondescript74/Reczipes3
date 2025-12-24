@@ -11,6 +11,7 @@ import SwiftData
 
 struct RecipeExtractorView: View {
     @StateObject private var viewModel: RecipeExtractorViewModel
+    @EnvironmentObject private var appState: AppStateManager
     @State private var showImagePicker = false
     @State private var showCamera = false
     @State private var showImageComparison = false
@@ -21,6 +22,8 @@ struct RecipeExtractorView: View {
     @State private var downloadedWebImages: [UIImage] = []
     @State private var isDownloadingImage = false
     @State private var extractionSource: ExtractionSource = .none
+    @State private var extractionProgress: Double = 0.0
+    @State private var showPendingExtractionAlert = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
@@ -79,24 +82,10 @@ struct RecipeExtractorView: View {
             .navigationTitle("Recipe Extractor")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-//                ToolbarItem(placement: .navigationBarLeading) {
-//                    Button("Close") {
-//                        dismiss()
-//                    }
-//                }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.extractedRecipe != nil {
-//                        Button {
-//                            logInfo("Save Recipe button tapped", category: "ui")
-//                            saveRecipe()
-//                        } label: {
-//                            Text("Save Recipe")
-//                        }
-//                        .buttonStyle(.borderedProminent)
-//                        .onAppear {
-//                            logInfo("Save Recipe button is visible for: \(recipe.title)", category: "ui")
-//                        }
+                        // nothing for now
+
                     } else {
                         Text("No recipe")
                             .onAppear {
@@ -141,6 +130,18 @@ struct RecipeExtractorView: View {
             }
             .sheet(isPresented: $showImagePicker) {
                 ImagePicker(image: $viewModel.selectedImage, sourceType: .photoLibrary) { image in
+                    // Save input data for task restoration
+                    if let imageData = image.jpegData(compressionQuality: 0.8) {
+                        let inputData = ExtractionInputData(
+                            imageData: imageData,
+                            textInput: nil,
+                            timestamp: Date()
+                        )
+                        if let encoded = try? JSONEncoder().encode(inputData) {
+                            appState.startTask(type: .extraction, inputData: encoded)
+                        }
+                    }
+                    
                     Task {
                         await viewModel.extractRecipe(from: image)
                     }
@@ -148,6 +149,18 @@ struct RecipeExtractorView: View {
             }
             .sheet(isPresented: $showCamera) {
                 ImagePicker(image: $viewModel.selectedImage, sourceType: .camera) { image in
+                    // Save input data for task restoration
+                    if let imageData = image.jpegData(compressionQuality: 0.8) {
+                        let inputData = ExtractionInputData(
+                            imageData: imageData,
+                            textInput: nil,
+                            timestamp: Date()
+                        )
+                        if let encoded = try? JSONEncoder().encode(inputData) {
+                            appState.startTask(type: .extraction, inputData: encoded)
+                        }
+                    }
+                    
                     Task {
                         await viewModel.extractRecipe(from: image)
                     }
@@ -158,6 +171,24 @@ struct RecipeExtractorView: View {
                    let processed = viewModel.processedImage {
                     ImageComparisonView(original: original, processed: processed)
                 }
+            }
+            .onAppear {
+                checkForPendingExtraction()
+            }
+            .trackTask(
+                type: .extraction,
+                progress: extractionProgress,
+                isActive: viewModel.isLoading
+            )
+            .alert("Resume Extraction?", isPresented: $showPendingExtractionAlert) {
+                Button("Resume") {
+                    resumeExtraction()
+                }
+                Button("Cancel", role: .cancel) {
+                    appState.completeTask()
+                }
+            } message: {
+                Text("You have an extraction in progress. Would you like to resume where you left off?")
             }
         }
     }
@@ -263,6 +294,16 @@ struct RecipeExtractorView: View {
                 .textContentType(.URL)
             
             Button {
+                // Save input data for task restoration
+                let inputData = ExtractionInputData(
+                    imageData: nil,
+                    textInput: viewModel.recipeURL,
+                    timestamp: Date()
+                )
+                if let encoded = try? JSONEncoder().encode(inputData) {
+                    appState.startTask(type: .extraction, inputData: encoded)
+                }
+                
                 Task {
                     await viewModel.extractRecipe(from: viewModel.recipeURL)
                 }
@@ -370,10 +411,32 @@ struct RecipeExtractorView: View {
             
             Button("Try Again") {
                 if extractionSource == .url, !viewModel.recipeURL.isEmpty {
+                    // Save input data for task restoration
+                    let inputData = ExtractionInputData(
+                        imageData: nil,
+                        textInput: viewModel.recipeURL,
+                        timestamp: Date()
+                    )
+                    if let encoded = try? JSONEncoder().encode(inputData) {
+                        appState.startTask(type: .extraction, inputData: encoded)
+                    }
+                    
                     Task {
                         await viewModel.extractRecipe(from: viewModel.recipeURL)
                     }
                 } else if let image = viewModel.selectedImage {
+                    // Save input data for task restoration
+                    if let imageData = image.jpegData(compressionQuality: 0.8) {
+                        let inputData = ExtractionInputData(
+                            imageData: imageData,
+                            textInput: nil,
+                            timestamp: Date()
+                        )
+                        if let encoded = try? JSONEncoder().encode(inputData) {
+                            appState.startTask(type: .extraction, inputData: encoded)
+                        }
+                    }
+                    
                     Task {
                         await viewModel.extractRecipe(from: image)
                     }
@@ -890,6 +953,57 @@ struct RecipeExtractorView: View {
             
         } catch {
             logError("Error saving recipe image: \(error)", category: "storage")
+        }
+    }
+    
+    // MARK: - Task Restoration
+    
+    private func checkForPendingExtraction() {
+        // Check if there's a pending extraction task
+        if let task = appState.activeTask,
+           task.taskType == .extraction {
+            logInfo("Found pending extraction task with progress: \(task.progress)", category: "state")
+            showPendingExtractionAlert = true
+        }
+    }
+    
+    private func resumeExtraction() {
+        // Resume from saved progress
+        guard let task = appState.activeTask else { return }
+        
+        logInfo("Resuming extraction from progress: \(task.progress)", category: "state")
+        extractionProgress = task.progress
+        
+        // If we have saved input data, try to restore it
+        if let inputData = task.inputData,
+           let extractionInput = try? JSONDecoder().decode(ExtractionInputData.self, from: inputData) {
+            
+            // Restore image if available
+            if let imageData = extractionInput.imageData,
+               let image = UIImage(data: imageData) {
+                viewModel.selectedImage = image
+                extractionSource = .library
+                
+                // Resume extraction
+                Task {
+                    await viewModel.extractRecipe(from: image)
+                }
+            }
+            
+            // Restore URL if available
+            if let textInput = extractionInput.textInput, !textInput.isEmpty {
+                viewModel.recipeURL = textInput
+                extractionSource = .url
+                
+                // Resume extraction
+                Task {
+                    await viewModel.extractRecipe(from: textInput)
+                }
+            }
+        } else {
+            // No input data saved - just show the UI state
+            logWarning("No input data available to resume extraction", category: "state")
+            appState.completeTask()
         }
     }
 }

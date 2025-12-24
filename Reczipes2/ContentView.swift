@@ -14,6 +14,8 @@ struct ContentView: View {
     @Query private var imageAssignments: [RecipeImageAssignment]
     @Query private var allergenProfiles: [UserAllergenProfile]
     
+    @EnvironmentObject private var appState: AppStateManager
+    
     @State private var selectedRecipe: RecipeModel?
     @State private var showingImageAssignment = false
     @State private var showingDebug = false
@@ -109,6 +111,13 @@ struct ContentView: View {
                     description: Text("Choose a recipe from the list to view its details")
                 )
             }
+        }
+        .onAppear {
+            restoreSelectedRecipe()
+        }
+        .onChange(of: selectedRecipe) { _, newRecipe in
+            // Save selected recipe to app state when it changes
+            appState.selectedRecipeId = newRecipe?.id
         }
     }
     
@@ -302,6 +311,20 @@ struct ContentView: View {
     }
     
     // MARK: - Helper Methods
+    
+    private func restoreSelectedRecipe() {
+        // Restore selected recipe from app state if available
+        if let recipeId = appState.selectedRecipeId {
+            // Find the recipe in available recipes
+            if let recipe = availableRecipes.first(where: { $0.id == recipeId }) {
+                selectedRecipe = recipe
+                logInfo("Restored selected recipe: \(recipe.title)", category: "state")
+            } else {
+                // Recipe no longer exists, clear the selection
+                appState.selectedRecipeId = nil
+            }
+        }
+    }
     
     private func isRecipeSaved(_ recipe: RecipeModel) -> Bool {
         RecipeCollection.shared.isRecipeSaved(recipe, savedRecipes: savedRecipes)

@@ -11,6 +11,10 @@ import SwiftData
 @main
 struct Reczipes2App: App {
     
+    // State management
+    @StateObject private var appState = AppStateManager.shared
+    @StateObject private var taskRestoration = TaskRestorationCoordinator.shared
+    
     init() {
         // Suppress Auto Layout constraint warnings from UIKit internals
         UserDefaults.standard.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
@@ -31,7 +35,6 @@ struct Reczipes2App: App {
         }
     }()
     
-    @State private var showLaunchScreen = true
     @State private var showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
     @State private var showAPIKeySetup = false
     @Environment(\.scenePhase) private var scenePhase
@@ -41,6 +44,8 @@ struct Reczipes2App: App {
             ZStack {
                 MainTabView()
                     .modelContainer(sharedModelContainer)
+                    .environmentObject(appState)
+                    .environmentObject(taskRestoration)
                     .fullScreenCover(isPresented: $showLicenseAgreement) {
                         LicenseAgreementView(isPresented: $showLicenseAgreement)
                             .onDisappear {
@@ -61,47 +66,90 @@ struct Reczipes2App: App {
                         }
                     }
                 
-                // Launch screen overlay - only shows on initial launch
-                if showLaunchScreen {
+                // Launch screen overlay - only shows on true first launch
+                if appState.shouldShowLaunchScreen() {
                     LaunchScreenView {
-                        showLaunchScreen = false
+                        withAnimation {
+                            appState.isFirstLaunch = false
+                        }
                     }
                     .transition(.opacity)
                     .zIndex(1)
                 }
-            }
-            .onChange(of: scenePhase) { oldPhase, newPhase in
-                // Don't show launch screen when returning from background
-                if newPhase == .active && oldPhase == .background {
-                    showLaunchScreen = false
+                
+                // Task restoration prompt
+                if taskRestoration.showRestorationPrompt {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .zIndex(2)
+                    
+                    TaskRestorationPromptView(
+                        coordinator: taskRestoration,
+                        modelContainer: sharedModelContainer
+                    )
+                    .zIndex(3)
                 }
             }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
+            }
+        }
+    }
+    
+    // MARK: - Scene Phase Handling
+    
+    private func handleScenePhaseChange(oldPhase: ScenePhase, newPhase: ScenePhase) {
+        // Notify app state manager
+        appState.handleScenePhaseChange(newPhase)
+        
+        switch newPhase {
+        case .active:
+            // App is now active - check if we need to restore tasks
+            if oldPhase == .background {
+                logInfo("App returning from background", category: "state")
+                taskRestoration.checkForTaskRestoration()
+            }
+            
+        case .background:
+            // App is going to background - state is automatically saved by AppStateManager
+            logInfo("App entering background", category: "state")
+            
+        case .inactive:
+            break
+            
+        @unknown default:
+            break
         }
     }
 }
 
 // MARK: - Main Tab View
 
-struct MainTabView: View {    
+struct MainTabView: View {
+    @EnvironmentObject private var appState: AppStateManager
+    
     var body: some View {
-        TabView {
+        TabView(selection: $appState.currentTab) {
             // Existing recipes tab
             ContentView()
                 .tabItem {
                     Label("Recipes", systemImage: "book.fill")
                 }
+                .tag(AppTab.recipes)
             
             // Extraction tab - always visible
             RecipeExtractorTabWrapper()
                 .tabItem {
                     Label("Extract", systemImage: "camera.fill")
                 }
+                .tag(AppTab.extract)
             
             // Settings tab
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
+                .tag(AppTab.settings)
         }
     }
 }

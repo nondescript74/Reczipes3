@@ -15,6 +15,7 @@ struct RecipeDetailView: View {
     let previewImage: UIImage? // Optional image for unsaved recipes being previewed
     
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppStateManager
     
     @Query private var savedRecipes: [Recipe]
     @Query private var allergenProfiles: [UserAllergenProfile]
@@ -33,6 +34,8 @@ struct RecipeDetailView: View {
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
     @State private var isLoadingDiabeticInfo = false
+    @State private var analysisProgress: Double = 0.0
+    @State private var showPendingAnalysisAlert = false
     
     private let remindersService = RemindersService()
     
@@ -231,11 +234,13 @@ struct RecipeDetailView: View {
                         if let info = diabeticInfo {
                             DiabeticInfoView(info: info)
                         } else if isLoadingDiabeticInfo {
-                            HStack {
-                                ProgressView()
-                                    .padding(.trailing, 8)
-                                Text("Analyzing recipe...")
-                                    .font(.subheadline)
+                            VStack(spacing: 12) {
+                                ProgressView("Analyzing recipe...", value: analysisProgress)
+                                    .progressViewStyle(.linear)
+                                    .tint(.red)
+                                
+                                Text("\(Int(analysisProgress * 100))% complete")
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
@@ -464,6 +469,27 @@ struct RecipeDetailView: View {
         } message: {
             Text(remindersAlertMessage)
         }
+        .onAppear {
+            checkForPendingAnalysis()
+        }
+        .trackTask(
+            type: .diabeticAnalysis,
+            recipeId: recipe.id,
+            progress: analysisProgress,
+            isActive: isLoadingDiabeticInfo
+        )
+        .alert("Resume Analysis?", isPresented: $showPendingAnalysisAlert) {
+            Button("Resume") {
+                Task {
+                    await resumeAnalysis()
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                appState.completeTask()
+            }
+        } message: {
+            Text("You have a diabetic analysis in progress for this recipe. Would you like to resume?")
+        }
     }
     
     // MARK: - Export to Reminders
@@ -494,30 +520,80 @@ struct RecipeDetailView: View {
     
     private func loadDiabeticInfo() async {
         isLoadingDiabeticInfo = true
-        defer { isLoadingDiabeticInfo = false }
+        analysisProgress = 0.0
+        defer { 
+            isLoadingDiabeticInfo = false
+            analysisProgress = 0.0
+        }
         
         do {
+            // Progress: Preparing request
+            analysisProgress = 0.1
+            logInfo("Starting diabetic analysis for recipe: \(recipe.title)", category: "diabetic")
+            
             // Get the model container from the context
             let modelContainer = modelContext.container
             
+            // Progress: Container ready
+            analysisProgress = 0.2
+            
             // For saved recipes, use the saved Recipe entity
             if let savedRecipe = savedRecipe {
+                analysisProgress = 0.3
+                logInfo("Analyzing saved recipe", category: "diabetic")
+                
                 diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
                     for: savedRecipe,
                     modelContainer: modelContainer
                 )
             } else {
+                analysisProgress = 0.3
+                logInfo("Analyzing unsaved recipe", category: "diabetic")
+                
                 // For unsaved recipes, use RecipeModel
                 diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
                     for: recipe,
                     modelContainer: modelContainer
                 )
             }
+            
+            // Progress: Analysis complete
+            analysisProgress = 1.0
+            logInfo("Diabetic analysis completed successfully", category: "diabetic")
+            
         } catch {
             // Handle error - show alert to user
+            logError("Diabetic analysis failed: \(error)", category: "diabetic")
             remindersAlertMessage = "Failed to analyze recipe: \(error.localizedDescription)"
             showingRemindersAlert = true
         }
+    }
+    
+    // MARK: - Task Restoration
+    
+    private func checkForPendingAnalysis() {
+        // Check if there's a pending analysis task for this recipe
+        if let task = appState.activeTask,
+           task.taskType == .diabeticAnalysis,
+           task.recipeId == recipe.id {
+            logInfo("Found pending diabetic analysis for recipe: \(recipe.title)", category: "state")
+            showPendingAnalysisAlert = true
+        }
+    }
+    
+    private func resumeAnalysis() async {
+        // Resume from saved progress
+        guard let task = appState.activeTask,
+              task.recipeId == recipe.id else { 
+            appState.completeTask()
+            return 
+        }
+        
+        logInfo("Resuming diabetic analysis from progress: \(task.progress)", category: "state")
+        analysisProgress = task.progress
+        
+        // Continue analysis from where it left off
+        await loadDiabeticInfo()
     }
     
     private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
