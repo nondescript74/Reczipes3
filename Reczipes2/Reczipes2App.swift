@@ -18,6 +18,17 @@ struct Reczipes2App: App {
     init() {
         // Suppress Auto Layout constraint warnings from UIKit internals
         UserDefaults.standard.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
+        
+        // Handle UI testing mode
+        if ProcessInfo.processInfo.arguments.contains("UI_TESTING") {
+            // Accept license and set up API key for testing
+            LicenseHelper.acceptLicense()
+            // Set a dummy API key for testing (won't actually work but allows UI to load)
+            _ = APIKeyHelper.setAPIKey("sk-ant-test-key-for-ui-testing")
+            // Skip first launch screens
+            UserDefaults.standard.set(false, forKey: "shouldShowLaunchScreen")
+            logInfo("🧪 UI Testing mode enabled - bypassing onboarding", category: "testing")
+        }
     }
     
     var sharedModelContainer: ModelContainer = {

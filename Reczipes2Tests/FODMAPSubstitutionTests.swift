@@ -227,6 +227,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Settings Tests
     
     @Test("FODMAP settings have default values")
+    @MainActor
     func testSettingsDefaults() {
         let settings = UserFODMAPSettings.shared
         
@@ -395,6 +396,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Performance Tests
     
     @Test("Database lookup is fast")
+    @MainActor
     func testLookupPerformance() async {
         let db = FODMAPSubstitutionDatabase.shared
         let startTime = Date()
@@ -409,6 +411,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Recipe analysis is fast")
+    @MainActor
     func testAnalysisPerformance() async {
         let recipe = RecipeModel(
             title: "Large Recipe",
@@ -442,6 +445,7 @@ struct FODMAPSubstitutionTests {
 struct FODMAPIntegrationTests {
     
     @Test("Settings persistence")
+    @MainActor
     func testSettingsPersistence() {
         let settings = UserFODMAPSettings.shared
         

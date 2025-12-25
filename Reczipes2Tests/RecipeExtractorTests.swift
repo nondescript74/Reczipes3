@@ -99,6 +99,7 @@ class RecipeExtractorTests: XCTestCase {
     
     // MARK: - JSON Parsing Tests
     
+    @MainActor
     func testRecipeResponseParsing() {
         let json = """
         {
@@ -393,9 +394,9 @@ class TestImageGenerator {
 
 class RecipeExtractorPerformanceTests: XCTestCase {
     
-    func testImagePreprocessingPerformance() {
+    func testImagePreprocessingPerformance() throws {
         guard let testImage = UIImage(named: "test_recipe_card") else {
-            XCTSkip("Test image not available")
+            throw XCTSkip("Test image not available")
         }
         
         let preprocessor = ImagePreprocessor()
@@ -405,13 +406,21 @@ class RecipeExtractorPerformanceTests: XCTestCase {
         }
     }
     
+    @MainActor
     func testRecipeJSONParsingPerformance() {
         let json = createLargeRecipeJSON()
         let jsonData = json.data(using: .utf8)!
         
         measure {
-            _ = try? JSONDecoder().decode(RecipeResponse.self, from: jsonData)
+            _ = try? decodeRecipeResponse(from: jsonData)
         }
+    }
+    
+    // Helper function to decode RecipeResponse
+    @MainActor
+    private func decodeRecipeResponse(from data: Data) throws -> RecipeResponse {
+        let decoder = JSONDecoder()
+        return try decoder.decode(RecipeResponse.self, from: data)
     }
     
     private func createLargeRecipeJSON() -> String {
