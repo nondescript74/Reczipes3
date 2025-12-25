@@ -24,6 +24,21 @@ final class Recipe {
     var instructionSectionsData: Data?
     var notesData: Data?
     
+    // Version tracking for cache invalidation (optional for backward compatibility)
+    var version: Int? // Increments on each edit, defaults to 1 for existing recipes
+    var lastModified: Date? // Timestamp of last modification
+    var ingredientsHash: String? // Hash of ingredients for change detection
+    
+    // Computed property for safe version access
+    var currentVersion: Int {
+        return version ?? 1
+    }
+    
+    // Computed property for safe lastModified access
+    var modificationDate: Date {
+        return lastModified ?? dateAdded
+    }
+    
     init(id: UUID = UUID(),
          title: String,
          headerNotes: String? = nil,
@@ -34,7 +49,10 @@ final class Recipe {
          additionalImageNames: [String]? = nil,
          ingredientSectionsData: Data? = nil,
          instructionSectionsData: Data? = nil,
-         notesData: Data? = nil) {
+         notesData: Data? = nil,
+         version: Int? = 1,
+         lastModified: Date? = nil,
+         ingredientsHash: String? = nil) {
         self.id = id
         self.title = title
         self.headerNotes = headerNotes
@@ -46,6 +64,9 @@ final class Recipe {
         self.ingredientSectionsData = ingredientSectionsData
         self.instructionSectionsData = instructionSectionsData
         self.notesData = notesData
+        self.version = version
+        self.lastModified = lastModified ?? Date()
+        self.ingredientsHash = ingredientsHash ?? Self.calculateIngredientsHash(from: ingredientSectionsData)
     }
     
     // Helper computed properties
@@ -85,8 +106,52 @@ final class Recipe {
             imageName: recipeModel.imageName,
             ingredientSectionsData: ingredientsData,
             instructionSectionsData: instructionsData,
-            notesData: notesData
+            notesData: notesData,
+            version: 1,
+            lastModified: Date(),
+            ingredientsHash: Self.calculateIngredientsHash(from: ingredientsData)
         )
+    }
+    
+    // MARK: - Ingredient Change Detection
+    
+    /// Calculate a hash of the ingredients for change detection
+    static func calculateIngredientsHash(from ingredientsData: Data?) -> String {
+        guard let data = ingredientsData else { return "" }
+        
+        // Decode the ingredients
+        let decoder = JSONDecoder()
+        guard let sections = try? decoder.decode([IngredientSection].self, from: data) else {
+            return ""
+        }
+        
+        // Create a stable string representation of ingredients
+        // Include: name, quantity, unit (but not preparation, as that's less critical)
+        let ingredientStrings = sections.flatMap { section in
+            section.ingredients.map { ingredient in
+                let qty = ingredient.quantity ?? ""
+                let unit = ingredient.unit ?? ""
+                let name = ingredient.name
+                return "\(qty)|\(unit)|\(name)"
+            }
+        }.sorted() // Sort for stable ordering
+        
+        let combined = ingredientStrings.joined(separator: "||")
+        return combined.sha256Hash()
+    }
+    
+    /// Update the recipe with new data and increment version
+    func updateIngredients(_ ingredientsData: Data) {
+        self.ingredientSectionsData = ingredientsData
+        self.ingredientsHash = Self.calculateIngredientsHash(from: ingredientsData)
+        self.version = currentVersion + 1 // Use computed property for safe access
+        self.lastModified = Date()
+    }
+    
+    /// Check if ingredients have changed compared to a hash
+    func hasIngredientsChanged(comparedTo hash: String?) -> Bool {
+        guard let hash = hash else { return true }
+        return self.ingredientsHash != hash
     }
     
     // Convert back to RecipeModel for display
@@ -116,3 +181,16 @@ final class Recipe {
         )
     }
 }
+// MARK: - String Extension for SHA256 Hashing
+
+import CryptoKit
+
+extension String {
+    /// Generate SHA256 hash of the string
+    func sha256Hash() -> String {
+        let inputData = Data(self.utf8)
+        let hashed = SHA256.hash(data: inputData)
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
+

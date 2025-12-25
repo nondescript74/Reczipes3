@@ -15,16 +15,55 @@ final class CachedDiabeticAnalysis {
     var analysisData: Data // Encoded DiabeticInfo
     var cachedAt: Date
     
-    init(recipeId: UUID, analysisData: Data, cachedAt: Date = Date()) {
+    // Ingredient change tracking
+    var recipeVersion: Int // Recipe version when analyzed
+    var ingredientsHash: String // Hash of ingredients when analyzed
+    var recipeLastModified: Date // Recipe's lastModified when analyzed
+    
+    init(recipeId: UUID, 
+         analysisData: Data, 
+         cachedAt: Date = Date(),
+         recipeVersion: Int,
+         ingredientsHash: String,
+         recipeLastModified: Date) {
         self.recipeId = recipeId
         self.analysisData = analysisData
         self.cachedAt = cachedAt
+        self.recipeVersion = recipeVersion
+        self.ingredientsHash = ingredientsHash
+        self.recipeLastModified = recipeLastModified
     }
     
     /// Check if this cached analysis is still valid (30 days per guidelines)
     var isStale: Bool {
         let expirationInterval: TimeInterval = 30 * 24 * 60 * 60 // 30 days in seconds
         return Date().timeIntervalSince(cachedAt) > expirationInterval
+    }
+    
+    /// Check if ingredients have changed since this analysis
+    func isIngredientsOutdated(recipe: Recipe) -> Bool {
+        // Check version mismatch
+        if recipe.currentVersion != recipeVersion {
+            return true
+        }
+        
+        // Check hash mismatch
+        if let currentHash = recipe.ingredientsHash,
+           currentHash != ingredientsHash {
+            return true
+        }
+        
+        // Check if recipe was modified after analysis
+        if recipe.modificationDate > recipeLastModified {
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Check if cache is still valid (not stale and ingredients haven't changed)
+    func isValid(for recipe: Recipe) -> Bool {
+        return !isStale && !isIngredientsOutdated(recipe: recipe)
     }
     
     /// Decode the stored analysis
@@ -35,10 +74,18 @@ final class CachedDiabeticAnalysis {
     }
     
     /// Create a cached analysis from DiabeticInfo
-    @MainActor static func create(from info: DiabeticInfo, recipeId: UUID) throws -> CachedDiabeticAnalysis {
+    @MainActor static func create(from info: DiabeticInfo, recipe: Recipe) throws -> CachedDiabeticAnalysis {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(info)
-        return CachedDiabeticAnalysis(recipeId: recipeId, analysisData: data)
+        
+        return CachedDiabeticAnalysis(
+            recipeId: recipe.id,
+            analysisData: data,
+            cachedAt: Date(),
+            recipeVersion: recipe.currentVersion,
+            ingredientsHash: recipe.ingredientsHash ?? "",
+            recipeLastModified: recipe.modificationDate
+        )
     }
 }

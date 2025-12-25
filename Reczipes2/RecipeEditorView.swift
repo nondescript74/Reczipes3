@@ -211,18 +211,41 @@ struct RecipeEditorView: View {
         let instructionSectionModels = instructionSections.map { $0.toModel() }
         let noteModels = notes.map { $0.toModel() }
         
-        // Encode to data
+        // Encode ingredients to check if they changed
+        let newIngredientsData = try? encoder.encode(ingredientSectionModels)
+        let ingredientsChanged = (newIngredientsData != recipe.ingredientSectionsData)
+        
+        // Update recipe properties
         recipe.title = title
         recipe.headerNotes = headerNotes.isEmpty ? nil : headerNotes
         recipe.recipeYield = recipeYield.isEmpty ? nil : recipeYield
         recipe.reference = reference.isEmpty ? nil : reference
         
-        recipe.ingredientSectionsData = try? encoder.encode(ingredientSectionModels)
         recipe.instructionSectionsData = try? encoder.encode(instructionSectionModels)
         recipe.notesData = try? encoder.encode(noteModels)
         
+        // Update ingredients with version tracking if they changed
+        if ingredientsChanged, let ingredientsData = newIngredientsData {
+            print("📝 Ingredients changed - updating version and hash")
+            recipe.updateIngredients(ingredientsData)
+            
+            // Clear any cached diabetic analysis since ingredients changed
+            Task {
+                DiabeticInfoCache.shared.clear(recipeId: recipe.id)
+                print("🗑️ Cleared in-memory diabetic cache for recipe: \(recipe.title)")
+            }
+        } else {
+            // Still update lastModified even if ingredients didn't change
+            recipe.lastModified = Date()
+        }
+        
         // Save context
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            print("💾 Recipe saved successfully with version \(recipe.currentVersion)")
+        } catch {
+            print("❌ Failed to save recipe: \(error)")
+        }
         
         dismiss()
     }

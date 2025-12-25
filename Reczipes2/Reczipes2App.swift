@@ -25,12 +25,29 @@ struct Reczipes2App: App {
             Recipe.self,
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
+            CachedDiabeticAnalysis.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        
+        // Enable automatic migration for schema changes
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            allowsSave: true
+        )
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            print("✅ ModelContainer created successfully")
+            return container
         } catch {
+            print("❌ ModelContainer creation failed: \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            
+            // If there's a migration issue, try to provide more context
+            if let swiftDataError = error as? SwiftDataError {
+                print("   SwiftData Error: \(swiftDataError)")
+            }
+            
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
