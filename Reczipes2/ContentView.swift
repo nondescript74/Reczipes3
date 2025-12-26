@@ -25,6 +25,9 @@ struct ContentView: View {
     @State private var showingSearch = false
     @State private var allergenFilterEnabled = false
     @State private var showOnlySafe = false
+    @State private var isProcessingFilter = false
+    @State private var cachedFilteredRecipes: [RecipeModel] = []
+    @State private var cachedAllergenScores: [UUID: RecipeAllergenScore] = [:]
     
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
@@ -36,12 +39,9 @@ struct ContentView: View {
         imageAssignments.first { $0.recipeID == recipeID }?.imageName
     }
     
-    // Allergen scores for recipes
+    // Allergen scores for recipes (now cached)
     private var allergenScores: [UUID: RecipeAllergenScore] {
-        guard let profile = activeProfile, allergenFilterEnabled else {
-            return [:]
-        }
-        return AllergenAnalyzer.shared.analyzeRecipes(availableRecipesBeforeFilter, profile: profile)
+        cachedAllergenScores
     }
     
     // All available recipe models from SwiftData (Claude API-extracted)
@@ -72,19 +72,51 @@ struct ContentView: View {
         return recipes
     }
     
-    // Filtered recipes based on allergen settings
+    // Filtered recipes based on allergen settings (now uses cached results)
     private var availableRecipes: [RecipeModel] {
-        guard let profile = activeProfile, allergenFilterEnabled else {
+        if allergenFilterEnabled {
+            return cachedFilteredRecipes
+        } else {
             return availableRecipesBeforeFilter
         }
+    }
+    
+    // MARK: - Filter Processing
+    
+    /// Process allergen filtering in background to avoid blocking UI
+    private func processAllergenFilter() {
+        guard let profile = activeProfile else {
+            cachedFilteredRecipes = availableRecipesBeforeFilter
+            cachedAllergenScores = [:]
+            return
+        }
         
-        let recipes = availableRecipesBeforeFilter
+        // Show loading state
+        isProcessingFilter = true
         
-        if showOnlySafe {
-            return AllergenAnalyzer.shared.filterSafeRecipes(recipes, profile: profile)
-        } else {
-            // Sort by safety score
-            return AllergenAnalyzer.shared.sortRecipesBySafety(recipes, profile: profile)
+        // Capture values to use in detached task
+        let recipesToProcess = availableRecipesBeforeFilter
+        let shouldShowOnlySafe = showOnlySafe
+        
+        Task.detached(priority: .userInitiated) {
+            // Analyze all recipes for allergens (this is the expensive operation)
+            let scores = await AllergenAnalyzer.shared.analyzeRecipes(recipesToProcess, profile: profile)
+            
+            // Filter or sort based on settings
+            let filteredRecipes: [RecipeModel]
+            if shouldShowOnlySafe {
+                filteredRecipes = await AllergenAnalyzer.shared.filterSafeRecipes(recipesToProcess, profile: profile)
+            } else {
+                // Sort by safety score
+                filteredRecipes = await AllergenAnalyzer.shared.sortRecipesBySafety(recipesToProcess, profile: profile)
+            }
+            
+            // Update UI on main thread
+            await MainActor.run {
+                cachedFilteredRecipes = filteredRecipes
+                cachedAllergenScores = scores
+                isProcessingFilter = false
+            }
         }
     }
 
@@ -115,6 +147,35 @@ struct ContentView: View {
         }
         .onAppear {
             restoreSelectedRecipe()
+            // Initialize cached recipes
+            cachedFilteredRecipes = availableRecipesBeforeFilter
+        }
+        .onChange(of: allergenFilterEnabled) { _, isEnabled in
+            if isEnabled {
+                processAllergenFilter()
+            } else {
+                // Clear cache when filter is disabled
+                cachedFilteredRecipes = availableRecipesBeforeFilter
+                cachedAllergenScores = [:]
+            }
+        }
+        .onChange(of: showOnlySafe) { _, _ in
+            if allergenFilterEnabled {
+                processAllergenFilter()
+            }
+        }
+        .onChange(of: activeProfile?.id) { _, _ in
+            if allergenFilterEnabled {
+                processAllergenFilter()
+            }
+        }
+        .onChange(of: savedRecipes.count) { _, _ in
+            // Recipes changed, update cache
+            if allergenFilterEnabled {
+                processAllergenFilter()
+            } else {
+                cachedFilteredRecipes = availableRecipesBeforeFilter
+            }
         }
         .onChange(of: selectedRecipe) { _, newRecipe in
             // Save selected recipe to app state when it changes
@@ -156,6 +217,20 @@ struct ContentView: View {
                     showingAllergenProfiles = true
                 }
             )
+            
+            // Loading indicator when processing filter
+            if isProcessingFilter {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Analyzing recipes...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemGray6))
+            }
             
             List(selection: $selectedRecipe) {
                 Section {
