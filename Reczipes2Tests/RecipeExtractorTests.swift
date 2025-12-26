@@ -22,11 +22,10 @@ class RecipeExtractorTests: XCTestCase {
     
     // MARK: - Image Preprocessing Tests
     
-    func testImagePreprocessing() {
-        // Load a test image
-        guard let testImage = UIImage(named: "test_recipe_card") else {
-            XCTFail("Test image not found")
-            return
+    func testImagePreprocessing() throws {
+        // Generate a test image instead of loading from assets
+        guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
+            throw XCTSkip("Could not generate test image")
         }
         
         // Test preprocessing
@@ -40,10 +39,9 @@ class RecipeExtractorTests: XCTestCase {
         }
     }
     
-    func testLightweightPreprocessing() {
-        guard let testImage = UIImage(named: "test_recipe_card") else {
-            XCTFail("Test image not found")
-            return
+    func testLightweightPreprocessing() throws {
+        guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
+            throw XCTSkip("Could not generate test image")
         }
         
         let processedData = imagePreprocessor.preprocessLightweight(testImage)

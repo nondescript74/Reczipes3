@@ -134,35 +134,48 @@ class RecipeSearchService {
             var score: Double = 0
             var matchedFields: [SearchResult.MatchField] = []
             
-            // Search text matching (title, ingredients, instructions, notes)
-            if !criteria.searchText.isEmpty {
-                let textMatches = searchText(in: recipe, searchText: criteria.searchText)
-                score += textMatches.score
-                matchedFields.append(contentsOf: textMatches.fields)
-            }
-            
-            // Dish type matching
+            // Dish type matching - this acts as a FILTER when specified
             if !criteria.dishTypes.isEmpty {
                 let dishTypeMatches = matchDishTypes(in: recipe, types: criteria.dishTypes)
-                if !dishTypeMatches.isEmpty {
-                    score += 10.0 * Double(dishTypeMatches.count)
-                    matchedFields.append(contentsOf: dishTypeMatches.map { .dishType($0) })
+                if dishTypeMatches.isEmpty {
+                    // Recipe doesn't match required dish type - skip it
+                    continue
                 }
+                score += 10.0 * Double(dishTypeMatches.count)
+                matchedFields.append(contentsOf: dishTypeMatches.map { .dishType($0) })
             }
             
-            // Cooking time matching
+            // Cooking time matching - also acts as a FILTER when specified
             if let maxTime = criteria.maxCookingTime {
-                if let recipeTime = extractCookingTime(from: recipe), recipeTime <= maxTime {
-                    score += 5.0
-                    matchedFields.append(.cookingTime)
+                guard let recipeTime = extractCookingTime(from: recipe), recipeTime <= maxTime else {
+                    // Recipe doesn't meet cooking time requirement - skip it
+                    continue
                 }
+                score += 5.0
+                matchedFields.append(.cookingTime)
             }
             
-            // Author matching
+            // Author matching - acts as a FILTER when specified
             if let authorQuery = criteria.author, !authorQuery.isEmpty {
-                if let reference = recipe.reference, reference.localizedCaseInsensitiveContains(authorQuery) {
-                    score += 8.0
-                    matchedFields.append(.author)
+                guard let reference = recipe.reference, reference.localizedCaseInsensitiveContains(authorQuery) else {
+                    // Recipe doesn't match author requirement - skip it
+                    continue
+                }
+                score += 8.0
+                matchedFields.append(.author)
+            }
+            
+            // Search text matching (title, ingredients, instructions, notes)
+            // This is optional - if specified, adds to score, but if not specified, doesn't filter
+            if !criteria.searchText.isEmpty {
+                let textMatches = searchText(in: recipe, searchText: criteria.searchText)
+                if textMatches.score > 0 {
+                    score += textMatches.score
+                    matchedFields.append(contentsOf: textMatches.fields)
+                } else if !criteria.dishTypes.isEmpty || criteria.maxCookingTime != nil || criteria.author != nil {
+                    // If there are other criteria (dish type, time, author) and text search is specified,
+                    // the recipe must match the text search too
+                    continue
                 }
             }
             

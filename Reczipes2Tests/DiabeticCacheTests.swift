@@ -7,14 +7,21 @@
 
 import Testing
 import Foundation
+import OSLog
 @testable import Reczipes2
 
 @Suite("Diabetic Analysis Caching Tests")
 struct DiabeticCacheTests {
     
+    // Logger for test diagnostics
+    private let logger = Logger(subsystem: "com.reczipes.tests", category: "diabetic-cache")
+    
     @Test("Ingredients hash calculation is consistent")
     nonisolated func ingredientsHashConsistency() async throws {
+        logger.info("🧪 Starting ingredientsHashConsistency test")
+        
         // Create ingredient data
+        logger.info("📝 Creating first ingredient set")
         let ingredients1 = await [
             IngredientSection(
                 title: "Main",
@@ -28,8 +35,10 @@ struct DiabeticCacheTests {
         let encoder = JSONEncoder()
         let data1 = try encoder.encode(ingredients1)
         let hash1 = Recipe.calculateIngredientsHash(from: data1)
+        logger.info("✅ Hash 1: \(hash1)")
         
         // Create identical ingredients (different order)
+        logger.info("📝 Creating second ingredient set (different order)")
         let ingredients2 = await [
             IngredientSection(
                 title: "Main",
@@ -42,10 +51,14 @@ struct DiabeticCacheTests {
         
         let data2 = try encoder.encode(ingredients2)
         let hash2 = Recipe.calculateIngredientsHash(from: data2)
+        logger.info("✅ Hash 2: \(hash2)")
         
         // Hashes should be identical (sorted internally)
+        logger.info("🔍 Comparing hashes...")
         #expect(hash1 == hash2, "Hashes should match regardless of ingredient order")
         #expect(!hash1.isEmpty, "Hash should not be empty")
+        
+        logger.info("✅ Test completed successfully")
     }
     
     @Test("Ingredients hash changes when ingredients differ")
@@ -95,9 +108,11 @@ struct DiabeticCacheTests {
     
     @Test("Recipe version increments on ingredient update")
     nonisolated func recipeVersionIncrement() async throws {
+        logger.info("🧪 Starting recipeVersionIncrement test")
         let encoder = JSONEncoder()
         
         // Create a recipe
+        logger.info("📝 Creating recipe")
         let recipeModel = await RecipeModel(
             title: "Test Recipe",
             ingredientSections: [
@@ -115,14 +130,19 @@ struct DiabeticCacheTests {
             ]
         )
         
+        logger.info("🔨 Creating Recipe from RecipeModel")
         let recipe = Recipe(from: recipeModel)
-        let initialVersion = recipe.currentVersion  // ✅ Use computed property
+        let initialVersion = recipe.currentVersion
         let initialHash = recipe.ingredientsHash
+        
+        logger.info("✅ Initial state - Version: \(initialVersion), Hash: \(initialHash ?? "nil")")
         
         #expect(initialVersion == 1, "Initial version should be 1")
         #expect(initialHash != nil, "Initial hash should be calculated")
+        logger.info("✅ Initial state verified")
         
         // Update ingredients
+        logger.info("📝 Creating new ingredients")
         let newIngredients = await [
             IngredientSection(
                 title: "Main",
@@ -133,18 +153,32 @@ struct DiabeticCacheTests {
         ]
         let newData = try encoder.encode(newIngredients)
         
+        logger.info("🔄 Updating recipe ingredients")
         recipe.updateIngredients(newData)
         
-        #expect(recipe.currentVersion == initialVersion + 1, "Version should increment after update")  // ✅ Use computed property
+        let newVersion = recipe.currentVersion
+        let newHash = recipe.ingredientsHash
+        logger.info("✅ Updated state - Version: \(newVersion), Hash: \(newHash ?? "nil")")
+        
+        logger.info("🔍 Verifying version incremented: \(initialVersion) -> \(newVersion)")
+        #expect(recipe.currentVersion == initialVersion + 1, "Version should increment after update")
+        
+        logger.info("🔍 Verifying hash changed: \(initialHash ?? "nil") -> \(newHash ?? "nil")")
         #expect(recipe.ingredientsHash != initialHash, "Hash should change with ingredients")
-        #expect(recipe.modificationDate > Date(timeIntervalSinceNow: -1), "lastModified should be recent")  // ✅ Use computed property
+        
+        logger.info("🔍 Verifying modification date is recent")
+        #expect(recipe.modificationDate > Date(timeIntervalSinceNow: -1), "lastModified should be recent")
+        
+        logger.info("✅ Test completed successfully")
     }
     
     @Test("Cache detects ingredient changes via version")
     @MainActor func cacheDetectsVersionChange() async throws {
+        logger.info("🧪 Starting cacheDetectsVersionChange test")
         let encoder = JSONEncoder()
         
         // Create recipe and cache
+        logger.info("📝 Creating recipe")
         let recipeModel = RecipeModel(
             title: "Test Recipe",
             ingredientSections: [
@@ -158,8 +192,10 @@ struct DiabeticCacheTests {
         )
         
         let recipe = Recipe(from: recipeModel)
+        logger.info("✅ Recipe created - Version: \(recipe.currentVersion), Hash: \(recipe.ingredientsHash ?? "nil")")
         
         // Create a mock cache entry
+        logger.info("📝 Creating mock diabetic analysis")
         let mockAnalysis = DiabeticInfo(
             id: UUID(),
             recipeId: recipe.id,
@@ -177,8 +213,10 @@ struct DiabeticCacheTests {
         )
         
         let analysisData = try encoder.encode(mockAnalysis)
+        logger.info("✅ Mock analysis created and encoded")
         
-        // ✅ Use computed properties for cache initialization
+        // Create cache
+        logger.info("📝 Creating cached analysis")
         let cached = CachedDiabeticAnalysis(
             recipeId: recipe.id,
             analysisData: analysisData,
@@ -187,11 +225,16 @@ struct DiabeticCacheTests {
             ingredientsHash: recipe.ingredientsHash ?? "",
             recipeLastModified: recipe.modificationDate
         )
+        logger.info("✅ Cache created - Version: \(cached.recipeVersion), Hash: \(cached.ingredientsHash)")
         
         // Cache should be valid initially
-        #expect(cached.isValid(for: recipe), "Cache should be valid for unchanged recipe")
+        logger.info("🔍 Checking if cache is valid for unchanged recipe")
+        let isInitiallyValid = cached.isValid(for: recipe)
+        logger.info("   Result: \(isInitiallyValid ? "VALID ✅" : "INVALID ❌")")
+        #expect(isInitiallyValid, "Cache should be valid for unchanged recipe")
         
         // Update recipe version
+        logger.info("🔄 Updating recipe ingredients")
         let newIngredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "3", unit: "cups", name: "flour")
@@ -199,10 +242,20 @@ struct DiabeticCacheTests {
         ]
         let newData = try encoder.encode(newIngredients)
         recipe.updateIngredients(newData)
+        logger.info("✅ Recipe updated - New Version: \(recipe.currentVersion), New Hash: \(recipe.ingredientsHash ?? "nil")")
         
         // Cache should now be invalid
-        #expect(!cached.isValid(for: recipe), "Cache should be invalid after ingredient change")
-        #expect(cached.isIngredientsOutdated(recipe: recipe), "Cache should detect outdated ingredients")
+        logger.info("🔍 Checking if cache is invalid after ingredient change")
+        let isStillValid = cached.isValid(for: recipe)
+        logger.info("   Result: \(isStillValid ? "VALID ❌" : "INVALID ✅")")
+        #expect(!isStillValid, "Cache should be invalid after ingredient change")
+        
+        logger.info("🔍 Checking if cache detects outdated ingredients")
+        let isOutdated = cached.isIngredientsOutdated(recipe: recipe)
+        logger.info("   Result: \(isOutdated ? "OUTDATED ✅" : "UP TO DATE ❌")")
+        #expect(isOutdated, "Cache should detect outdated ingredients")
+        
+        logger.info("✅ Test completed successfully")
     }
     
     @Test("Cache detects ingredient changes via hash")
