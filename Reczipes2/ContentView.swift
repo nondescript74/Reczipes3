@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var showingAllergenProfiles = false
     @State private var showingBackup = false
     @State private var showingSearch = false
+    @State private var showingSavedLinks = false
     @State private var allergenFilterEnabled = false
     @State private var showOnlySafe = false
     @State private var isProcessingFilter = false
@@ -283,6 +284,12 @@ struct ContentView: View {
                         }
                         
                         Button {
+                            showingSavedLinks = true
+                        } label: {
+                            Label("Saved Links", systemImage: "link.circle")
+                        }
+                        
+                        Button {
                             showingBackup = true
                         } label: {
                             Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
@@ -313,6 +320,14 @@ struct ContentView: View {
                         showingImageAssignment = true
                     } label: {
                         Label("Assign Images", systemImage: "photo.on.rectangle")
+                    }
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingSavedLinks = true
+                    } label: {
+                        Label("Saved Links", systemImage: "link.circle")
                     }
                 }
                 
@@ -358,6 +373,9 @@ struct ContentView: View {
                     recipes: .constant(availableRecipes),
                     selectedRecipe: $selectedRecipe
                 )
+            }
+            .sheet(isPresented: $showingSavedLinks) {
+                SavedLinksView()
             }
         }
     }

@@ -37,6 +37,7 @@ struct Reczipes2App: App {
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
             CachedDiabeticAnalysis.self,
+            SavedLink.self,
         ])
         
         // Enable automatic migration for schema changes
