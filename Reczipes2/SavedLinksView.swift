@@ -19,6 +19,7 @@ struct SavedLinksView: View {
     @State private var showingImportResult = false
     @State private var selectedLink: SavedLink?
     @State private var showingExtractor = false
+    @State private var showingBatchExtractor = false
     @State private var searchText = ""
     @State private var filterOption: FilterOption = .all
     #if DEBUG
@@ -105,10 +106,19 @@ struct SavedLinksView: View {
                             Label("Import from JSON", systemImage: "square.and.arrow.down")
                         }
                         
+                        Divider()
+                        
+                        Button {
+                            showingBatchExtractor = true
+                        } label: {
+                            Label("Batch Extract All Unprocessed", systemImage: "arrow.down.circle.fill")
+                        }
+                        .disabled(stats.unprocessed == 0 || APIKeyHelper.getAPIKey() == nil)
+                        
                         Button {
                             extractAllUnprocessed()
                         } label: {
-                            Label("Extract All Unprocessed", systemImage: "arrow.down.circle")
+                            Label("Extract All (Legacy)", systemImage: "arrow.down.circle")
                         }
                         .disabled(stats.unprocessed == 0)
                         
@@ -169,6 +179,35 @@ struct SavedLinksView: View {
                             .foregroundColor(.secondary)
                         Button("Dismiss") {
                             selectedLink = nil
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                }
+            }
+            .sheet(isPresented: $showingBatchExtractor) {
+                if let apiKey = APIKeyHelper.getAPIKey() {
+                    BatchExtractionView(
+                        links: savedLinks,
+                        apiKey: apiKey,
+                        onComplete: {
+                            // Refresh or show completion message
+                            importResultMessage = "Batch extraction completed"
+                            showingImportResult = true
+                        }
+                    )
+                } else {
+                    VStack(spacing: 20) {
+                        Image(systemName: "key.slash")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("API Key Required")
+                            .font(.headline)
+                        Text("Please configure your Claude API key in Settings to use batch extraction")
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.secondary)
+                        Button("Dismiss") {
+                            showingBatchExtractor = false
                         }
                         .buttonStyle(.borderedProminent)
                     }
