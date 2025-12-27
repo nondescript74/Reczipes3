@@ -46,6 +46,91 @@ struct JSONLinkValidator {
         }
     }
     
+    /// URL fix result for a single link
+    struct URLFixResult {
+        let linkNumber: Int
+        let title: String
+        let originalURL: String
+        let fixedURL: String
+        let wasFixed: Bool
+        let issues: [String]
+        let verificationStatus: VerificationStatus
+        
+        enum VerificationStatus {
+            case valid
+            case invalid(String)
+            case skipped
+        }
+        
+        var logEntry: String {
+            var lines: [String] = []
+            
+            if wasFixed {
+                lines.append("🔧 Link #\(linkNumber): \(title)")
+                lines.append("   Original: \(originalURL)")
+                lines.append("   Fixed:    \(fixedURL)")
+                lines.append("   Issues fixed:")
+                issues.forEach { lines.append("     • \($0)") }
+                
+                switch verificationStatus {
+                case .valid:
+                    lines.append("   ✅ Verification: URL is now valid")
+                case .invalid(let reason):
+                    lines.append("   ❌ Verification failed: \(reason)")
+                case .skipped:
+                    lines.append("   ⏭️ Verification skipped")
+                }
+            } else {
+                lines.append("✅ Link #\(linkNumber): \(title)")
+                lines.append("   URL: \(originalURL)")
+                lines.append("   No fixes needed")
+            }
+            
+            return lines.joined(separator: "\n")
+        }
+    }
+    
+    /// Complete fix report
+    struct FixReport {
+        let totalLinks: Int
+        let fixedCount: Int
+        let unfixedCount: Int
+        let fixResults: [URLFixResult]
+        
+        var summary: String {
+            var lines: [String] = []
+            lines.append("=" + String(repeating: "=", count: 59))
+            lines.append("URL Fix Report")
+            lines.append("=" + String(repeating: "=", count: 59))
+            lines.append("")
+            lines.append("Total links: \(totalLinks)")
+            lines.append("Fixed: \(fixedCount)")
+            lines.append("Already valid: \(unfixedCount)")
+            lines.append("")
+            
+            if !fixResults.isEmpty {
+                lines.append("Detailed Results:")
+                lines.append("")
+                fixResults.forEach { result in
+                    lines.append(result.logEntry)
+                    lines.append("")
+                }
+            }
+            
+            let failedVerifications = fixResults.filter {
+                if case .invalid = $0.verificationStatus { return true }
+                return false
+            }
+            
+            if !failedVerifications.isEmpty {
+                lines.append("⚠️ Warning: \(failedVerifications.count) link(s) failed verification after fixing")
+            }
+            
+            lines.append("=" + String(repeating: "=", count: 59))
+            return lines.joined(separator: "\n")
+        }
+    }
+    
     /// Validate a JSON file
     /// - Parameter url: URL of the JSON file
     /// - Returns: Validation result
@@ -255,6 +340,297 @@ struct JSONLinkValidator {
         )
     }
     
+    // MARK: - URL Fixing
+    
+    /// Fix all URLs in a JSON file with detailed logging
+    /// - Parameters:
+    ///   - inputURL: Input file URL
+    ///   - outputURL: Output file URL (can be same as input to overwrite)
+    ///   - verify: Whether to verify each URL after fixing
+    /// - Returns: Fix report with details of all changes
+    /// - Throws: File reading/writing errors
+    static func fixURLs(
+        inputURL: URL,
+        outputURL: URL,
+        verify: Bool = true
+    ) throws -> FixReport {
+        // Read and parse
+        let data = try Data(contentsOf: inputURL)
+        let decoder = JSONDecoder()
+        let originalLinks = try decoder.decode([JSONLink].self, from: data)
+        
+        var fixResults: [URLFixResult] = []
+        var fixedLinks: [JSONLink] = []
+        
+        // Process each link
+        for (index, link) in originalLinks.enumerated() {
+            let linkNumber = index + 1
+            let result = fixURL(
+                for: link,
+                linkNumber: linkNumber,
+                verify: verify
+            )
+            
+            fixResults.append(result)
+            fixedLinks.append(
+                JSONLink(
+                    title: link.title,
+                    url: result.fixedURL,
+                    tips: link.tips
+                )
+            )
+        }
+        
+        // Write fixed version
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let fixedData = try encoder.encode(fixedLinks)
+        try fixedData.write(to: outputURL)
+        
+        // Create report
+        let fixedCount = fixResults.filter { $0.wasFixed }.count
+        let report = FixReport(
+            totalLinks: originalLinks.count,
+            fixedCount: fixedCount,
+            unfixedCount: originalLinks.count - fixedCount,
+            fixResults: fixResults
+        )
+        
+        return report
+    }
+    
+    /// Fix a single URL with detailed issue tracking
+    /// - Parameters:
+    ///   - link: The link to fix
+    ///   - linkNumber: Link number for reporting
+    ///   - verify: Whether to verify the URL after fixing
+    /// - Returns: Fix result with details
+    private static func fixURL(
+        for link: JSONLink,
+        linkNumber: Int,
+        verify: Bool
+    ) -> URLFixResult {
+        var currentURL = link.url
+        var issues: [String] = []
+        let originalURL = currentURL
+        
+        // 1. Remove HTML tags
+        let withoutHTML = cleanHTML(from: currentURL)
+        if withoutHTML != currentURL {
+            issues.append("Removed HTML tags")
+            currentURL = withoutHTML
+        }
+        
+        // 2. Trim whitespace and newlines
+        let trimmed = currentURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed != currentURL {
+            issues.append("Trimmed whitespace")
+            currentURL = trimmed
+        }
+        
+        // 3. Remove invisible characters (zero-width spaces, etc.)
+        let withoutInvisible = removeInvisibleCharacters(from: currentURL)
+        if withoutInvisible != currentURL {
+            issues.append("Removed invisible characters")
+            currentURL = withoutInvisible
+        }
+        
+        // 4. Decode HTML entities
+        let decodedHTML = decodeHTMLEntities(currentURL)
+        if decodedHTML != currentURL {
+            issues.append("Decoded HTML entities")
+            currentURL = decodedHTML
+        }
+        
+        // 5. Fix common URL issues
+        let fixedCommon = fixCommonURLIssues(currentURL)
+        if fixedCommon != currentURL {
+            issues.append("Fixed common URL issues")
+            currentURL = fixedCommon
+        }
+        
+        // 6. Verify the URL if requested
+        let verificationStatus: URLFixResult.VerificationStatus
+        if verify {
+            verificationStatus = verifyURL(currentURL)
+        } else {
+            verificationStatus = .skipped
+        }
+        
+        let wasFixed = currentURL != originalURL
+        
+        return URLFixResult(
+            linkNumber: linkNumber,
+            title: link.title,
+            originalURL: originalURL,
+            fixedURL: currentURL,
+            wasFixed: wasFixed,
+            issues: issues,
+            verificationStatus: verificationStatus
+        )
+    }
+    
+    /// Verify that a URL is valid and well-formed
+    /// - Parameter urlString: URL string to verify
+    /// - Returns: Verification status
+    private static func verifyURL(_ urlString: String) -> URLFixResult.VerificationStatus {
+        // Check for empty URL
+        if urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .invalid("URL is empty")
+        }
+        
+        // Check for HTML tags
+        if urlString.contains("<") || urlString.contains(">") {
+            return .invalid("URL still contains HTML tags")
+        }
+        
+        // Try to create URL
+        guard let url = URL(string: urlString) else {
+            return .invalid("URL string is not a valid URL")
+        }
+        
+        // Check for scheme
+        guard let scheme = url.scheme?.lowercased() else {
+            return .invalid("URL has no scheme (http/https)")
+        }
+        
+        // Check for HTTP/HTTPS
+        guard ["http", "https"].contains(scheme) else {
+            return .invalid("URL scheme is '\(scheme)' (expected http or https)")
+        }
+        
+        // Check for host
+        guard url.host != nil else {
+            return .invalid("URL has no host/domain")
+        }
+        
+        // All checks passed
+        return .valid
+    }
+    
+    /// Remove invisible characters from a string
+    /// - Parameter string: Input string
+    /// - Returns: String without invisible characters
+    private static func removeInvisibleCharacters(from string: String) -> String {
+        // Remove zero-width spaces, zero-width joiners, etc.
+        let invisibleCharacters: [Character] = [
+            "\u{200B}", // Zero-width space
+            "\u{200C}", // Zero-width non-joiner
+            "\u{200D}", // Zero-width joiner
+            "\u{FEFF}", // Zero-width no-break space (BOM)
+            "\u{00AD}"  // Soft hyphen
+        ]
+        
+        var cleaned = string
+        for char in invisibleCharacters {
+            cleaned = cleaned.replacingOccurrences(of: String(char), with: "")
+        }
+        
+        return cleaned
+    }
+    
+    /// Decode common HTML entities
+    /// - Parameter string: String that may contain HTML entities
+    /// - Returns: String with decoded entities
+    private static func decodeHTMLEntities(_ string: String) -> String {
+        var result = string
+        
+        // Common HTML entities
+        let entities: [(entity: String, replacement: String)] = [
+            ("&amp;", "&"),
+            ("&lt;", "<"),
+            ("&gt;", ">"),
+            ("&quot;", "\""),
+            ("&#39;", "'"),
+            ("&apos;", "'"),
+            ("&nbsp;", " "),
+            ("&#x2F;", "/"),
+            ("&#47;", "/")
+        ]
+        
+        for entity in entities {
+            result = result.replacingOccurrences(of: entity.entity, with: entity.replacement)
+        }
+        
+        // Handle numeric entities (&#123; or &#xAB;)
+        let decimalPattern = "&#(\\d+);"
+        let hexPattern = "&#x([0-9A-Fa-f]+);"
+        
+        if let decimalRegex = try? NSRegularExpression(pattern: decimalPattern) {
+            let nsString = result as NSString
+            let matches = decimalRegex.matches(in: result, range: NSRange(location: 0, length: nsString.length))
+            
+            for match in matches.reversed() {
+                if match.numberOfRanges > 1 {
+                    let numRange = match.range(at: 1)
+                    let numString = nsString.substring(with: numRange)
+                    
+                    if let num = Int(numString), let scalar = UnicodeScalar(num) {
+                        let char = String(Character(scalar))
+                        let fullRange = match.range(at: 0)
+                        result = (result as NSString).replacingCharacters(in: fullRange, with: char)
+                    }
+                }
+            }
+        }
+        
+        if let hexRegex = try? NSRegularExpression(pattern: hexPattern) {
+            let nsString = result as NSString
+            let matches = hexRegex.matches(in: result, range: NSRange(location: 0, length: nsString.length))
+            
+            for match in matches.reversed() {
+                if match.numberOfRanges > 1 {
+                    let numRange = match.range(at: 1)
+                    let numString = nsString.substring(with: numRange)
+                    
+                    if let num = Int(numString, radix: 16), let scalar = UnicodeScalar(num) {
+                        let char = String(Character(scalar))
+                        let fullRange = match.range(at: 0)
+                        result = (result as NSString).replacingCharacters(in: fullRange, with: char)
+                    }
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    /// Fix common URL issues
+    /// - Parameter urlString: URL string to fix
+    /// - Returns: Fixed URL string
+    private static func fixCommonURLIssues(_ urlString: String) -> String {
+        var fixed = urlString
+        
+        // Remove trailing slashes from parameters (but keep path trailing slashes)
+        // Example: "http://example.com/path?param=value/" -> "http://example.com/path?param=value"
+        if fixed.contains("?") {
+            let components = fixed.components(separatedBy: "?")
+            if components.count == 2 {
+                let path = components[0]
+                let query = components[1].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                fixed = path + "?" + query
+            }
+        }
+        
+        // Fix double slashes in path (but not in protocol)
+        if let urlComponents = URLComponents(string: fixed) {
+            var components = urlComponents
+            let path = components.path
+            let fixedPath = path.replacingOccurrences(of: "//", with: "/")
+            components.path = fixedPath
+            if let newURL = components.url?.absoluteString {
+                fixed = newURL
+            }
+        }
+        
+        // Remove spaces in URL (replace with %20)
+        fixed = fixed.replacingOccurrences(of: " ", with: "%20")
+        
+        return fixed
+    }
+    
+    // MARK: - Cleaning
+    
     /// Clean and normalize a JSON link file
     /// - Parameters:
     ///   - inputURL: Input file URL
@@ -340,6 +716,33 @@ extension JSONLinkValidator {
         }
     }
     
+    /// Example of how to fix URLs in a file
+    static func exampleFixURLs() throws {
+        guard let inputURL = Bundle.main.url(forResource: "links_from_notes", withExtension: "json") else {
+            print("❌ Could not find input file")
+            return
+        }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let outputURL = documentsPath.appendingPathComponent("links_fixed.json")
+        
+        // Fix all URLs with verification
+        let report = try fixURLs(
+            inputURL: inputURL,
+            outputURL: outputURL,
+            verify: true
+        )
+        
+        // Print the detailed report
+        print(report.summary)
+        print("\n✅ Fixed file saved to: \(outputURL.path)")
+        
+        // Optionally validate the fixed file
+        let validationResult = validate(fileAt: outputURL)
+        print("\nPost-Fix Validation:")
+        print(validationResult.summary)
+    }
+    
     /// Example of how to clean a file
     static func exampleCleaning() throws {
         guard let inputURL = Bundle.main.url(forResource: "links_from_notes", withExtension: "json") else {
@@ -352,6 +755,49 @@ extension JSONLinkValidator {
         
         try clean(inputURL: inputURL, outputURL: outputURL, removeDuplicates: true)
         print("✅ Cleaned file saved to: \(outputURL.path)")
+    }
+    
+    /// Example of complete workflow: fix URLs, then clean
+    static func exampleCompleteWorkflow() throws {
+        guard let inputURL = Bundle.main.url(forResource: "links_from_notes", withExtension: "json") else {
+            print("❌ Could not find input file")
+            return
+        }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fixedURL = documentsPath.appendingPathComponent("links_fixed.json")
+        let finalURL = documentsPath.appendingPathComponent("links_final.json")
+        
+        print("🔧 Step 1: Fixing URLs...")
+        print()
+        
+        let fixReport = try fixURLs(
+            inputURL: inputURL,
+            outputURL: fixedURL,
+            verify: true
+        )
+        print(fixReport.summary)
+        
+        print()
+        print("🧹 Step 2: Cleaning and removing duplicates...")
+        print()
+        
+        try clean(
+            inputURL: fixedURL,
+            outputURL: finalURL,
+            removeDuplicates: true
+        )
+        
+        print("✅ Cleaning completed")
+        print()
+        print("📊 Step 3: Final validation...")
+        print()
+        
+        let finalValidation = validate(fileAt: finalURL)
+        print(finalValidation.summary)
+        
+        print()
+        print("🎉 Complete! Final file saved to: \(finalURL.path)")
     }
 }
 #endif

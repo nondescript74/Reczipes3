@@ -45,7 +45,7 @@ struct HTMLTagCleaningTests {
     // MARK: - JSONLinkValidator Tests
     
     @Test("JSONLinkValidator detects HTML tags in URLs")
-    func validatorDetectsHTMLTags() async throws {
+    func validatorDetectsHTMLTags() throws {
         // Given: Links with HTML tags
         let testLinks = [
             JSONLink(
@@ -84,7 +84,7 @@ struct HTMLTagCleaningTests {
     }
     
     @Test("JSONLinkValidator accepts clean URLs")
-    func validatorAcceptsCleanURLs() async throws {
+    func validatorAcceptsCleanURLs() throws {
         // Given: Links with clean URLs
         let testLinks = [
             JSONLink(
@@ -109,6 +109,7 @@ struct HTMLTagCleaningTests {
         #expect(result.errors.isEmpty, "Should have no errors")
     }
     
+    @MainActor
     @Test("JSONLinkValidator cleans HTML tags from URLs", arguments: [
         ("https://www.example.com/recipe<br></div>", "https://www.example.com/recipe"),
         ("https://www.example.com/recipe</div>", "https://www.example.com/recipe"),
@@ -155,7 +156,7 @@ struct HTMLTagCleaningTests {
     func extractorCleansURLs() async throws {
         // Given: A URL with HTML tags
         let dirtyURL = "https://httpbin.org/status/404<br></div>"
-        let extractor = WebRecipeExtractor()
+        let extractor = await WebRecipeExtractor()
         
         // When: Attempting to fetch (will fail but should clean first)
         do {
@@ -173,7 +174,7 @@ struct HTMLTagCleaningTests {
     func extractorHandlesCleanURLs() async throws {
         // Given: A clean URL
         let cleanURL = "https://httpbin.org/status/404"
-        let extractor = WebRecipeExtractor()
+        let extractor = await WebRecipeExtractor()
         
         // When: Attempting to fetch
         do {
@@ -191,6 +192,7 @@ struct HTMLTagCleaningTests {
     
     // MARK: - Integration Tests
     
+    @MainActor
     @Test("Full workflow: dirty JSON → cleaned → valid URLs")
     func fullCleaningWorkflow() async throws {
         // Given: JSON file with dirty URLs
@@ -272,7 +274,7 @@ struct HTMLTagCleaningTests {
         let jsonData = try encoder.encode(testLinks)
         
         // When: First validating
-        let validationResult = JSONLinkValidator.validate(data: jsonData)
+        let validationResult = await JSONLinkValidator.validate(data: jsonData)
         
         // Then: Should detect issues
         #expect(!validationResult.isValid, "Should fail validation")
@@ -285,7 +287,7 @@ struct HTMLTagCleaningTests {
             .appendingPathComponent("test_val_clean_output.json")
         
         try jsonData.write(to: inputURL)
-        try JSONLinkValidator.clean(
+        try await JSONLinkValidator.clean(
             inputURL: inputURL,
             outputURL: outputURL,
             removeDuplicates: false
@@ -293,7 +295,7 @@ struct HTMLTagCleaningTests {
         
         // Then: Cleaned file should pass validation
         let cleanedData = try Data(contentsOf: outputURL)
-        let cleanedValidation = JSONLinkValidator.validate(data: cleanedData)
+        let cleanedValidation = await JSONLinkValidator.validate(data: cleanedData)
         
         #expect(cleanedValidation.isValid, "Cleaned file should pass validation")
         #expect(cleanedValidation.errors.isEmpty, "Should have no errors after cleaning")
@@ -305,6 +307,7 @@ struct HTMLTagCleaningTests {
     
     // MARK: - Edge Cases
     
+    @MainActor
     @Test("Handles URLs with query parameters")
     func handlesQueryParameters() async throws {
         // Given: URL with HTML tags and query parameters
@@ -335,6 +338,7 @@ struct HTMLTagCleaningTests {
         try? FileManager.default.removeItem(at: outputURL)
     }
     
+    @MainActor
     @Test("Handles URLs with anchors")
     func handlesAnchors() async throws {
         // Given: URL with HTML tags and anchor
@@ -365,6 +369,7 @@ struct HTMLTagCleaningTests {
         try? FileManager.default.removeItem(at: outputURL)
     }
     
+    @MainActor
     @Test("Handles empty and whitespace URLs")
     func handlesEmptyURLs() async throws {
         // Given: Links with empty or whitespace URLs

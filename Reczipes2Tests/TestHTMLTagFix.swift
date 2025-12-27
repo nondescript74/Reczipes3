@@ -58,8 +58,6 @@ struct HTMLTagFixTester {
         print()
         
         let extractor = await WebRecipeExtractor()
-        var passCount = 0
-        var failCount = 0
         
         for (index, test) in testURLs.enumerated() {
             print("Test \(index + 1): \(test.name)")
