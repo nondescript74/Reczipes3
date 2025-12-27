@@ -70,7 +70,7 @@ struct JSONLinkValidator {
         // Parse JSON
         let decoder = JSONDecoder()
         guard let links = try? decoder.decode([JSONLink].self, from: data) else {
-            errors.append("Invalid JSON format. Expected array of {title, url} objects")
+            errors.append("Invalid JSON format. Expected array of {title, url, tips?} objects")
             return ValidationResult(
                 isValid: false,
                 linkCount: 0,
@@ -108,6 +108,11 @@ struct JSONLinkValidator {
                 continue
             }
             
+            // Check for HTML tags in URL
+            if link.url.contains("<") || link.url.contains(">") {
+                errors.append("Link #\(linkNumber) (\(link.title)) contains HTML tags in URL: \(link.url)")
+            }
+            
             // Validate URL format
             if let url = URL(string: link.url) {
                 if url.scheme == nil {
@@ -117,6 +122,25 @@ struct JSONLinkValidator {
                 }
             } else {
                 errors.append("Link #\(linkNumber) (\(link.title)) has invalid URL: \(link.url)")
+            }
+            
+            // Validate tips if present
+            if let tips = link.tips {
+                if tips.isEmpty {
+                    // Empty tips array is OK, but might want to mention it
+                    // (Not adding a warning as this is intentional)
+                } else {
+                    let emptyTips = tips.filter { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+                    if !emptyTips.isEmpty {
+                        warnings.append("Link #\(linkNumber) (\(link.title)) has \(emptyTips.count) empty tip(s)")
+                    }
+                    
+                    // Check for very long tips (might be accidentally pasted data)
+                    let longTips = tips.filter { $0.count > 500 }
+                    if !longTips.isEmpty {
+                        warnings.append("Link #\(linkNumber) (\(link.title)) has \(longTips.count) very long tip(s) (>500 chars)")
+                    }
+                }
             }
             
             // Track duplicates
@@ -149,7 +173,7 @@ struct JSONLinkValidator {
         // Parse JSON
         let decoder = JSONDecoder()
         guard let links = try? decoder.decode([JSONLink].self, from: data) else {
-            errors.append("Invalid JSON format. Expected array of {title, url} objects")
+            errors.append("Invalid JSON format. Expected array of {title, url, tips?} objects")
             return ValidationResult(
                 isValid: false,
                 linkCount: 0,
@@ -183,6 +207,11 @@ struct JSONLinkValidator {
                 continue
             }
             
+            // Check for HTML tags in URL
+            if link.url.contains("<") || link.url.contains(">") {
+                errors.append("Link #\(linkNumber) (\(link.title)) contains HTML tags in URL")
+            }
+            
             // Validate URL format
             if let url = URL(string: link.url) {
                 if url.scheme == nil {
@@ -192,6 +221,19 @@ struct JSONLinkValidator {
                 }
             } else {
                 errors.append("Link #\(linkNumber) (\(link.title)) has invalid URL")
+            }
+            
+            // Validate tips if present
+            if let tips = link.tips, !tips.isEmpty {
+                let emptyTips = tips.filter { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+                if !emptyTips.isEmpty {
+                    warnings.append("Link #\(linkNumber) (\(link.title)) has \(emptyTips.count) empty tip(s)")
+                }
+                
+                let longTips = tips.filter { $0.count > 500 }
+                if !longTips.isEmpty {
+                    warnings.append("Link #\(linkNumber) (\(link.title)) has \(longTips.count) very long tip(s)")
+                }
             }
             
             // Track duplicates
@@ -229,11 +271,21 @@ struct JSONLinkValidator {
         let decoder = JSONDecoder()
         var links = try decoder.decode([JSONLink].self, from: data)
         
-        // Clean titles and URLs
+        // Clean titles, URLs, and tips
         links = links.map { link in
-            JSONLink(
+            // Clean tips by trimming whitespace and removing empty strings
+            let cleanedTips: [String]? = link.tips?.compactMap { tip in
+                let trimmed = tip.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+            
+            // Clean URL by removing HTML tags and trimming
+            let cleanedURL = cleanHTML(from: link.url).trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            return JSONLink(
                 title: link.title.trimmingCharacters(in: .whitespacesAndNewlines),
-                url: link.url.trimmingCharacters(in: .whitespacesAndNewlines)
+                url: cleanedURL,
+                tips: cleanedTips?.isEmpty == true ? nil : cleanedTips
             )
         }
         
@@ -258,6 +310,20 @@ struct JSONLinkValidator {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let cleanedData = try encoder.encode(links)
         try cleanedData.write(to: outputURL)
+    }
+    
+    /// Remove HTML tags from a string
+    /// - Parameter string: String that may contain HTML tags
+    /// - Returns: String with HTML tags removed
+    private static func cleanHTML(from string: String) -> String {
+        // Remove HTML tags using regex
+        let pattern = "<[^>]+>"
+        let cleanedString = string.replacingOccurrences(
+            of: pattern,
+            with: "",
+            options: .regularExpression
+        )
+        return cleanedString
     }
 }
 

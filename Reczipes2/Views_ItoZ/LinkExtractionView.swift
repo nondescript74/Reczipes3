@@ -531,12 +531,38 @@ struct LinkExtractionView: View {
     private func saveRecipe() {
         logInfo("Saving recipe from link", category: "recipe")
         
-        guard let recipeModel = viewModel.extractedRecipe else {
+        guard var recipeModel = viewModel.extractedRecipe else {
             logError("No recipe to save", category: "recipe")
             return
         }
         
         logInfo("Saving recipe: \(recipeModel.title)", category: "recipe")
+        
+        // Add tips from the SavedLink as recipe notes (type: .tip)
+        if let tips = link.tips, !tips.isEmpty {
+            logInfo("Adding \(tips.count) tip(s) from saved link to recipe notes", category: "recipe")
+            
+            // Convert tips to RecipeNote objects
+            let tipNotes = tips.map { tipText in
+                RecipeNote(type: .tip, text: tipText)
+            }
+            
+            // Append tips to existing notes
+            recipeModel = RecipeModel(
+                id: recipeModel.id,
+                title: recipeModel.title,
+                headerNotes: recipeModel.headerNotes,
+                yield: recipeModel.yield,
+                ingredientSections: recipeModel.ingredientSections,
+                instructionSections: recipeModel.instructionSections,
+                notes: recipeModel.notes + tipNotes,  // Append tips to existing notes
+                reference: recipeModel.reference,
+                imageName: recipeModel.imageName,
+                additionalImageNames: recipeModel.additionalImageNames
+            )
+            
+            logInfo("Total notes including tips: \(recipeModel.notes.count)", category: "recipe")
+        }
         
         // Determine which images we'll save
         let imagesToSave = downloadedWebImages.isEmpty ? [] : downloadedWebImages

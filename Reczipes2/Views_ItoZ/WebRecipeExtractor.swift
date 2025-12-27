@@ -17,8 +17,15 @@ class WebRecipeExtractor {
         print("🌐 ========== WEB CONTENT FETCH START ==========")
         print("🌐 URL: \(urlString)")
         
+        // Clean HTML tags from URL string (defense-in-depth)
+        let cleanedURLString = cleanHTMLTags(from: urlString)
+        if cleanedURLString != urlString {
+            print("🌐 ⚠️ Removed HTML tags from URL")
+            print("🌐 Cleaned URL: \(cleanedURLString)")
+        }
+        
         // Validate URL
-        guard let url = URL(string: urlString) else {
+        guard let url = URL(string: cleanedURLString) else {
             print("🌐 ❌ Invalid URL format")
             throw WebExtractionError.invalidURL
         }
@@ -263,6 +270,20 @@ class WebRecipeExtractor {
         }
         
         return imageURLs
+    }
+    
+    /// Remove HTML tags from a string
+    /// - Parameter string: String that may contain HTML tags
+    /// - Returns: String with HTML tags removed and trimmed
+    private func cleanHTMLTags(from string: String) -> String {
+        // Remove HTML tags using regex
+        let pattern = "<[^>]+>"
+        let cleaned = string.replacingOccurrences(
+            of: pattern,
+            with: "",
+            options: .regularExpression
+        )
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

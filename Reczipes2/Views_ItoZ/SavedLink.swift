@@ -17,6 +17,7 @@ final class SavedLink {
     var isProcessed: Bool // Whether the recipe has been extracted from this link
     var extractedRecipeID: UUID? // ID of the recipe extracted from this link
     var processingError: String? // Error message if extraction failed
+    var tips: [String]? // Optional array of user tips/notes about this recipe
     
     init(id: UUID = UUID(),
          title: String,
@@ -24,7 +25,8 @@ final class SavedLink {
          dateAdded: Date = Date(),
          isProcessed: Bool = false,
          extractedRecipeID: UUID? = nil,
-         processingError: String? = nil) {
+         processingError: String? = nil,
+         tips: [String]? = nil) {
         self.id = id
         self.title = title
         self.url = url
@@ -32,6 +34,7 @@ final class SavedLink {
         self.isProcessed = isProcessed
         self.extractedRecipeID = extractedRecipeID
         self.processingError = processingError
+        self.tips = tips
     }
 }
 
@@ -44,7 +47,8 @@ extension SavedLink {
             title: jsonLink.title,
             url: jsonLink.url,
             dateAdded: Date(),
-            isProcessed: false
+            isProcessed: false,
+            tips: jsonLink.tips
         )
     }
 }
@@ -54,4 +58,5 @@ extension SavedLink {
 struct JSONLink: Codable {
     let title: String
     let url: String
+    let tips: [String]?  // Optional array of tip strings
 }
