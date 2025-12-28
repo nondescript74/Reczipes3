@@ -66,6 +66,7 @@ struct Reczipes2App: App {
                 UserAllergenProfile.self,
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
+                RecipeBook.self,
             ])
             
             let container = try ModelContainer(
@@ -88,6 +89,7 @@ struct Reczipes2App: App {
                     UserAllergenProfile.self,
                     CachedDiabeticAnalysis.self,
                     SavedLink.self,
+                    RecipeBook.self,
                 ])
                 
                 let container = try ModelContainer(

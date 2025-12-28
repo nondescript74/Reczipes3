@@ -28,6 +28,30 @@ extension RecipeModel {
     }
 }
 
+// MARK: - Ingredient Extensions
+extension Ingredient {
+    /// Returns a formatted display text for the ingredient
+    var displayText: String {
+        var parts: [String] = []
+        
+        if let quantity = quantity {
+            parts.append(quantity)
+        }
+        
+        if let unit = unit {
+            parts.append(unit)
+        }
+        
+        parts.append(name)
+        
+        if let preparation = preparation {
+            parts.append("(\(preparation))")
+        }
+        
+        return parts.joined(separator: " ")
+    }
+}
+
 //// MARK: - Recipe Extensions
 //
 //extension RecipeModel {

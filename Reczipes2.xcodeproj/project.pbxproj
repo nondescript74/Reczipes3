@@ -44,6 +44,13 @@
 			);
 			target = F8C80F522EE246D300AA52E7 /* Reczipes2Tests */;
 		};
+		F8D232D72F01ECD900B998FA /* Exceptions for "Reczipes2" folder in "Reczipes2" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
+		};
 		F8F1931A2F0068F7001B77D4 /* Exceptions for "Docs" folder in "Reczipes2" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -136,6 +143,7 @@
 		F8C80F462EE246D200AA52E7 /* Reczipes2 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				F8D232D72F01ECD900B998FA /* Exceptions for "Reczipes2" folder in "Reczipes2" target */,
 				F87D19EC2EE778EE009C11CB /* Exceptions for "Reczipes2" folder in "Reczipes2Tests" target */,
 			);
 			path = Reczipes2;
@@ -299,6 +307,9 @@
 			);
 			mainGroup = F8C80F3B2EE246D200AA52E7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F8D232D52F01E93A00B998FA /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = F8C80F452EE246D200AA52E7 /* Products */;
 			projectDirPath = "";
@@ -491,7 +502,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 41;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -499,9 +510,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Reczipes2/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RecipeExtract;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your permission to use the camera to add photos to your recipes";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photos to let you assign images to your recipes and to extract recipes";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "We need access to Reminders to able to add your ingredients";
@@ -515,11 +528,12 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 10.2;
+				MARKETING_VERSION = 10.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -545,7 +559,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 41;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -553,9 +567,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Reczipes2/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RecipeExtract;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your permission to use the camera to add photos to your recipes";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photos to let you assign images to your recipes and to extract recipes";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "We need access to Reminders to able to add your ingredients";
@@ -569,11 +585,12 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 10.2;
+				MARKETING_VERSION = 10.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -735,6 +752,17 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F8D232D52F01E93A00B998FA /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.20;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = F8C80F3C2EE246D200AA52E7 /* Project object */;
 }

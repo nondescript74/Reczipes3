@@ -191,19 +191,9 @@ class AppStateManager: ObservableObject {
     // MARK: - Should Show Launch Screen
     
     func shouldShowLaunchScreen() -> Bool {
-        // Only show launch screen on first launch
-        // Or if app hasn't been used in a very long time (e.g., 30 days)
-        if isFirstLaunch {
-            return true
-        }
-        
-        // Check if it's been more than 30 days since last use
-        if let lastActive = lastActiveDate {
-            let daysSinceLastUse = Calendar.current.dateComponents([.day], from: lastActive, to: Date()).day ?? 0
-            return daysSinceLastUse > 30
-        }
-        
-        return false
+        // Always show the launch screen on every app launch
+        // (Set to false to disable or make conditional)
+        return true
     }
 }
 

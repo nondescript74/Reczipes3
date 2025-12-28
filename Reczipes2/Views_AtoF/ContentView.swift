@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var showingBackup = false
     @State private var showingSearch = false
     @State private var showingSavedLinks = false
+    @State private var showingBooks = false
     @State private var filterMode: RecipeFilterMode = .none
     @State private var showOnlySafe = false
     @State private var isProcessingFilter = false
@@ -330,6 +331,14 @@ struct ContentView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Menu {
                         Button {
+                            showingBooks = true
+                        } label: {
+                            Label("Recipe Books", systemImage: "books.vertical")
+                        }
+                        
+                        Divider()
+                        
+                        Button {
                             showingImageAssignment = true
                         } label: {
                             Label("Assign Images", systemImage: "photo.on.rectangle")
@@ -373,6 +382,14 @@ struct ContentView: View {
 #else
                 ToolbarItem(placement: .primaryAction) {
                     CloudKitSyncBadge()
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingBooks = true
+                    } label: {
+                        Label("Recipe Books", systemImage: "books.vertical")
+                    }
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
@@ -436,6 +453,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSavedLinks) {
                 SavedLinksView()
+            }
+            .sheet(isPresented: $showingBooks) {
+                RecipeBooksView()
             }
         }
     }
@@ -570,5 +590,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Recipe.self, RecipeImageAssignment.self, UserAllergenProfile.self], inMemory: true)
+        .modelContainer(for: [Recipe.self, RecipeImageAssignment.self, UserAllergenProfile.self, RecipeBook.self], inMemory: true)
 }

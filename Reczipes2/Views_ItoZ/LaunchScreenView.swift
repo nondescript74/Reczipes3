@@ -10,16 +10,18 @@ import SwiftUI
 struct LaunchScreenView: View {
     @State private var wipeProgress: CGFloat = 0
     @State private var imageOpacity: Double = 0
+    @State private var textOpacity: Double = 0
+    @State private var accentScale: CGFloat = 0.8
     @State private var isComplete = false
     let onComplete: () -> Void
     
     // App version information
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0"
     }
     
     private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
     
     private var appName: String {
@@ -30,116 +32,231 @@ struct LaunchScreenView: View {
         DiagnosticLogger.shared.getFormattedLogFileSize()
     }
     
+    // Latest features to highlight
+    private let latestFeatures = [
+        "📚 Export & Import Recipe Books",
+        "🔄 Share Collections with Friends",
+        "🤖 AI-Powered Recipe Extraction",
+        "☁️ iCloud Sync Enabled"
+    ]
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background gradient for a subtle base
+                // Beautiful gradient background with recipe-inspired colors
                 LinearGradient(
                     colors: [
-                        Color(.systemBackground),
-                        Color(.systemBackground).opacity(0.95)
+                        Color(red: 1.0, green: 0.95, blue: 0.85),  // Warm cream
+                        Color(red: 0.98, green: 0.92, blue: 0.80),  // Light peach
+                        Color(red: 1.0, green: 0.88, blue: 0.70),   // Soft apricot
+                        Color(red: 0.95, green: 0.85, blue: 0.75)   // Warm beige
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
                 
-                // Recipe image from asset catalog that fades in as glass wipes away
-                // Replace "launch_recipe_image" with your actual asset name
-                Image("launch_recipe_image")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding(.horizontal, 40) // Add margins on left and right
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .opacity(imageOpacity)
+                // Decorative accent circles for visual interest
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.orange.opacity(0.15),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 200
+                        )
+                    )
+                    .frame(width: 400, height: 400)
+                    .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.15)
+                    .scaleEffect(accentScale)
+                    .blur(radius: 20)
+                
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.pink.opacity(0.12),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 250
+                        )
+                    )
+                    .frame(width: 500, height: 500)
+                    .position(x: geometry.size.width * 0.8, y: geometry.size.height * 0.85)
+                    .scaleEffect(accentScale)
+                    .blur(radius: 30)
+                
+                // Recipe image that fades in (optional)
+                if let _ = UIImage(named: "launch_recipe_image") {
+                    Image("launch_recipe_image")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: geometry.size.width * 0.5)
+                        .opacity(imageOpacity * 0.15) // Very subtle background image
+                        .blur(radius: 8)
+                }
+                
+                // Main content
+                VStack(spacing: 0) {
+                    Spacer()
+                    
+                    // App Icon-style header with recipe emoji
+                    VStack(spacing: 20) {
+                        // Large app icon style circle
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.orange,
+                                            Color.pink.opacity(0.8)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 120, height: 120)
+                                .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 5)
+                            
+                            Text("🍳")
+                                .font(.system(size: 60))
+                        }
+                        .scaleEffect(accentScale)
+                        
+                        // App name
+                        Text(appName)
+                            .font(.system(size: 52, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.8, green: 0.3, blue: 0.1),  // Rich orange-red
+                                        Color(red: 0.9, green: 0.5, blue: 0.3)   // Warm coral
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 2)
+                        
+                        // Tagline
+                        Text("Your Digital Recipe Collection")
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .opacity(textOpacity)
+                    }
+                    .opacity(textOpacity)
+                    
+                    Spacer()
+                        .frame(height: 60)
+                    
+                    // What's New section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.orange)
+                            
+                            Text("What's New")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(latestFeatures, id: \.self) { feature in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(feature)
+                                        .font(.system(size: 15, weight: .medium, design: .default))
+                                        .foregroundColor(.primary.opacity(0.9))
+                                }
+                            }
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.white.opacity(0.7))
+                            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
+                    )
+                    .padding(.horizontal, 40)
+                    .opacity(textOpacity)
+                    
+                    Spacer()
+                    
+                    // Version info footer
+                    VStack(spacing: 6) {
+                        HStack(spacing: 4) {
+                            Text("Version")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                            Text(appVersion)
+                                .font(.system(size: 13, weight: .regular, design: .monospaced))
+                            Text("•")
+                            Text("Build")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                            Text(buildNumber)
+                                .font(.system(size: 13, weight: .regular, design: .monospaced))
+                        }
+                        .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "cloud.fill")
+                                .font(.system(size: 11))
+                            Text("iCloud Sync")
+                            Text("•")
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 11))
+                            Text("Diagnostic Log: \(logFileSize)")
+                        }
+                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.8))
+                    }
+                    .padding(.bottom, 30)
+                    .opacity(textOpacity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
                 // Liquid Glass overlay that wipes left to right
                 if wipeProgress < 1.0 {
                     Rectangle()
                         .fill(Color.clear)
                         .frame(width: geometry.size.width * (1 - wipeProgress))
-                        .glassEffect(.regular.tint(.white.opacity(0.2)))
+                        .glassEffect(.regular.tint(.white.opacity(0.3)))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 }
-                
-                // App information overlay
-                VStack(spacing: 0) {
-                    // App name at the top with background
-                    Text(appName)
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
-                        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.black.opacity(0.5))
-                                .blur(radius: 10)
-                        )
-                        .padding(.top, 60)
-                        .padding(.horizontal, 40)
-                    
-                    Spacer()
-                    
-                    // Version and diagnostic info at the bottom with background
-                    VStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Text("Version")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                            Text(appVersion)
-                                .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        }
-                        .foregroundStyle(.white)
-                        
-                        HStack(spacing: 4) {
-                            Text("Build")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                            Text(buildNumber)
-                                .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        }
-                        .foregroundStyle(.white)
-                        
-                        HStack(spacing: 4) {
-                            Text("Diagnostic Log")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                            Text(logFileSize)
-                                .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        }
-                        .foregroundStyle(.white)
-                    }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.black.opacity(0.5))
-                            .blur(radius: 10)
-                    )
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
-                    .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 3)
-                    .padding(.bottom, 40)
-                    .padding(.horizontal, 40)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .ignoresSafeArea()
         }
         .onAppear {
-            // Start fading in the image immediately
-            withAnimation(.easeIn(duration: 0.3)) {
+            // Smooth animations sequence
+            
+            // Start background image fade
+            withAnimation(.easeIn(duration: 0.4)) {
                 imageOpacity = 1.0
             }
             
-            // Slightly delayed wipe animation for better effect
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                withAnimation(.easeInOut(duration: 1.3)) {
+            // Animate accent circles
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                accentScale = 1.0
+            }
+            
+            // Fade in text content
+            withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
+                textOpacity = 1.0
+            }
+            
+            // Wipe away liquid glass
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeInOut(duration: 1.4)) {
                     wipeProgress = 1.0
                 }
             }
             
-            // Complete after 2.0 seconds total
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // Complete after 2.2 seconds total
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                 isComplete = true
                 onComplete()
             }
