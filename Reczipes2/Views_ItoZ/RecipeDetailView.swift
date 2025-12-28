@@ -142,16 +142,34 @@ struct RecipeDetailView: View {
                         
                         Spacer()
                         
-                        Button(action: onSave) {
-                            Label(
-                                isSaved ? "Saved" : "Save Recipe",
-                                systemImage: isSaved ? "checkmark.circle.fill" : "plus.circle.fill"
-                            )
-                            .font(.headline)
+                        VStack(spacing: 8) {
+                            Button(action: onSave) {
+                                Label(
+                                    isSaved ? "Saved" : "Save Recipe",
+                                    systemImage: isSaved ? "checkmark.circle.fill" : "plus.circle.fill"
+                                )
+                                .font(.headline)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(isSaved ? .green : .blue)
+                            .disabled(isSaved)
+                            
+                            // Show diabetic badge if diabetic mode is enabled or profile has diabetes concern
+                            if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
+                                RecipeDiabeticBadge.full(
+                                    info: diabeticInfo,
+                                    isLoading: isLoadingDiabeticInfo,
+                                    progress: analysisProgress
+                                )
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemBackground))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                            }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(isSaved ? .green : .blue)
-                        .disabled(isSaved)
                     }
                     
                     if let yield = recipe.yield {
@@ -244,7 +262,8 @@ struct RecipeDetailView: View {
                 }
                 
                 // Diabetic-Friendly Analysis Section
-                if diabeticSettings.isDiabeticEnabled {
+                // Show if diabetic mode is enabled OR if active profile has diabetes concern
+                if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Label("Diabetic-Friendly Analysis", systemImage: "heart.text.square")
@@ -253,6 +272,28 @@ struct RecipeDetailView: View {
                                 .foregroundStyle(.red)
                             
                             Spacer()
+                            
+                            // Show diabetes status badge if from profile
+                            if let profile = activeProfile, profile.hasDiabetesConcern {
+                                HStack(spacing: 4) {
+                                    Text(profile.diabetesStatus.icon)
+                                    Text(profile.diabetesStatus.rawValue)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .foregroundStyle(.red)
+                                .clipShape(Capsule())
+                            }
+                        }
+                        
+                        // Show profile note if analysis is triggered by profile diabetes status
+                        if let profile = activeProfile, profile.hasDiabetesConcern {
+                            Text("Analysis based on \(profile.name) - \(profile.diabetesStatus.description)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         
                         if let info = diabeticInfo {
@@ -500,6 +541,13 @@ struct RecipeDetailView: View {
         }
         .onAppear {
             checkForPendingAnalysis()
+            
+            // Auto-load diabetic analysis if profile has diabetes concern
+            if let profile = activeProfile, profile.hasDiabetesConcern, diabeticInfo == nil, !isLoadingDiabeticInfo {
+                Task {
+                    await loadDiabeticInfo()
+                }
+            }
         }
         .trackTask(
             type: .diabeticAnalysis,
