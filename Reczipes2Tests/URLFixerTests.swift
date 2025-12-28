@@ -73,7 +73,7 @@ struct URLFixerTests {
         let testCases: [(input: String, expected: String)] = [
             (
                 "https://example.com/recipe?name=Caf&eacute;",
-                "https://example.com/recipe?name=Café"
+                "https://example.com/recipe?name=Caf%C3%A9"  // Properly percent-encoded é
             ),
             (
                 "https://example.com/recipe?q=Rock%20&amp;%20Roll",
@@ -89,7 +89,7 @@ struct URLFixerTests {
             let link = JSONLink(title: "Test \(index + 1)", url: testCase.input, tips: nil)
             let result = try runFixTest(link: link, expectedURL: testCase.expected)
             #expect(result.wasFixed, "Link should have been fixed")
-            #expect(result.fixedURL == testCase.expected, "HTML entities should be decoded")
+            #expect(result.fixedURL == testCase.expected, "HTML entities should be decoded and properly encoded")
         }
     }
     

@@ -117,6 +117,9 @@ actor ExtractionRetryManager {
                 lastError = error
                 await logWarning("✗ Attempt \(attempt) failed for \(operationID): \(error)", category: "retry")
                 
+                // Record failed attempt
+                recordAttempt(operationID: operationID)
+                
                 // Classify the error
                 let classification = classifyError(error)
                 
@@ -402,7 +405,7 @@ actor ExtractionRetryManager {
 // MARK: - Supporting Types
 
 /// Statistics about retry attempts
-struct RetryStats {
+struct RetryStats: Sendable {
     let totalAttempts: Int
     let lastAttempt: Date?
     let attemptHistory: [Date]

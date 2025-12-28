@@ -11,7 +11,7 @@ import Foundation
 struct JSONLinkValidator {
     
     /// Validation result
-    struct ValidationResult {
+    struct ValidationResult: Sendable {
         let isValid: Bool
         let linkCount: Int
         let errors: [String]
@@ -47,7 +47,7 @@ struct JSONLinkValidator {
     }
     
     /// URL fix result for a single link
-    struct URLFixResult {
+    struct URLFixResult: Sendable {
         let linkNumber: Int
         let title: String
         let originalURL: String
@@ -56,7 +56,7 @@ struct JSONLinkValidator {
         let issues: [String]
         let verificationStatus: VerificationStatus
         
-        enum VerificationStatus {
+        enum VerificationStatus: Sendable {
             case valid
             case invalid(String)
             case skipped
@@ -91,7 +91,7 @@ struct JSONLinkValidator {
     }
     
     /// Complete fix report
-    struct FixReport {
+    struct FixReport: Sendable {
         let totalLinks: Int
         let fixedCount: Int
         let unfixedCount: Int
@@ -535,9 +535,8 @@ struct JSONLinkValidator {
     private static func decodeHTMLEntities(_ string: String) -> String {
         var result = string
         
-        // Common HTML entities
+        // Common HTML entities - NOTE: Order matters! Process &amp; last to avoid double-decoding
         let entities: [(entity: String, replacement: String)] = [
-            ("&amp;", "&"),
             ("&lt;", "<"),
             ("&gt;", ">"),
             ("&quot;", "\""),
@@ -545,7 +544,67 @@ struct JSONLinkValidator {
             ("&apos;", "'"),
             ("&nbsp;", " "),
             ("&#x2F;", "/"),
-            ("&#47;", "/")
+            ("&#47;", "/"),
+            // Extended Latin characters
+            ("&Agrave;", "À"),
+            ("&Aacute;", "Á"),
+            ("&Acirc;", "Â"),
+            ("&Atilde;", "Ã"),
+            ("&Auml;", "Ä"),
+            ("&Aring;", "Å"),
+            ("&AElig;", "Æ"),
+            ("&Ccedil;", "Ç"),
+            ("&Egrave;", "È"),
+            ("&Eacute;", "É"),
+            ("&Ecirc;", "Ê"),
+            ("&Euml;", "Ë"),
+            ("&Igrave;", "Ì"),
+            ("&Iacute;", "Í"),
+            ("&Icirc;", "Î"),
+            ("&Iuml;", "Ï"),
+            ("&Ntilde;", "Ñ"),
+            ("&Ograve;", "Ò"),
+            ("&Oacute;", "Ó"),
+            ("&Ocirc;", "Ô"),
+            ("&Otilde;", "Õ"),
+            ("&Ouml;", "Ö"),
+            ("&Oslash;", "Ø"),
+            ("&Ugrave;", "Ù"),
+            ("&Uacute;", "Ú"),
+            ("&Ucirc;", "Û"),
+            ("&Uuml;", "Ü"),
+            ("&Yacute;", "Ý"),
+            ("&agrave;", "à"),
+            ("&aacute;", "á"),
+            ("&acirc;", "â"),
+            ("&atilde;", "ã"),
+            ("&auml;", "ä"),
+            ("&aring;", "å"),
+            ("&aelig;", "æ"),
+            ("&ccedil;", "ç"),
+            ("&egrave;", "è"),
+            ("&eacute;", "é"),
+            ("&ecirc;", "ê"),
+            ("&euml;", "ë"),
+            ("&igrave;", "ì"),
+            ("&iacute;", "í"),
+            ("&icirc;", "î"),
+            ("&iuml;", "ï"),
+            ("&ntilde;", "ñ"),
+            ("&ograve;", "ò"),
+            ("&oacute;", "ó"),
+            ("&ocirc;", "ô"),
+            ("&otilde;", "õ"),
+            ("&ouml;", "ö"),
+            ("&oslash;", "ø"),
+            ("&ugrave;", "ù"),
+            ("&uacute;", "ú"),
+            ("&ucirc;", "û"),
+            ("&uuml;", "ü"),
+            ("&yacute;", "ý"),
+            ("&yuml;", "ÿ"),
+            // Process &amp; last to avoid double-decoding
+            ("&amp;", "&")
         ]
         
         for entity in entities {

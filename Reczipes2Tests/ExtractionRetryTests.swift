@@ -44,7 +44,8 @@ struct ExtractionRetryTests {
         }
         
         #expect(result == "Success!")
-        #expect(await counter.count == 1)
+        let countAfterSuccess = await counter.count
+        #expect(countAfterSuccess == 1)
     }
     
     // MARK: - Transient Failures
@@ -68,7 +69,8 @@ struct ExtractionRetryTests {
         }
         
         #expect(result == "Success after retry!")
-        #expect(await counter.count == 3)
+        let countAfterRetry = await counter.count
+        #expect(countAfterRetry == 3)
     }
     
     @Test("Retry on timeout error")
@@ -89,7 +91,8 @@ struct ExtractionRetryTests {
         }
         
         #expect(result == "Success after timeout!")
-        #expect(await counter.count == 2)
+        let countAfterTimeout = await counter.count
+        #expect(countAfterTimeout == 2)
     }
     
     @Test("Retry on server error (500)")
@@ -110,7 +113,8 @@ struct ExtractionRetryTests {
         }
         
         #expect(result == "Success after server error!")
-        #expect(await counter.count == 2)
+        let countAfterServerError = await counter.count
+        #expect(countAfterServerError == 2)
     }
     
     // MARK: - Terminal Failures
@@ -210,7 +214,8 @@ struct ExtractionRetryTests {
         let elapsed = Date().timeIntervalSince(startTime)
         
         #expect(result == "Success after rate limit!")
-        #expect(await counter.count == 2)
+        let countAfterRateLimit = await counter.count
+        #expect(countAfterRateLimit == 2)
         // Should have waited ~10 seconds (rate limit delay)
         #expect(elapsed >= 9.0, "Should have delayed for rate limit")
     }
@@ -310,9 +315,13 @@ struct ExtractionRetryTests {
         }
         
         let stats = await retryManager.getRetryStats(operationID: operationID)
-        #expect(stats.totalAttempts == 3)
-        #expect(stats.lastAttempt != nil)
-        #expect(stats.attemptHistory.count == 3)
+        let totalAttempts = await stats.totalAttempts
+        let lastAttempt = await stats.lastAttempt
+        let historyCount = await stats.attemptHistory.count
+        
+        #expect(totalAttempts == 3)
+        #expect(lastAttempt != nil)
+        #expect(historyCount == 3)
     }
     
     // MARK: - Error Type Classification

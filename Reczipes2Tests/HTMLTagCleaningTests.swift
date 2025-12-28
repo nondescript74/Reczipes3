@@ -76,8 +76,10 @@ struct HTMLTagCleaningTests {
         let result = JSONLinkValidator.validate(data: jsonData)
         
         // Then: Should detect HTML tags
-        #expect(!result.isValid, "Validation should fail for URLs with HTML tags")
-        #expect(result.linkCount == 4, "Should find all 4 links")
+        let isValid = result.isValid
+        let linkCount = result.linkCount
+        #expect(!isValid, "Validation should fail for URLs with HTML tags")
+        #expect(linkCount == 4, "Should find all 4 links")
         
         let htmlTagErrors = result.errors.filter { $0.contains("HTML tags") }
         #expect(htmlTagErrors.count == 3, "Should detect 3 URLs with HTML tags")
@@ -105,8 +107,10 @@ struct HTMLTagCleaningTests {
         let result = JSONLinkValidator.validate(data: jsonData)
         
         // Then: Should pass validation
-        #expect(result.isValid, "Validation should pass for clean URLs")
-        #expect(result.errors.isEmpty, "Should have no errors")
+        let isValid = result.isValid
+        let errors = result.errors
+        #expect(isValid, "Validation should pass for clean URLs")
+        #expect(errors.isEmpty, "Should have no errors")
     }
     
     @MainActor
@@ -143,7 +147,8 @@ struct HTMLTagCleaningTests {
         let cleanedLinks = try decoder.decode([JSONLink].self, from: cleanedData)
         
         #expect(cleanedLinks.count == 1, "Should have one link")
-        #expect(cleanedLinks[0].url == expectedCleanURL, "URL should be cleaned: '\(cleanedLinks[0].url)' should equal '\(expectedCleanURL)'")
+        let cleanedURL = cleanedLinks[0].url
+        #expect(cleanedURL == expectedCleanURL, "URL should be cleaned: '\(cleanedURL)' should equal '\(expectedCleanURL)'")
         
         // Cleanup
         try? FileManager.default.removeItem(at: tempInputURL)
@@ -241,18 +246,24 @@ struct HTMLTagCleaningTests {
         
         // Verify each URL is clean
         for link in cleanedLinks {
-            #expect(!link.url.contains("<"), "URL should not contain '<': \(link.url)")
-            #expect(!link.url.contains(">"), "URL should not contain '>': \(link.url)")
+            let url = link.url
+            #expect(!url.contains("<"), "URL should not contain '<': \(url)")
+            #expect(!url.contains(">"), "URL should not contain '>': \(url)")
         }
         
         // Verify specific URLs
-        #expect(cleanedLinks[0].url == "https://www.example.com/recipe1.html")
-        #expect(cleanedLinks[1].url == "https://www.example.com/recipe2.html")
-        #expect(cleanedLinks[2].url == "https://www.example.com/recipe3.html")
+        let url0 = cleanedLinks[0].url
+        let url1 = cleanedLinks[1].url
+        let url2 = cleanedLinks[2].url
+        #expect(url0 == "https://www.example.com/recipe1.html")
+        #expect(url1 == "https://www.example.com/recipe2.html")
+        #expect(url2 == "https://www.example.com/recipe3.html")
         
         // Verify tips are preserved
-        #expect(cleanedLinks[0].tips == ["Tasty"], "Tips should be preserved")
-        #expect(cleanedLinks[2].tips == ["Already clean"], "Tips should be preserved")
+        let tips0 = cleanedLinks[0].tips
+        let tips2 = cleanedLinks[2].tips
+        #expect(tips0 == ["Tasty"], "Tips should be preserved")
+        #expect(tips2 == ["Already clean"], "Tips should be preserved")
         
         // Cleanup
         try? FileManager.default.removeItem(at: inputURL)
@@ -277,8 +288,10 @@ struct HTMLTagCleaningTests {
         let validationResult = await JSONLinkValidator.validate(data: jsonData)
         
         // Then: Should detect issues
-        #expect(!validationResult.isValid, "Should fail validation")
-        #expect(validationResult.errors.count > 0, "Should have errors")
+        let isValid = await validationResult.isValid
+        let errorCount = await validationResult.errors.count
+        #expect(!isValid, "Should fail validation")
+        #expect(errorCount > 0, "Should have errors")
         
         // When: Then cleaning
         let inputURL = FileManager.default.temporaryDirectory
@@ -297,8 +310,10 @@ struct HTMLTagCleaningTests {
         let cleanedData = try Data(contentsOf: outputURL)
         let cleanedValidation = await JSONLinkValidator.validate(data: cleanedData)
         
-        #expect(cleanedValidation.isValid, "Cleaned file should pass validation")
-        #expect(cleanedValidation.errors.isEmpty, "Should have no errors after cleaning")
+        let cleanedIsValid = await cleanedValidation.isValid
+        let cleanedErrors = await cleanedValidation.errors
+        #expect(cleanedIsValid, "Cleaned file should pass validation")
+        #expect(cleanedErrors.isEmpty, "Should have no errors after cleaning")
         
         // Cleanup
         try? FileManager.default.removeItem(at: inputURL)
@@ -331,7 +346,8 @@ struct HTMLTagCleaningTests {
         let decoder = JSONDecoder()
         let cleanedLinks = try decoder.decode([JSONLink].self, from: cleanedData)
         
-        #expect(cleanedLinks[0].url == expectedClean, "Query parameters should be preserved")
+        let cleanedURL = cleanedLinks[0].url
+        #expect(cleanedURL == expectedClean, "Query parameters should be preserved")
         
         // Cleanup
         try? FileManager.default.removeItem(at: inputURL)
@@ -362,7 +378,8 @@ struct HTMLTagCleaningTests {
         let decoder = JSONDecoder()
         let cleanedLinks = try decoder.decode([JSONLink].self, from: cleanedData)
         
-        #expect(cleanedLinks[0].url == expectedClean, "Anchor should be preserved")
+        let cleanedURL = cleanedLinks[0].url
+        #expect(cleanedURL == expectedClean, "Anchor should be preserved")
         
         // Cleanup
         try? FileManager.default.removeItem(at: inputURL)
@@ -396,7 +413,8 @@ struct HTMLTagCleaningTests {
         let cleanedLinks = try decoder.decode([JSONLink].self, from: cleanedData)
         
         #expect(cleanedLinks.count == 1, "Empty URLs should be filtered out")
-        #expect(cleanedLinks[0].url == "https://example.com", "Valid URL should remain")
+        let validURL = cleanedLinks[0].url
+        #expect(validURL == "https://example.com", "Valid URL should remain")
         
         // Cleanup
         try? FileManager.default.removeItem(at: inputURL)

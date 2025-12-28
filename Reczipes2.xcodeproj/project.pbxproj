@@ -58,6 +58,7 @@
 				ARCHITECTURE_IMAGE_ASSIGNMENT.md,
 				ARCHITECTURE_RECIPE_EXTRACTION.md,
 				AUTOMATIC_IMAGE_ASSIGNMENT.md,
+				BATCH_EXTRACTION_IMPROVEMENTS.md,
 				COMPLETE_APP_HELP_GUIDE.md,
 				CONTEXTUAL_HELP_IMPLEMENTATION.md,
 				DIABETIC_ANALYSIS_USER_GUIDE.md,
@@ -126,20 +127,12 @@
 			);
 			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
 		};
-		F8FF8E232F018A3100BCA014 /* Exceptions for "Reczipes2" folder in "Reczipes2" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Views_ItoZ/BATCH_EXTRACTION_IMPROVEMENTS.md,
-			);
-			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F8C80F462EE246D200AA52E7 /* Reczipes2 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				F8FF8E232F018A3100BCA014 /* Exceptions for "Reczipes2" folder in "Reczipes2" target */,
 				F87D19EC2EE778EE009C11CB /* Exceptions for "Reczipes2" folder in "Reczipes2Tests" target */,
 			);
 			path = Reczipes2;
