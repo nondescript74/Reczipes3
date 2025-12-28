@@ -15,6 +15,7 @@ class ClaudeAPIClient {
     private let apiKey: String
     private let baseURL = "https://api.anthropic.com/v1/messages"
     private let imagePreprocessor = ImagePreprocessor()
+    private let retryManager = ExtractionRetryManager()
     
     // Model fallback list - try these in order for validation
     private let validationModels = [
@@ -134,6 +135,26 @@ class ClaudeAPIClient {
     func extractRecipe(from htmlContent: String) async throws -> RecipeModel {
         logInfo("WEB RECIPE EXTRACTION START", category: "extraction")
         logDebug("Content length: \(htmlContent.count) characters", category: "extraction")
+        
+        // Use retry manager for API resilience
+        let operationID = "claude-extract-web-\(htmlContent.prefix(100).hashValue)"
+        
+        return try await retryManager.withRetry(
+            operationID: operationID,
+            configuration: .init(
+                maxAttempts: 3,
+                initialDelay: 2.0,
+                maxDelay: 20.0,
+                backoffMultiplier: 2.0,
+                useJitter: true
+            )
+        ) {
+            try await self.performWebExtraction(htmlContent: htmlContent)
+        }
+    }
+    
+    /// Perform the actual web extraction (wrapped by retry logic)
+    private func performWebExtraction(htmlContent: String) async throws -> RecipeModel {
         
         let systemPrompt = """
         You are an expert at extracting recipes from web pages and text content. 
@@ -335,6 +356,26 @@ class ClaudeAPIClient {
         logInfo("RECIPE EXTRACTION START", category: "extraction")
         logDebug("Original image data size: \(imageData.count) bytes", category: "extraction")
         logDebug("Use preprocessing: \(usePreprocessing)", category: "extraction")
+        
+        // Use retry manager for API resilience
+        let operationID = "claude-extract-image-\(imageData.hashValue)"
+        
+        return try await retryManager.withRetry(
+            operationID: operationID,
+            configuration: .init(
+                maxAttempts: 3,
+                initialDelay: 2.0,
+                maxDelay: 20.0,
+                backoffMultiplier: 2.0,
+                useJitter: true
+            )
+        ) {
+            try await self.performImageExtraction(imageData: imageData, usePreprocessing: usePreprocessing)
+        }
+    }
+    
+    /// Perform the actual image extraction (wrapped by retry logic)
+    private func performImageExtraction(imageData: Data, usePreprocessing: Bool) async throws -> RecipeModel {
         
         // Preprocess the image if requested
         let finalImageData: Data

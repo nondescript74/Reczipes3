@@ -10,13 +10,35 @@ import Foundation
 /// Extracts recipe content from web pages
 class WebRecipeExtractor {
     
-    /// Fetch and extract text content from a URL
+    private let retryManager = ExtractionRetryManager()
+    
+    /// Fetch and extract text content from a URL with automatic retry on transient failures
     /// - Parameter urlString: The URL of the recipe webpage
     /// - Returns: The HTML content as a string
     func fetchWebContent(from urlString: String) async throws -> String {
         print("🌐 ========== WEB CONTENT FETCH START ==========")
         print("🌐 URL: \(urlString)")
         
+        // Create operation ID for retry tracking
+        let operationID = "web-fetch-\(urlString.hashValue)"
+        
+        // Use retry manager for resilience
+        return try await retryManager.withRetry(
+            operationID: operationID,
+            configuration: .init(
+                maxAttempts: 3,
+                initialDelay: 2.0,
+                maxDelay: 15.0,
+                backoffMultiplier: 2.0,
+                useJitter: true
+            )
+        ) {
+            try await self.performFetch(urlString: urlString)
+        }
+    }
+    
+    /// Perform the actual web content fetch (wrapped by retry logic)
+    private func performFetch(urlString: String) async throws -> String {
         // Clean HTML tags from URL string (defense-in-depth)
         let cleanedURLString = cleanHTMLTags(from: urlString)
         if cleanedURLString != urlString {

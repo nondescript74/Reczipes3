@@ -9,6 +9,7 @@ import Foundation
 import OSLog
 
 /// Centralized logging system that writes to both OSLog and a diagnostic file
+@preconcurrency
 final class DiagnosticLogger: @unchecked Sendable {
     
     // MARK: - Singleton
@@ -19,7 +20,7 @@ final class DiagnosticLogger: @unchecked Sendable {
     
     private let fileManager = FileManager.default
     private let logFileName = "reczipes_diagnostics.log"
-    private var logFileURL: URL?
+    private nonisolated(unsafe) var logFileURL: URL?
     private let logQueue = DispatchQueue(label: "com.reczipes.diagnosticlogger", qos: .utility)
     
     // OSLog subsystems for different areas of the app
@@ -77,33 +78,33 @@ final class DiagnosticLogger: @unchecked Sendable {
     // MARK: - Public Logging Methods
     
     /// Log a debug message
-    func debug(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+    nonisolated func debug(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
         log(message, level: .debug, category: category, file: file, function: function, line: line)
     }
     
     /// Log an info message
-    func info(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+    nonisolated func info(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
         log(message, level: .info, category: category, file: file, function: function, line: line)
     }
     
     /// Log a warning message
-    func warning(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+    nonisolated func warning(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
         log(message, level: .default, category: category, file: file, function: function, line: line)
     }
     
     /// Log an error message
-    func error(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+    nonisolated func error(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
         log(message, level: .error, category: category, file: file, function: function, line: line)
     }
     
     /// Log a critical/fault message
-    func critical(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+    nonisolated func critical(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
         log(message, level: .fault, category: category, file: file, function: function, line: line)
     }
     
     // MARK: - Private Logging Implementation
     
-    private func log(
+    private nonisolated func log(
         _ message: String,
         level: OSLogType,
         category: String,
@@ -140,7 +141,7 @@ final class DiagnosticLogger: @unchecked Sendable {
         writeToFile(fileLogMessage)
     }
     
-    private func logLevelString(_ level: OSLogType) -> String {
+    private nonisolated func logLevelString(_ level: OSLogType) -> String {
         switch level {
         case .debug:
             return "DEBUG"
@@ -157,7 +158,7 @@ final class DiagnosticLogger: @unchecked Sendable {
         }
     }
     
-    private func writeToFile(_ message: String) {
+    private nonisolated func writeToFile(_ message: String) {
         guard let url = logFileURL else { return }
         
         logQueue.async {
@@ -181,12 +182,12 @@ final class DiagnosticLogger: @unchecked Sendable {
     // MARK: - Log Management
     
     /// Get the current log file URL
-    func getLogFileURL() -> URL? {
+    nonisolated func getLogFileURL() -> URL? {
         return logFileURL
     }
     
     /// Get the contents of the log file
-    func getLogContents() -> String {
+    nonisolated func getLogContents() -> String {
         guard let url = logFileURL else {
             return "Log file not available"
         }
@@ -199,7 +200,7 @@ final class DiagnosticLogger: @unchecked Sendable {
     }
     
     /// Clear the log file
-    func clearLog() {
+    nonisolated func clearLog() {
         guard let url = logFileURL else { return }
         
         logQueue.async { [weak self] in
@@ -225,11 +226,11 @@ final class DiagnosticLogger: @unchecked Sendable {
     }
     
     /// Get the size of the log file in bytes
-    func getLogFileSize() -> Int64 {
+    nonisolated func getLogFileSize() -> Int64 {
         guard let url = logFileURL else { return 0 }
         
         do {
-            let attributes = try fileManager.attributesOfItem(atPath: url.path)
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
             return attributes[.size] as? Int64 ?? 0
         } catch {
             return 0
@@ -237,7 +238,7 @@ final class DiagnosticLogger: @unchecked Sendable {
     }
     
     /// Get formatted file size (e.g., "1.5 MB")
-    func getFormattedLogFileSize() -> String {
+    nonisolated func getFormattedLogFileSize() -> String {
         let bytes = getLogFileSize()
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB]

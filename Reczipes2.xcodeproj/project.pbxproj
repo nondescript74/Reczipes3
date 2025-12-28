@@ -35,6 +35,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F84A0D632F01A2980005198A /* Exceptions for "Docs" folder in "Reczipes2Tests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				RETRY_RESILIENCE_SYSTEM.md,
+			);
+			target = F8C80F522EE246D300AA52E7 /* Reczipes2Tests */;
+		};
 		F87D19EC2EE778EE009C11CB /* Exceptions for "Reczipes2" folder in "Reczipes2Tests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -101,6 +108,8 @@
 				RECIPE_SHARING_FIXED.md,
 				RecipeImageAssignmentInstructions.md,
 				REMINDERS_INTEGRATION_SETUP.md,
+				RETRY_IMPLEMENTATION_SUMMARY.md,
+				RETRY_RESILIENCE_SYSTEM.md,
 				SAVED_LINKS_FEATURE.md,
 				SHARING_GUIDANCE_IMPROVEMENTS.md,
 				STATE_PRESERVATION_GUIDE.md,
@@ -150,6 +159,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				F8F1931A2F0068F7001B77D4 /* Exceptions for "Docs" folder in "Reczipes2" target */,
+				F84A0D632F01A2980005198A /* Exceptions for "Docs" folder in "Reczipes2Tests" target */,
 			);
 			path = Docs;
 			sourceTree = "<group>";
@@ -483,7 +493,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -511,7 +521,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 9.2;
+				MARKETING_VERSION = 9.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -536,7 +546,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -564,7 +574,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 9.2;
+				MARKETING_VERSION = 9.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
