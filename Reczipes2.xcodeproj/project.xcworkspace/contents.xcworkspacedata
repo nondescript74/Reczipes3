@@ -4,4 +4,7 @@
    <FileRef
       location = "self:">
    </FileRef>
+   <FileRef
+      location = "group:GLOBAL_STATUS_BAR_DOCUMENTATION.md">
+   </FileRef>
 </Workspace>

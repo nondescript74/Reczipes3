@@ -21,16 +21,20 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("Recipe Extraction") {
-                    HStack {
-                        Text("API Key Status")
-                        Spacer()
-                        if isAPIKeyConfigured {
-                            Label("Configured", systemImage: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                        } else {
+        VStack(spacing: 0) {
+            // Global batch extraction status bar
+            BatchExtractionStatusBar(manager: BatchExtractionManager.shared)
+            
+            NavigationView {
+                Form {
+                    Section("Recipe Extraction") {
+                        HStack {
+                            Text("API Key Status")
+                            Spacer()
+                            if isAPIKeyConfigured {
+                                Label("Configured", systemImage: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            } else {
                             Label("Not Set", systemImage: "xmark.circle.fill")
                                 .foregroundColor(.red)
                         }
@@ -174,25 +178,26 @@ struct SettingsView: View {
                          destination: URL(string: "https://www.anthropic.com")!)
                 }
             }
-            .navigationTitle("Settings")
-            .fullScreenCover(isPresented: $showAPIKeyManager, onDismiss: {
-                // Refresh API key status when manager is dismissed
-                isAPIKeyConfigured = APIKeyHelper.isConfigured
-            }) {
-                APIKeyManagerView()
-            }
-            .sheet(isPresented: $showLicenseAgreement) {
-                LicenseDisplayView()
-            }
-            .sheet(isPresented: $showHelpBrowser) {
-                HelpBrowserView()
-            }
-            .sheet(isPresented: $showDiagnosticLog) {
-                DiagnosticLogView()
-            }
-            .onAppear {
-                // Refresh API key status when view appears
-                isAPIKeyConfigured = APIKeyHelper.isConfigured
+                .navigationTitle("Settings")
+                .fullScreenCover(isPresented: $showAPIKeyManager, onDismiss: {
+                    // Refresh API key status when manager is dismissed
+                    isAPIKeyConfigured = APIKeyHelper.isConfigured
+                }) {
+                    APIKeyManagerView()
+                }
+                .sheet(isPresented: $showLicenseAgreement) {
+                    LicenseDisplayView()
+                }
+                .sheet(isPresented: $showHelpBrowser) {
+                    HelpBrowserView()
+                }
+                .sheet(isPresented: $showDiagnosticLog) {
+                    DiagnosticLogView()
+                }
+                .onAppear {
+                    // Refresh API key status when view appears
+                    isAPIKeyConfigured = APIKeyHelper.isConfigured
+                }
             }
         }
     }

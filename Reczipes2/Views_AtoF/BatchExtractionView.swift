@@ -16,84 +16,81 @@ struct BatchExtractionView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    @State private var viewModel: BatchRecipeExtractorViewModel?
+    @StateObject private var manager = BatchExtractionManager.shared
     @State private var showingStopConfirmation = false
     @State private var showingErrorLog = false
     
     var body: some View {
         NavigationStack {
-            Group {
-                if let vm = viewModel {
-                    contentView(vm: vm)
-                } else {
-                    ProgressView("Initializing...")
-                }
-            }
-            .navigationTitle("Batch Extract Recipes")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(viewModel?.isExtracting == true ? "Cancel" : "Done") {
-                        if viewModel?.isExtracting == true {
-                            showingStopConfirmation = true
-                        } else {
-                            dismiss()
-                            onComplete()
+            contentView
+                .navigationTitle("Batch Extract Recipes")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(manager.isExtracting ? "Close" : "Done") {
+                            if manager.isExtracting {
+                                // Just dismiss - extraction continues in background
+                                dismiss()
+                                onComplete()
+                            } else {
+                                dismiss()
+                                onComplete()
+                            }
                         }
                     }
                 }
-            }
-            .onAppear {
-                if viewModel == nil {
-                    viewModel = BatchRecipeExtractorViewModel(
-                        apiKey: apiKey,
-                        modelContext: modelContext
-                    )
+                .onAppear {
+                    // Configure the manager
+                    manager.configure(apiKey: apiKey, modelContext: modelContext)
                 }
-            }
-            .alert("Stop Extraction?", isPresented: $showingStopConfirmation) {
-                Button("Continue", role: .cancel) { }
-                Button("Stop", role: .destructive) {
-                    viewModel?.stop()
+                .alert("Stop Extraction?", isPresented: $showingStopConfirmation) {
+                    Button("Continue", role: .cancel) { }
+                    Button("Stop", role: .destructive) {
+                        manager.stop()
+                    }
+                } message: {
+                    Text("This will stop the batch extraction. Progress will be saved, but unprocessed links will remain.")
                 }
-            } message: {
-                Text("This will stop the batch extraction. Progress will be saved, but unprocessed links will remain.")
-            }
-            .sheet(isPresented: $showingErrorLog) {
-                if let vm = viewModel {
-                    errorLogSheet(vm: vm)
+                .sheet(isPresented: $showingErrorLog) {
+                    errorLogSheet
                 }
-            }
         }
     }
     
     // MARK: - Main Content View
     
-    private func contentView(vm: BatchRecipeExtractorViewModel) -> some View {
+    private var contentView: some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Header
-                headerSection
+                if !manager.isExtracting {
+                    headerSection
+                }
                 
-                // Progress Section
-                if vm.isExtracting {
-                    progressSection(vm: vm)
+                // Detailed Progress Section
+                if manager.isExtracting, let status = manager.currentStatus {
+                    detailedProgressSection(status: status)
                 }
                 
                 // Current Recipe Preview
-                if let recipe = vm.currentRecipe {
+                if let recipe = manager.currentRecipe {
                     currentRecipePreview(recipe)
                 }
                 
+                // Recently Extracted Recipes
+                if !manager.recentlyExtracted.isEmpty {
+                    recentlyExtractedSection
+                }
+                
                 // Stats Section
-                statsSection(vm: vm)
+                statsSection
                 
                 // Control Buttons
-                controlButtonsSection(vm: vm)
+                controlButtonsSection
                 
                 // Error Log Button
-                if !vm.errorLog.isEmpty {
-                    errorLogButton(vm: vm)
+                if !manager.errorLog.isEmpty {
+                    errorLogButton
                 }
             }
             .padding()
@@ -112,7 +109,7 @@ struct BatchExtractionView: View {
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Text("Recipes will be extracted automatically with a 1-minute interval between each extraction")
+            Text("Recipes will be extracted automatically with a 5-second interval between each extraction")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -121,7 +118,7 @@ struct BatchExtractionView: View {
             HStack(spacing: 4) {
                 Image(systemName: "info.circle.fill")
                     .font(.caption)
-                Text("Maximum 10 recipes per batch")
+                Text("Maximum 50 recipes per batch")
                     .font(.caption)
             }
             .foregroundStyle(.orange)
@@ -132,37 +129,75 @@ struct BatchExtractionView: View {
         }
     }
     
-    private func progressSection(vm: BatchRecipeExtractorViewModel) -> some View {
+    private func detailedProgressSection(status: ExtractionStatus) -> some View {
         VStack(spacing: 16) {
-            // Progress Bar
-            ProgressView(
-                value: Double(vm.currentProgress),
-                total: Double(vm.totalToExtract)
-            )
-            .progressViewStyle(.linear)
-            .tint(.blue)
-            
-            // Progress Text
-            HStack {
-                Text("\(vm.currentProgress) of \(vm.totalToExtract)")
-                    .font(.headline)
-                Spacer()
-                Text("\(Int((Double(vm.currentProgress) / Double(vm.totalToExtract)) * 100))%")
-                    .font(.headline)
-                    .foregroundStyle(.blue)
+            // Main Progress Bar
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Overall Progress")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text("\(status.currentIndex) of \(status.totalCount)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                
+                ProgressView(
+                    value: Double(status.currentIndex),
+                    total: Double(status.totalCount)
+                )
+                .progressViewStyle(.linear)
+                .tint(.blue)
+                
+                HStack {
+                    Text("\(Int((Double(status.currentIndex) / Double(status.totalCount)) * 100))%")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    if let estimatedTime = status.estimatedTimeRemaining {
+                        Text("~\(formatTimeRemaining(estimatedTime)) remaining")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             
-            // Current Status
-            if !vm.currentStatus.isEmpty {
-                Text(vm.currentStatus)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
+            Divider()
+            
+            // Current Step Progress
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: stepIcon(for: status.currentStep))
+                        .foregroundStyle(stepColor(for: status.currentStep))
+                    Text(status.currentStep.rawValue)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Spacer()
+                }
+                
+                if status.totalImages > 0 {
+                    HStack {
+                        Image(systemName: "photo.stack")
+                            .font(.caption)
+                        Text("Images: \(status.imagesDownloaded)/\(status.totalImages)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                ProgressView(value: status.stepProgress, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(stepColor(for: status.currentStep))
             }
             
-            // Current Link
-            if let currentLink = vm.currentLink {
+            Divider()
+            
+            // Current Link Info
+            if let currentLink = status.currentLink {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Currently Extracting:", systemImage: "link")
                         .font(.caption)
@@ -177,16 +212,83 @@ struct BatchExtractionView: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(Color.blue.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            
+            // Time Stats
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Elapsed Time")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(formatTimeElapsed(status.timeElapsed))
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Avg. per Recipe")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    if status.currentIndex > 0 {
+                        Text(formatTimeElapsed(status.timeElapsed / Double(status.currentIndex)))
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    } else {
+                        Text("--")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+            .padding(.horizontal)
         }
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
+    private var recentlyExtractedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recently Extracted")
+                .font(.headline)
+            
+            ForEach(manager.recentlyExtracted.prefix(5), id: \.id) { recipe in
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.title3)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(recipe.title)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                        
+                        if let yield = recipe.yield {
+                            Text(yield)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+                .background(Color.green.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
     private func currentRecipePreview(_ recipe: RecipeModel) -> some View {
@@ -236,26 +338,28 @@ struct BatchExtractionView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
-    private func statsSection(vm: BatchRecipeExtractorViewModel) -> some View {
+    private var statsSection: some View {
         HStack(spacing: 20) {
-            BatchStatBadge(
-                label: "To Extract",
-                value: vm.totalToExtract,
-                color: .blue,
-                icon: "clock"
-            )
+            if manager.isExtracting, let status = manager.currentStatus {
+                BatchStatBadge(
+                    label: "Remaining",
+                    value: status.totalCount - status.currentIndex,
+                    color: .blue,
+                    icon: "clock"
+                )
+            }
             
             BatchStatBadge(
                 label: "Success",
-                value: vm.successCount,
+                value: manager.successCount,
                 color: .green,
                 icon: "checkmark.circle"
             )
             
-            if vm.failureCount > 0 {
+            if manager.failureCount > 0 {
                 BatchStatBadge(
                     label: "Failed",
-                    value: vm.failureCount,
+                    value: manager.failureCount,
                     color: .red,
                     icon: "xmark.circle"
                 )
@@ -266,14 +370,14 @@ struct BatchExtractionView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
-    private func controlButtonsSection(vm: BatchRecipeExtractorViewModel) -> some View {
+    private var controlButtonsSection: some View {
         VStack(spacing: 12) {
-            if !vm.isExtracting {
+            if !manager.isExtracting {
                 // Show count info
                 let unprocessedCount = links.filter { !$0.isProcessed }.count
-                let willProcess = min(unprocessedCount, 10)
+                let willProcess = min(unprocessedCount, 50)
                 
-                if unprocessedCount > 10 {
+                if unprocessedCount > 50 {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.circle.fill")
                             .font(.caption)
@@ -286,7 +390,9 @@ struct BatchExtractionView: View {
                 
                 // Start Button
                 Button {
-                    vm.startBatchExtraction(links: links)
+                    manager.startBatchExtraction(links: links)
+                    // Dismiss the sheet when extraction starts
+                    dismiss()
                 } label: {
                     Label("Start Batch Extraction", systemImage: "play.fill")
                         .font(.headline)
@@ -301,20 +407,20 @@ struct BatchExtractionView: View {
             } else {
                 // Pause/Resume Button
                 Button {
-                    if vm.isPaused {
-                        vm.resume()
+                    if manager.isPaused {
+                        manager.resume()
                     } else {
-                        vm.pause()
+                        manager.pause()
                     }
                 } label: {
                     Label(
-                        vm.isPaused ? "Resume" : "Pause",
-                        systemImage: vm.isPaused ? "play.fill" : "pause.fill"
+                        manager.isPaused ? "Resume" : "Pause",
+                        systemImage: manager.isPaused ? "play.fill" : "pause.fill"
                     )
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(vm.isPaused ? Color.green : Color.orange)
+                    .background(manager.isPaused ? Color.green : Color.orange)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -337,14 +443,14 @@ struct BatchExtractionView: View {
         }
     }
     
-    private func errorLogButton(vm: BatchRecipeExtractorViewModel) -> some View {
+    private var errorLogButton: some View {
         Button {
             showingErrorLog = true
         } label: {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
-                Text("View Error Log (\(vm.errorLog.count))")
+                Text("View Error Log (\(manager.errorLog.count))")
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
@@ -359,16 +465,19 @@ struct BatchExtractionView: View {
         .buttonStyle(.plain)
     }
     
-    private func errorLogSheet(vm: BatchRecipeExtractorViewModel) -> some View {
+    private var errorLogSheet: some View {
         NavigationStack {
             List {
-                ForEach(Array(vm.errorLog.enumerated()), id: \.offset) { _, error in
+                ForEach(Array(manager.errorLog.enumerated()), id: \.offset) { _, error in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(error.link)
                             .font(.headline)
                         Text(error.error)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Text(error.timestamp, style: .time)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
                     .padding(.vertical, 4)
                 }
@@ -382,6 +491,53 @@ struct BatchExtractionView: View {
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func stepIcon(for step: ExtractionStep) -> String {
+        switch step {
+        case .fetching: return "network"
+        case .analyzing: return "brain"
+        case .downloadingImages: return "arrow.down.circle"
+        case .savingRecipe: return "square.and.arrow.down"
+        case .waiting: return "clock"
+        case .complete: return "checkmark.circle"
+        case .failed: return "xmark.circle"
+        }
+    }
+    
+    private func stepColor(for step: ExtractionStep) -> Color {
+        switch step {
+        case .fetching, .analyzing: return .blue
+        case .downloadingImages: return .purple
+        case .savingRecipe: return .green
+        case .waiting: return .orange
+        case .complete: return .green
+        case .failed: return .red
+        }
+    }
+    
+    private func formatTimeElapsed(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds) / 60
+        let remainingSeconds = Int(seconds) % 60
+        
+        if minutes > 0 {
+            return "\(minutes)m \(remainingSeconds)s"
+        } else {
+            return "\(remainingSeconds)s"
+        }
+    }
+    
+    private func formatTimeRemaining(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds) / 60
+        let remainingSeconds = Int(seconds) % 60
+        
+        if minutes > 0 {
+            return "\(minutes)m \(remainingSeconds)s"
+        } else {
+            return "\(remainingSeconds)s"
         }
     }
 }

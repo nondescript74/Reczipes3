@@ -29,8 +29,8 @@ class BatchRecipeExtractorViewModel: ObservableObject {
     
     private let apiKey: String
     private let modelContext: ModelContext
-    private let extractionInterval: TimeInterval = 60.0 // 1 minute between extractions
-    private let maxBatchSize: Int = 10 // Maximum recipes per batch
+    private let extractionInterval: TimeInterval = 5.0 // 5 seconds between extractions
+    private let maxBatchSize: Int = 50 // Maximum recipes per batch
     private var extractionTask: Task<Void, Never>?
     private let webImageDownloader = WebImageDownloader()
     

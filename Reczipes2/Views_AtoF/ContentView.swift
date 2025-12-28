@@ -122,65 +122,70 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            if availableRecipes.isEmpty {
-                // Empty state when no recipes exist
-                emptyStateView
-            } else {
-                // Recipe list when recipes are available
-                recipeListView
+        VStack(spacing: 0) {
+            // Global batch extraction status bar
+            BatchExtractionStatusBar(manager: BatchExtractionManager.shared)
+            
+            NavigationSplitView {
+                if availableRecipes.isEmpty {
+                    // Empty state when no recipes exist
+                    emptyStateView
+                } else {
+                    // Recipe list when recipes are available
+                    recipeListView
+                }
+            } detail: {
+                if let recipe = selectedRecipe {
+                    RecipeDetailView(
+                        recipe: recipe,
+                        isSaved: isRecipeSaved(recipe),
+                        onSave: { saveRecipe(recipe) }
+                    )
+                    .id("\(recipe.id)-\(recipe.imageName ?? "no-image")")  // Force view refresh when recipe or image changes
+                } else {
+                    ContentUnavailableView(
+                        "Select a Recipe",
+                        systemImage: "book.closed",
+                        description: Text("Choose a recipe from the list to view its details")
+                    )
+                }
             }
-        } detail: {
-            if let recipe = selectedRecipe {
-                RecipeDetailView(
-                    recipe: recipe,
-                    isSaved: isRecipeSaved(recipe),
-                    onSave: { saveRecipe(recipe) }
-                )
-                .id("\(recipe.id)-\(recipe.imageName ?? "no-image")")  // Force view refresh when recipe or image changes
-            } else {
-                ContentUnavailableView(
-                    "Select a Recipe",
-                    systemImage: "book.closed",
-                    description: Text("Choose a recipe from the list to view its details")
-                )
-            }
-        }
-        .onAppear {
-            restoreSelectedRecipe()
-            // Initialize cached recipes
-            cachedFilteredRecipes = availableRecipesBeforeFilter
-        }
-        .onChange(of: allergenFilterEnabled) { _, isEnabled in
-            if isEnabled {
-                processAllergenFilter()
-            } else {
-                // Clear cache when filter is disabled
-                cachedFilteredRecipes = availableRecipesBeforeFilter
-                cachedAllergenScores = [:]
-            }
-        }
-        .onChange(of: showOnlySafe) { _, _ in
-            if allergenFilterEnabled {
-                processAllergenFilter()
-            }
-        }
-        .onChange(of: activeProfile?.id) { _, _ in
-            if allergenFilterEnabled {
-                processAllergenFilter()
-            }
-        }
-        .onChange(of: savedRecipes.count) { _, _ in
-            // Recipes changed, update cache
-            if allergenFilterEnabled {
-                processAllergenFilter()
-            } else {
+            .onAppear {
+                restoreSelectedRecipe()
+                // Initialize cached recipes
                 cachedFilteredRecipes = availableRecipesBeforeFilter
             }
-        }
-        .onChange(of: selectedRecipe) { _, newRecipe in
-            // Save selected recipe to app state when it changes
-            appState.selectedRecipeId = newRecipe?.id
+            .onChange(of: allergenFilterEnabled) { _, isEnabled in
+                if isEnabled {
+                    processAllergenFilter()
+                } else {
+                    // Clear cache when filter is disabled
+                    cachedFilteredRecipes = availableRecipesBeforeFilter
+                    cachedAllergenScores = [:]
+                }
+            }
+            .onChange(of: showOnlySafe) { _, _ in
+                if allergenFilterEnabled {
+                    processAllergenFilter()
+                }
+            }
+            .onChange(of: activeProfile?.id) { _, _ in
+                if allergenFilterEnabled {
+                    processAllergenFilter()
+                }
+            }
+            .onChange(of: savedRecipes.count) { _, _ in
+                // Recipes changed, update cache
+                if allergenFilterEnabled {
+                    processAllergenFilter()
+                } else {
+                    cachedFilteredRecipes = availableRecipesBeforeFilter
+                }
+            }
+            .onChange(of: selectedRecipe) { _, newRecipe in
+                // Save selected recipe to app state when it changes
+                appState.selectedRecipeId = newRecipe?.id
+            }
         }
     }
     

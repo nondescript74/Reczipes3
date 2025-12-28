@@ -35,21 +35,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F86FD81F2EFDB45700D809D1 /* Exceptions for "Docs" folder in "Reczipes2Tests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				DIABETIC_CACHE_TESTS_DEBUGGING.md,
-				TEST_MIGRATION_NOTE.md,
-			);
-			target = F8C80F522EE246D300AA52E7 /* Reczipes2Tests */;
-		};
-		F86FD8202EFDB45A00D809D1 /* Exceptions for "Docs" folder in "Reczipes2UITests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				UI_TESTING_SETUP.md,
-			);
-			target = F8C80F5C2EE246D300AA52E7 /* Reczipes2UITests */;
-		};
 		F87D19EC2EE778EE009C11CB /* Exceptions for "Reczipes2" folder in "Reczipes2Tests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -60,7 +45,82 @@
 		F8F1931A2F0068F7001B77D4 /* Exceptions for "Docs" folder in "Reczipes2" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				ALLERGEN_DETECTION_GUIDE.md,
+				ALLERGEN_IMPLEMENTATION_SUMMARY.md,
+				ALLERGEN_QUICK_REFERENCE.md,
+				ARCHITECTURE_IMAGE_ASSIGNMENT.md,
+				ARCHITECTURE_RECIPE_EXTRACTION.md,
+				AUTOMATIC_IMAGE_ASSIGNMENT.md,
+				COMPLETE_APP_HELP_GUIDE.md,
+				CONTEXTUAL_HELP_IMPLEMENTATION.md,
+				DIABETIC_ANALYSIS_USER_GUIDE.md,
+				DIABETIC_CACHE_IMPLEMENTATION_SUMMARY.md,
+				DIABETIC_CACHE_SYSTEM.md,
+				DIABETIC_CACHE_TESTS_DEBUGGING.md,
+				DIABETIC_FEATURE_COMPLIANCE_SUMMARY.md,
+				DIABETIC_FEATURE_QUICK_REFERENCE.md,
+				DIABETIC_GUIDELINES_COMPLIANCE.md,
+				DIABETIC_INTEGRATION_GUIDE.md,
+				DIABETIC_QUICKSTART.md,
+				DOCUMENTATION_UPDATE_SUMMARY.md,
+				FILE_ORGANIZATION_NOTE.md,
+				FODMAP_ALLERGEN_INTEGRATION.md,
+				FODMAP_IMPLEMENTATION_GUIDE.md,
+				FODMAP_INTEGRATION_GUIDE.md,
+				FODMAP_QUICK_REFERENCE.md,
+				FODMAP_QUICKSTART.md,
+				FODMAP_SUBSTITUTION_GUIDE.md,
+				FODMAP_UI_GUIDE.md,
+				GLOBAL_STATUS_BAR_DOCUMENTATION.md,
+				HELP_SYSTEM_PACKAGE.md,
+				HELP_TOPICS_QUICK_REFERENCE.md,
+				HTML_TAG_FIX_VISUAL.md,
+				HTML_TAG_URL_FIX.md,
+				IMPLEMENTATION_GUIDE.md,
+				IMPLEMENTATION_SUMMARY.md,
+				INTEGRATION_CHECKLIST.md,
+				JSONLINKVALIDATOR_CONSOLIDATED.md,
+				JSONLINKVALIDATOR_TIPS_FIX.md,
+				LAUNCH_SCREEN_SETUP.md,
+				LICENSE_IMPLEMENTATION.md,
+				MULTIPLE_IMAGES_ARCHITECTURE.md,
+				MULTIPLE_IMAGES_QUICK_REFERENCE.md,
+				MULTIPLE_IMAGES_REFACTOR.md,
+				PERFORMANCE_FIX_ALLERGEN_FILTER.md,
+				QUICK_FIX_HTML_TAGS.md,
+				QUICK_SETUP_SAVED_LINKS.md,
+				QUICK_START_URL_FIXER.md,
+				QUICK_START.md,
+				QUICK_TEST_CHECKLIST.md,
+				QUICKSTART.md,
+				README.md,
+				RECIPE_COLLECTION_REFACTOR.md,
+				RECIPE_EDITING_GUIDE.md,
+				RECIPE_EDITING_QUICKSTART.md,
+				RECIPE_SEARCH_IMPLEMENTATION.md,
+				RECIPE_SHARING_FIXED.md,
+				RecipeImageAssignmentInstructions.md,
+				REMINDERS_INTEGRATION_SETUP.md,
+				SAVED_LINKS_FEATURE.md,
+				SHARING_GUIDANCE_IMPROVEMENTS.md,
+				STATE_PRESERVATION_GUIDE.md,
+				TEST_FILE_FIX.md,
 				TEST_MIGRATION_NOTE.md,
+				TESTING_HTML_TAG_FIX.md,
+				TIPS_INTEGRATION_SUMMARY.md,
+				TIPS_INTEGRATION.md,
+				UI_TESTING_SETUP.md,
+				URL_FIXER_GUIDE.md,
+				WEB_IMAGE_EXTRACTION_FEATURE.md,
+				WEB_IMAGE_FLOW_DIAGRAM.md,
+				WEB_IMAGE_TESTING_CHECKLIST.md,
+			);
+			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
+		};
+		F8FF8E232F018A3100BCA014 /* Exceptions for "Reczipes2" folder in "Reczipes2" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Views_ItoZ/BATCH_EXTRACTION_IMPROVEMENTS.md,
 			);
 			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
 		};
@@ -70,6 +130,7 @@
 		F8C80F462EE246D200AA52E7 /* Reczipes2 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				F8FF8E232F018A3100BCA014 /* Exceptions for "Reczipes2" folder in "Reczipes2" target */,
 				F87D19EC2EE778EE009C11CB /* Exceptions for "Reczipes2" folder in "Reczipes2Tests" target */,
 			);
 			path = Reczipes2;
@@ -89,8 +150,6 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				F8F1931A2F0068F7001B77D4 /* Exceptions for "Docs" folder in "Reczipes2" target */,
-				F86FD81F2EFDB45700D809D1 /* Exceptions for "Docs" folder in "Reczipes2Tests" target */,
-				F86FD8202EFDB45A00D809D1 /* Exceptions for "Docs" folder in "Reczipes2UITests" target */,
 			);
 			path = Docs;
 			sourceTree = "<group>";
@@ -424,7 +483,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -477,7 +536,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;

@@ -120,7 +120,7 @@ struct SavedLinksView: View {
                         } label: {
                             Label("Extract All (Legacy)", systemImage: "arrow.down.circle")
                         }
-                        .disabled(stats.unprocessed == 0)
+                        .disabled(true)  // Not implemented - grayed out
                         
                         #if DEBUG
                         Divider()
