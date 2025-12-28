@@ -51,6 +51,12 @@ struct SettingsView: View {
                            isOn: .constant(RecipeExtractorConfig.defaultUsePreprocessing))
                 }
                 
+                Section("Data & Sync") {
+                    NavigationLink(destination: CloudKitSettingsView()) {
+                        Label("iCloud Sync", systemImage: "icloud.fill")
+                    }
+                }
+                
                 Section {
                     NavigationLink {
                         FODMAPSettingsView()
@@ -79,6 +85,8 @@ struct SettingsView: View {
                             .font(.caption)
                     }
                 }
+                    
+                    
                 
                 Section("Legal") {
                     Button {

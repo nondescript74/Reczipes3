@@ -377,6 +377,10 @@ struct RecipeSearchModalView: View {
         NavigationStack {
             RecipeSearchView(recipes: $recipes, selectedRecipe: $selectedRecipe)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        CloudKitSyncBadge()
+                    }
+                    
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
                             dismiss()

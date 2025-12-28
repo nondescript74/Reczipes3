@@ -83,6 +83,10 @@ struct RecipeExtractorView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.extractedRecipe != nil {
                         // nothing for now
 

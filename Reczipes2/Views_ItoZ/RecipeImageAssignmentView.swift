@@ -55,6 +55,10 @@ struct RecipeImageAssignmentView: View {
             }
             .navigationTitle("Recipe Images")
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
                         dismiss()

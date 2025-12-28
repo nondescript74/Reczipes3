@@ -138,6 +138,10 @@ struct RecipeBackupView: View {
             .navigationTitle("Backup & Restore")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
                         dismiss()

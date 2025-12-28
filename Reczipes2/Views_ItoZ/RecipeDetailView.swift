@@ -434,6 +434,11 @@ struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .toolbar {
+            // CloudKit Sync Badge
+            ToolbarItem(placement: .navigationBarTrailing) {
+                CloudKitSyncBadge()
+            }
+            
             // Share button
             ToolbarItem(placement: .primaryAction) {
                 RecipeShareButton(recipe: recipe)

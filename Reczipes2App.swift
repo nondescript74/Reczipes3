@@ -29,6 +29,11 @@ struct Reczipes2App: App {
             UserDefaults.standard.set(false, forKey: "shouldShowLaunchScreen")
             logInfo("🧪 UI Testing mode enabled - bypassing onboarding", category: "testing")
         }
+        
+        // Check CloudKit availability
+        Task {
+            await CloudKitSyncMonitor.shared.checkAccountStatus()
+        }
     }
     
     var sharedModelContainer: ModelContainer = {
@@ -40,27 +45,66 @@ struct Reczipes2App: App {
             SavedLink.self,
         ])
         
-        // Enable automatic migration for schema changes
-        let modelConfiguration = ModelConfiguration(
+        // MARK: - CloudKit Configuration
+        // To disable CloudKit and use local-only storage, comment out the cloudKitDatabase parameter below
+        
+        // CloudKit configuration
+        let cloudKitConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
-            allowsSave: true
+            allowsSave: true,
+            cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
+        )
+        
+        // Fallback configuration without CloudKit
+        let localConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            allowsSave: true,
+            cloudKitDatabase: .none
         )
 
+        // Try CloudKit configuration first
         do {
-            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            print("✅ ModelContainer created successfully")
+            let container = try ModelContainer(for: schema, configurations: [cloudKitConfiguration])
+            print("✅ ModelContainer created successfully with CloudKit sync enabled")
+            print("   Container: iCloud.com.headydiscy.reczipes")
             return container
         } catch {
-            print("❌ ModelContainer creation failed: \(error)")
-            print("   Error details: \(error.localizedDescription)")
+            // CloudKit failed, try local-only as fallback
+            print("⚠️ CloudKit ModelContainer creation failed: \(error)")
+            print("   Attempting fallback to local-only container...")
             
-            // If there's a migration issue, try to provide more context
-            if let swiftDataError = error as? SwiftDataError {
-                print("   SwiftData Error: \(swiftDataError)")
+            do {
+                let container = try ModelContainer(for: schema, configurations: [localConfiguration])
+                print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
+                print("   Note: CloudKit was enabled but failed. Check your iCloud settings and container identifier.")
+                print("   See CLOUDKIT_SETUP_GUIDE.md for troubleshooting steps.")
+                return container
+            } catch {
+                // All configurations failed, try simple initialization as last resort
+                print("❌ All ModelContainer configurations failed: \(error)")
+                print("   Error details: \(error.localizedDescription)")
+                print("   Attempting simple ModelContainer initialization...")
+                
+                do {
+                    let container = try ModelContainer(for: schema)
+                    print("✅ ModelContainer created with default configuration")
+                    return container
+                } catch {
+                    print("❌ All ModelContainer initialization attempts failed")
+                    print("   Final error: \(error)")
+                    print("")
+                    print("   TROUBLESHOOTING:")
+                    print("   1. Check that all @Model classes are properly defined")
+                    print("   2. Verify SwiftData schema is valid")
+                    print("   3. Try cleaning build folder (Cmd+Shift+K)")
+                    print("   4. Delete app from device/simulator and reinstall")
+                    print("   5. See CLOUDKIT_SETUP_GUIDE.md for detailed setup")
+                    print("")
+                    fatalError("Could not create ModelContainer. Please check your model schema and iCloud settings: \(error)")
+                }
             }
-            
-            fatalError("Could not create ModelContainer: \(error)")
         }
     }()
     

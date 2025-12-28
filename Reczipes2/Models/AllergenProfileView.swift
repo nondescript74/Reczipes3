@@ -43,6 +43,10 @@ struct AllergenProfileView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingNewProfile = true
                     } label: {

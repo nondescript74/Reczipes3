@@ -130,6 +130,10 @@ struct RecipeAllergenDetailView: View {
             .navigationTitle(recipe.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()

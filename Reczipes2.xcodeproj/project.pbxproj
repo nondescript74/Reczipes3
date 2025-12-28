@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F82B66222F01B60E00500EDE /* Reczipes2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82B65D12F01B60E00500EDE /* Reczipes2App.swift */; };
 		F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F89D3B622EF60B9700B52212 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F82B65D12F01B60E00500EDE /* Reczipes2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reczipes2App.swift; sourceTree = "<group>"; };
 		F89D3B622EF60B9700B52212 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F8C80F442EE246D200AA52E7 /* Reczipes2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reczipes2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8C80F532EE246D300AA52E7 /* Reczipes2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -59,6 +61,8 @@
 				ARCHITECTURE_RECIPE_EXTRACTION.md,
 				AUTOMATIC_IMAGE_ASSIGNMENT.md,
 				BATCH_EXTRACTION_IMPROVEMENTS.md,
+				CLOUDKIT_SETUP_GUIDE.md,
+				CLOUDKIT_SYNC_GUIDE.md,
 				COMPLETE_APP_HELP_GUIDE.md,
 				CONTEXTUAL_HELP_IMPLEMENTATION.md,
 				DIABETIC_ANALYSIS_USER_GUIDE.md,
@@ -95,6 +99,7 @@
 				MULTIPLE_IMAGES_QUICK_REFERENCE.md,
 				MULTIPLE_IMAGES_REFACTOR.md,
 				PERFORMANCE_FIX_ALLERGEN_FILTER.md,
+				QUICK_FIX_CLOUDKIT.md,
 				QUICK_FIX_HTML_TAGS.md,
 				QUICK_SETUP_SAVED_LINKS.md,
 				QUICK_START_URL_FIXER.md,
@@ -181,6 +186,7 @@
 		F8C80F3B2EE246D200AA52E7 = {
 			isa = PBXGroup;
 			children = (
+				F82B65D12F01B60E00500EDE /* Reczipes2App.swift */,
 				F89D3B622EF60B9700B52212 /* Assets.xcassets */,
 				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
 				F8C80F462EE246D200AA52E7 /* Reczipes2 */,
@@ -331,6 +337,7 @@
 		F8C80F402EE246D200AA52E7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				F82B66222F01B60E00500EDE /* Reczipes2App.swift in Sources */,
 			);
 		};
 		F8C80F4F2EE246D300AA52E7 /* Sources */ = {
@@ -485,8 +492,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -514,7 +522,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 9.3;
+				MARKETING_VERSION = 10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -538,8 +546,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -567,7 +576,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 9.3;
+				MARKETING_VERSION = 10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

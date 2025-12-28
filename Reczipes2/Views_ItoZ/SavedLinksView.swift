@@ -92,6 +92,10 @@ struct SavedLinksView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search links")
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
                         dismiss()

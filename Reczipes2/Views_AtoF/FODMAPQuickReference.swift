@@ -116,6 +116,10 @@ struct FODMAPQuickReferenceView: View {
             .navigationTitle("FODMAP Guide")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()

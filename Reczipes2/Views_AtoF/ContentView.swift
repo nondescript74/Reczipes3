@@ -305,6 +305,10 @@ struct ContentView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    CloudKitSyncBadge()
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingSearch = true
                     } label: {
@@ -320,6 +324,10 @@ struct ContentView: View {
                     }
                 }
 #else
+                ToolbarItem(placement: .primaryAction) {
+                    CloudKitSyncBadge()
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingImageAssignment = true
