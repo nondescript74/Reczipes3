@@ -37,20 +37,14 @@ struct Reczipes2App: App {
     }
     
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Recipe.self,
-            RecipeImageAssignment.self,
-            UserAllergenProfile.self,
-            CachedDiabeticAnalysis.self,
-            SavedLink.self,
-        ])
+        // Log schema version information
+        SchemaVersionManager.logSchemaInfo()
         
-        // MARK: - CloudKit Configuration
+        // MARK: - CloudKit Configuration with Migration Support
         // To disable CloudKit and use local-only storage, comment out the cloudKitDatabase parameter below
         
-        // CloudKit configuration
+        // CloudKit configuration with migration plan
         let cloudKitConfiguration = ModelConfiguration(
-            schema: schema,
             isStoredInMemoryOnly: false,
             allowsSave: true,
             cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
@@ -58,17 +52,29 @@ struct Reczipes2App: App {
         
         // Fallback configuration without CloudKit
         let localConfiguration = ModelConfiguration(
-            schema: schema,
             isStoredInMemoryOnly: false,
             allowsSave: true,
             cloudKitDatabase: .none
         )
 
         // Try CloudKit configuration first
+        // Note: Lightweight migration (adding diabetesStatusRaw field) is automatic
         do {
-            let container = try ModelContainer(for: schema, configurations: [cloudKitConfiguration])
+            let schema = Schema([
+                Recipe.self,
+                RecipeImageAssignment.self,
+                UserAllergenProfile.self,
+                CachedDiabeticAnalysis.self,
+                SavedLink.self,
+            ])
+            
+            let container = try ModelContainer(
+                for: schema,
+                configurations: [cloudKitConfiguration]
+            )
             print("✅ ModelContainer created successfully with CloudKit sync enabled")
             print("   Container: iCloud.com.headydiscy.reczipes")
+            print("   Automatic lightweight migration enabled for schema changes")
             return container
         } catch {
             // CloudKit failed, try local-only as fallback
@@ -76,34 +82,36 @@ struct Reczipes2App: App {
             print("   Attempting fallback to local-only container...")
             
             do {
-                let container = try ModelContainer(for: schema, configurations: [localConfiguration])
+                let schema = Schema([
+                    Recipe.self,
+                    RecipeImageAssignment.self,
+                    UserAllergenProfile.self,
+                    CachedDiabeticAnalysis.self,
+                    SavedLink.self,
+                ])
+                
+                let container = try ModelContainer(
+                    for: schema,
+                    configurations: [localConfiguration]
+                )
                 print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
+                print("   Automatic lightweight migration enabled for schema changes")
                 print("   Note: CloudKit was enabled but failed. Check your iCloud settings and container identifier.")
                 print("   See CLOUDKIT_SETUP_GUIDE.md for troubleshooting steps.")
                 return container
             } catch {
-                // All configurations failed, try simple initialization as last resort
-                print("❌ All ModelContainer configurations failed: \(error)")
-                print("   Error details: \(error.localizedDescription)")
-                print("   Attempting simple ModelContainer initialization...")
-                
-                do {
-                    let container = try ModelContainer(for: schema)
-                    print("✅ ModelContainer created with default configuration")
-                    return container
-                } catch {
-                    print("❌ All ModelContainer initialization attempts failed")
-                    print("   Final error: \(error)")
-                    print("")
-                    print("   TROUBLESHOOTING:")
-                    print("   1. Check that all @Model classes are properly defined")
-                    print("   2. Verify SwiftData schema is valid")
-                    print("   3. Try cleaning build folder (Cmd+Shift+K)")
-                    print("   4. Delete app from device/simulator and reinstall")
-                    print("   5. See CLOUDKIT_SETUP_GUIDE.md for detailed setup")
-                    print("")
-                    fatalError("Could not create ModelContainer. Please check your model schema and iCloud settings: \(error)")
-                }
+                print("❌ All ModelContainer initialization attempts failed")
+                print("   Final error: \(error)")
+                print("")
+                print("   TROUBLESHOOTING:")
+                print("   1. Check that all @Model classes are properly defined")
+                print("   2. Verify SwiftData schema is valid")
+                print("   3. Try cleaning build folder (Cmd+Shift+K)")
+                print("   4. Delete app from device/simulator and reinstall")
+                print("   5. Check that iCloud is properly configured")
+                print("   6. See CLOUDKIT_SETUP_GUIDE.md for detailed setup")
+                print("")
+                fatalError("Could not create ModelContainer. Please check your model schema and iCloud settings: \(error)")
             }
         }
     }()

@@ -24,11 +24,13 @@ struct ContentView: View {
     @State private var showingBackup = false
     @State private var showingSearch = false
     @State private var showingSavedLinks = false
-    @State private var allergenFilterEnabled = false
+    @State private var filterMode: RecipeFilterMode = .none
     @State private var showOnlySafe = false
     @State private var isProcessingFilter = false
     @State private var cachedFilteredRecipes: [RecipeModel] = []
     @State private var cachedAllergenScores: [UUID: RecipeAllergenScore] = [:]
+    @State private var cachedDiabetesScores: [UUID: DiabetesScore] = [:]
+    @State private var cachedCombinedScores: [UUID: CombinedRecipeScore] = [:]
     
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
@@ -40,9 +42,9 @@ struct ContentView: View {
         imageAssignments.first { $0.recipeID == recipeID }?.imageName
     }
     
-    // Allergen scores for recipes (now cached)
-    private var allergenScores: [UUID: RecipeAllergenScore] {
-        cachedAllergenScores
+    // Combined scores for recipes (now cached)
+    private var combinedScores: [UUID: CombinedRecipeScore] {
+        cachedCombinedScores
     }
     
     // All available recipe models from SwiftData (Claude API-extracted)
@@ -73,9 +75,9 @@ struct ContentView: View {
         return recipes
     }
     
-    // Filtered recipes based on allergen settings (now uses cached results)
+    // Filtered recipes based on filter settings (now uses cached results)
     private var availableRecipes: [RecipeModel] {
-        if allergenFilterEnabled {
+        if filterMode != .none {
             return cachedFilteredRecipes
         } else {
             return availableRecipesBeforeFilter
@@ -84,11 +86,14 @@ struct ContentView: View {
     
     // MARK: - Filter Processing
     
-    /// Process allergen filtering in background to avoid blocking UI
-    private func processAllergenFilter() {
-        guard let profile = activeProfile else {
+    /// Process filtering in background to avoid blocking UI
+    private func processFilter() {
+        // If no filter, just use all recipes
+        guard filterMode != .none else {
             cachedFilteredRecipes = availableRecipesBeforeFilter
             cachedAllergenScores = [:]
+            cachedDiabetesScores = [:]
+            cachedCombinedScores = [:]
             return
         }
         
@@ -98,24 +103,68 @@ struct ContentView: View {
         // Capture values to use in detached task
         let recipesToProcess = availableRecipesBeforeFilter
         let shouldShowOnlySafe = showOnlySafe
+        let currentMode = filterMode
+        let currentProfile = activeProfile
         
         Task.detached(priority: .userInitiated) {
-            // Analyze all recipes for allergens (this is the expensive operation)
-            let scores = await AllergenAnalyzer.shared.analyzeRecipes(recipesToProcess, profile: profile)
+            var allergenScores: [UUID: RecipeAllergenScore] = [:]
+            var diabetesScores: [UUID: DiabetesScore] = [:]
+            var combinedScores: [UUID: CombinedRecipeScore] = [:]
             
-            // Filter or sort based on settings
+            // Analyze for allergens if needed
+            if await currentMode.includesAllergenFilter, let profile = currentProfile {
+                allergenScores = await AllergenAnalyzer.shared.analyzeRecipes(recipesToProcess, profile: profile)
+            }
+            
+            // Analyze for diabetes if needed
+            if await currentMode.includesDiabetesFilter {
+                diabetesScores = await DiabetesAnalyzer.shared.analyzeRecipes(recipesToProcess)
+            }
+            
+            // Create combined scores and pre-compute safety values
+            // We create a tuple with precomputed values to avoid accessing computed properties
+            // in nonisolated context
+            var safetyInfo: [UUID: (isSafe: Bool, overallScore: Double)] = [:]
+            
+            for recipe in recipesToProcess {
+                let score = CombinedRecipeScore(
+                    recipeID: recipe.id,
+                    allergenScore: allergenScores[recipe.id],
+                    diabetesScore: diabetesScores[recipe.id],
+                    filterMode: currentMode
+                )
+                combinedScores[recipe.id] = score
+                
+                // Pre-compute the computed properties while we're still in a safe context
+                safetyInfo[recipe.id] = await (isSafe: score.isSafe, overallScore: score.overallScore)
+            }
+            
+            // Filter or sort based on settings using pre-computed values
+            let recipesWithScores = recipesToProcess.map { recipe -> (RecipeModel, Bool, Double) in
+                let safety = safetyInfo[recipe.id] ?? (isSafe: true, overallScore: 0)
+                return (recipe, safety.isSafe, safety.overallScore)
+            }
+            
             let filteredRecipes: [RecipeModel]
             if shouldShowOnlySafe {
-                filteredRecipes = await AllergenAnalyzer.shared.filterSafeRecipes(recipesToProcess, profile: profile)
+                // Show only safe recipes
+                filteredRecipes = recipesWithScores
+                    .filter { $0.1 } // Filter by isSafe boolean
+                    .map { $0.0 }    // Extract recipe
             } else {
-                // Sort by safety score
-                filteredRecipes = await AllergenAnalyzer.shared.sortRecipesBySafety(recipesToProcess, profile: profile)
+                // Sort by safety score (safest first)
+                filteredRecipes = recipesWithScores
+                    .sorted { $0.2 < $1.2 } // Sort by overallScore
+                    .map { $0.0 }           // Extract recipe
             }
             
             // Update UI on main thread
-            await MainActor.run {
+            // Explicitly capture values in capture list to satisfy Swift 6 concurrency
+            await MainActor.run { [filteredRecipes, allergenScores, diabetesScores, combinedScores] in
                 cachedFilteredRecipes = filteredRecipes
-                cachedAllergenScores = scores
+                cachedAllergenScores = allergenScores
+                cachedDiabetesScores = diabetesScores
+                cachedCombinedScores = combinedScores
                 isProcessingFilter = false
             }
         }
@@ -155,29 +204,28 @@ struct ContentView: View {
                 // Initialize cached recipes
                 cachedFilteredRecipes = availableRecipesBeforeFilter
             }
-            .onChange(of: allergenFilterEnabled) { _, isEnabled in
-                if isEnabled {
-                    processAllergenFilter()
-                } else {
-                    // Clear cache when filter is disabled
-                    cachedFilteredRecipes = availableRecipesBeforeFilter
-                    cachedAllergenScores = [:]
-                }
+            .onChange(of: filterMode) { _, _ in
+                processFilter()
             }
             .onChange(of: showOnlySafe) { _, _ in
-                if allergenFilterEnabled {
-                    processAllergenFilter()
+                if filterMode != .none {
+                    processFilter()
                 }
             }
             .onChange(of: activeProfile?.id) { _, _ in
-                if allergenFilterEnabled {
-                    processAllergenFilter()
+                if filterMode.includesAllergenFilter {
+                    processFilter()
+                }
+            }
+            .onChange(of: activeProfile?.diabetesStatus) { _, _ in
+                if filterMode.includesDiabetesFilter {
+                    processFilter()
                 }
             }
             .onChange(of: savedRecipes.count) { _, _ in
                 // Recipes changed, update cache
-                if allergenFilterEnabled {
-                    processAllergenFilter()
+                if filterMode != .none {
+                    processFilter()
                 } else {
                     cachedFilteredRecipes = availableRecipesBeforeFilter
                 }
@@ -214,9 +262,9 @@ struct ContentView: View {
     
     private var recipeListView: some View {
         VStack(spacing: 0) {
-            // Allergen filter bar
-            AllergenFilterBar(
-                filterEnabled: $allergenFilterEnabled,
+            // Filter bar with 4-state selector
+            RecipeFilterBar(
+                filterMode: $filterMode,
                 showOnlySafe: $showOnlySafe,
                 activeProfile: activeProfile,
                 onProfileTap: {
@@ -263,13 +311,12 @@ struct ContentView: View {
                         }
                     }
                 } header: {
-                    if allergenFilterEnabled && showOnlySafe {
-                        Text("Safe Recipes (\(availableRecipes.count))")
-                    } else if allergenFilterEnabled {
-                        Text("Recipes Sorted by Safety (\(availableRecipes.count))")
-                    } else {
-                        Text("All Recipes (\(availableRecipes.count))")
-                    }
+                    RecipeFilterStatusHeader(
+                        filterMode: filterMode,
+                        showOnlySafe: showOnlySafe,
+                        totalRecipes: availableRecipesBeforeFilter.count,
+                        filteredCount: availableRecipes.count
+                    )
                 } footer: {
                     Text("\(savedRecipes.count) recipe(s) in your collection")
                 }
@@ -432,9 +479,9 @@ struct ContentView: View {
             
             Spacer()
             
-            // Allergen badge
-            if let score = allergenScores[recipe.id] {
-                RecipeAllergenBadge(score: score, compact: true)
+            // Combined badge (shows allergen, diabetes, or both based on filter mode)
+            if filterMode != .none, let score = combinedScores[recipe.id] {
+                CombinedRecipeBadge(score: score, compact: true)
             }
         }
     }

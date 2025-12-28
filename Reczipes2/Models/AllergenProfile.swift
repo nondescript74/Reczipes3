@@ -259,7 +259,7 @@ enum SensitivitySeverity: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - User Sensitivity Entry
 
-struct UserSensitivity: Codable, Identifiable, Hashable {
+struct UserSensitivity: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let allergen: FoodAllergen?
     let intolerance: FoodIntolerance?
@@ -297,7 +297,7 @@ struct UserSensitivity: Codable, Identifiable, Hashable {
 
 // MARK: - Recipe Allergen Score
 
-struct RecipeAllergenScore: Identifiable {
+struct RecipeAllergenScore: Identifiable, Sendable {
     let id = UUID()
     let recipeID: UUID
     let score: Double // 0 = safe, higher = more problematic
@@ -321,7 +321,7 @@ struct RecipeAllergenScore: Identifiable {
     }
 }
 
-struct DetectedAllergen: Identifiable {
+struct DetectedAllergen: Identifiable, Sendable {
     let id = UUID()
     let sensitivity: UserSensitivity
     let matchedIngredients: [String] // Ingredient names that matched

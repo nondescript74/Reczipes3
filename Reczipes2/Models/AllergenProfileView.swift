@@ -76,12 +76,30 @@ struct ProfileRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(profile.name)
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Text(profile.name)
+                        .font(.headline)
+                    
+                    if profile.diabetesStatus != .none {
+                        Text(profile.diabetesStatus.icon)
+                            .font(.caption)
+                    }
+                }
                 
-                Text("\(profile.sensitivities.count) sensitivities")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text("\(profile.sensitivities.count) sensitivities")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    if profile.diabetesStatus != .none {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(profile.diabetesStatus.rawValue)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 
                 if !profile.sensitivities.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -189,6 +207,38 @@ struct ProfileEditorView: View {
             }
             
             Section {
+                Picker("Diabetes Status", selection: Binding(
+                    get: { profile.diabetesStatus },
+                    set: { profile.diabetesStatus = $0 }
+                )) {
+                    ForEach(DiabetesStatus.allCases, id: \.self) { status in
+                        HStack {
+                            if !status.icon.isEmpty {
+                                Text(status.icon)
+                            }
+                            Text(status.rawValue)
+                        }
+                        .tag(status)
+                    }
+                }
+                .pickerStyle(.menu)
+                
+                if profile.diabetesStatus != .none {
+                    HStack {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.blue)
+                        Text(profile.diabetesStatus.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Health Considerations")
+            } footer: {
+                Text("Set diabetes status to receive personalized recipe recommendations based on blood sugar management needs.")
+            }
+            
+            Section {
                 ForEach(profile.sensitivities) { sensitivity in
                     SensitivityRow(sensitivity: sensitivity, profile: profile)
                 }
@@ -200,7 +250,7 @@ struct ProfileEditorView: View {
                     Label("Add Sensitivity", systemImage: "plus.circle.fill")
                 }
             } header: {
-                Text("Sensitivities")
+                Text("Food Sensitivities")
             } footer: {
                 if profile.sensitivities.isEmpty {
                     Text("Add food allergens or intolerances to track.")

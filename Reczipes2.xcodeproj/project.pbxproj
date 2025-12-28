@@ -8,7 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		F82B66222F01B60E00500EDE /* Reczipes2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82B65D12F01B60E00500EDE /* Reczipes2App.swift */; };
+		F82B67AB2F01C3F000500EDE /* DIABETES_PROFILE_FEATURE.md in Resources */ = {isa = PBXBuildFile; fileRef = F82B67AA2F01C3F000500EDE /* DIABETES_PROFILE_FEATURE.md */; };
 		F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F89D3B622EF60B9700B52212 /* Assets.xcassets */; };
+		F8C166642F01C5980058FD71 /* MIGRATION_IMPLEMENTATION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = F8C166632F01C5980058FD71 /* MIGRATION_IMPLEMENTATION_SUMMARY.md */; };
+		F8C166662F01C5B10058FD71 /* MIGRATION_QUICK_REFERENCE.md in Resources */ = {isa = PBXBuildFile; fileRef = F8C166652F01C5B10058FD71 /* MIGRATION_QUICK_REFERENCE.md */; };
+		F8C166682F01C5F00058FD71 /* MIGRATION_VISUAL_GUIDE.md in Resources */ = {isa = PBXBuildFile; fileRef = F8C166672F01C5F00058FD71 /* MIGRATION_VISUAL_GUIDE.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,7 +34,11 @@
 
 /* Begin PBXFileReference section */
 		F82B65D12F01B60E00500EDE /* Reczipes2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reczipes2App.swift; sourceTree = "<group>"; };
+		F82B67AA2F01C3F000500EDE /* DIABETES_PROFILE_FEATURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = DIABETES_PROFILE_FEATURE.md; sourceTree = "<group>"; };
 		F89D3B622EF60B9700B52212 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F8C166632F01C5980058FD71 /* MIGRATION_IMPLEMENTATION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MIGRATION_IMPLEMENTATION_SUMMARY.md; sourceTree = "<group>"; };
+		F8C166652F01C5B10058FD71 /* MIGRATION_QUICK_REFERENCE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MIGRATION_QUICK_REFERENCE.md; sourceTree = "<group>"; };
+		F8C166672F01C5F00058FD71 /* MIGRATION_VISUAL_GUIDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MIGRATION_VISUAL_GUIDE.md; sourceTree = "<group>"; };
 		F8C80F442EE246D200AA52E7 /* Reczipes2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reczipes2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8C80F532EE246D300AA52E7 /* Reczipes2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8C80F5D2EE246D300AA52E7 /* Reczipes2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -193,6 +201,10 @@
 				F8C80F562EE246D300AA52E7 /* Reczipes2Tests */,
 				F8C80F602EE246D300AA52E7 /* Reczipes2UITests */,
 				F8C80F452EE246D200AA52E7 /* Products */,
+				F82B67AA2F01C3F000500EDE /* DIABETES_PROFILE_FEATURE.md */,
+				F8C166632F01C5980058FD71 /* MIGRATION_IMPLEMENTATION_SUMMARY.md */,
+				F8C166652F01C5B10058FD71 /* MIGRATION_QUICK_REFERENCE.md */,
+				F8C166672F01C5F00058FD71 /* MIGRATION_VISUAL_GUIDE.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -318,7 +330,11 @@
 		F8C80F422EE246D200AA52E7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				F8C166642F01C5980058FD71 /* MIGRATION_IMPLEMENTATION_SUMMARY.md in Resources */,
+				F82B67AB2F01C3F000500EDE /* DIABETES_PROFILE_FEATURE.md in Resources */,
 				F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */,
+				F8C166662F01C5B10058FD71 /* MIGRATION_QUICK_REFERENCE.md in Resources */,
+				F8C166682F01C5F00058FD71 /* MIGRATION_VISUAL_GUIDE.md in Resources */,
 			);
 		};
 		F8C80F512EE246D300AA52E7 /* Resources */ = {
@@ -494,7 +510,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -522,7 +538,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 10.0;
+				MARKETING_VERSION = 10.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -548,7 +564,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -576,7 +592,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 10.0;
+				MARKETING_VERSION = 10.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
