@@ -120,6 +120,7 @@ struct Reczipes2App: App {
     
     @State private var showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
     @State private var showAPIKeySetup = false
+    @State private var showLaunchScreen = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -147,12 +148,17 @@ struct Reczipes2App: App {
                         if LicenseHelper.hasAcceptedLicense {
                             showAPIKeySetup = !APIKeyHelper.isConfigured
                         }
+                        
+                        // Show launch screen on first launch
+                        showLaunchScreen = appState.shouldShowLaunchScreen()
                     }
                 
-                // Launch screen overlay - only shows on true first launch
-                if appState.shouldShowLaunchScreen() {
+                // Launch screen overlay - shows briefly on every launch
+                if showLaunchScreen {
                     LaunchScreenView {
+                        // Dismiss launch screen and mark first launch as complete
                         withAnimation {
+                            showLaunchScreen = false
                             appState.isFirstLaunch = false
                         }
                     }
@@ -219,6 +225,13 @@ struct MainTabView: View {
                     Label("Recipes", systemImage: "book.fill")
                 }
                 .tag(AppTab.recipes)
+            
+            // Recipe Books tab
+            RecipeBooksView()
+                .tabItem {
+                    Label("Books", systemImage: "books.vertical.fill")
+                }
+                .tag(AppTab.books)
             
             // Extraction tab - always visible
             RecipeExtractorTabWrapper()

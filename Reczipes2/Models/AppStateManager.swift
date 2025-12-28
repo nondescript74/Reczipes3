@@ -11,6 +11,7 @@ import Combine
 /// Tracks the current active tab in the app
 enum AppTab: String, Codable, CaseIterable {
     case recipes
+    case books
     case extract
     case settings
 }
@@ -191,9 +192,8 @@ class AppStateManager: ObservableObject {
     // MARK: - Should Show Launch Screen
     
     func shouldShowLaunchScreen() -> Bool {
-        // Always show the launch screen on every app launch
-        // (Set to false to disable or make conditional)
-        return true
+        // Show launch screen only on first launch
+        return isFirstLaunch
     }
 }
 
