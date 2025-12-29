@@ -55,6 +55,14 @@ struct SettingsView: View {
                     NavigationLink(destination: CloudKitSettingsView()) {
                         Label("iCloud Sync", systemImage: "icloud.fill")
                     }
+                    
+                    NavigationLink(destination: CloudKitDiagnosticsView()) {
+                        Label("CloudKit Diagnostics", systemImage: "stethoscope")
+                    }
+                    
+                    NavigationLink(destination: PersistentContainerInfoView()) {
+                        Label("Container Details", systemImage: "cylinder.split.1x2")
+                    }
                 }
                 
                 Section {

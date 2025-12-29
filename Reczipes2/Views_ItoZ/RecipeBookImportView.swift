@@ -56,19 +56,19 @@ struct RecipeBookImportView: View {
                 
                 // Info section
                 VStack(alignment: .leading, spacing: 12) {
-                    InfoRow(
+                    InfoRow_RBIV(
                         icon: "book.pages",
                         title: "Complete Books",
                         description: "Import entire recipe collections with all recipes"
                     )
                     
-                    InfoRow(
+                    InfoRow_RBIV(
                         icon: "photo.on.rectangle",
                         title: "Images Included",
                         description: "All recipe photos and book covers are preserved"
                     )
                     
-                    InfoRow(
+                    InfoRow_RBIV(
                         icon: "arrow.triangle.2.circlepath",
                         title: "Automatic Updates",
                         description: "Existing recipes are updated, new ones are added"
@@ -210,7 +210,7 @@ struct RecipeBookImportView: View {
 
 // MARK: - Info Row
 
-private struct InfoRow: View {
+private struct InfoRow_RBIV: View {
     let icon: String
     let title: String
     let description: String

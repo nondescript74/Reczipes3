@@ -336,6 +336,98 @@ struct AppHelp {
         relatedTopics: ["App Launch"]
     )
     
+    // MARK: - CloudKit & Sync Features
+    
+    static let cloudKitSync = HelpTopic(
+        title: "iCloud Sync",
+        icon: "icloud.fill",
+        description: """
+        Your recipes automatically sync across all your devices using iCloud. Create a recipe on your iPhone and it appears on your iPad instantly.
+        """,
+        tips: [
+            "Sign in with the same Apple ID on all devices to enable sync",
+            "Ensure iCloud Drive is enabled in Settings → [Your Name] → iCloud",
+            "Initial sync can take 5-10 minutes after first launch",
+            "Sync works faster when on Wi-Fi and app is in foreground",
+            "All recipe data is encrypted end-to-end for privacy",
+            "Check sync status in Settings → iCloud Sync",
+            "No manual sync needed - it happens automatically"
+        ],
+        relatedTopics: ["CloudKit Setup", "Sync Troubleshooting", "Container Details"]
+    )
+    
+    static let cloudKitSetup = HelpTopic(
+        title: "CloudKit Setup",
+        icon: "gearshape.icloud",
+        description: """
+        CloudKit enables your recipes to sync across all your Apple devices. Setup is automatic, but you need to be signed into iCloud.
+        """,
+        tips: [
+            "Open Settings app on your device",
+            "Sign in with your Apple ID at the top",
+            "Go to iCloud and enable iCloud Drive",
+            "Restart the Reczipes app after enabling iCloud",
+            "Check Settings → iCloud Sync in the app to verify status",
+            "Green checkmark means CloudKit is working properly",
+            "Orange or red warnings indicate setup issues that need attention"
+        ],
+        relatedTopics: ["iCloud Sync", "Sync Troubleshooting", "CloudKit Diagnostics"]
+    )
+    
+    static let cloudKitDiagnostics = HelpTopic(
+        title: "CloudKit Diagnostics",
+        icon: "stethoscope",
+        description: """
+        Built-in diagnostic tools help you troubleshoot sync issues and verify your CloudKit configuration. Access detailed system information and test connectivity.
+        """,
+        tips: [
+            "Go to Settings → CloudKit Diagnostics to run tests",
+            "Tap 'Run Full Diagnostics' to check all sync components",
+            "Green checkmarks mean everything is working",
+            "Red X marks indicate problems that need fixing",
+            "Compare diagnostics on both devices if sync isn't working",
+            "Use 'Copy Diagnostics to Clipboard' to save results",
+            "Force Sync Check can help trigger delayed sync operations"
+        ],
+        relatedTopics: ["iCloud Sync", "Sync Troubleshooting", "Container Details"]
+    )
+    
+    static let syncTroubleshooting = HelpTopic(
+        title: "Sync Troubleshooting",
+        icon: "wrench.and.screwdriver",
+        description: """
+        If recipes aren't syncing between devices, this guide helps you identify and fix common issues. Most problems are quick to resolve.
+        """,
+        tips: [
+            "Verify you're signed into the SAME Apple ID on both devices",
+            "Check that iCloud Drive is enabled on both devices",
+            "Wait 5-10 minutes for initial sync (it's not instant)",
+            "Ensure both devices have good network connectivity",
+            "Open Settings → CloudKit Diagnostics and compare results",
+            "Look for 'CloudKit sync enabled' in app console logs",
+            "If one device shows 'local-only', CloudKit isn't working on that device"
+        ],
+        relatedTopics: ["CloudKit Diagnostics", "iCloud Sync", "Container Details"]
+    )
+    
+    static let containerDetails = HelpTopic(
+        title: "Container Details",
+        icon: "cylinder.split.1x2",
+        description: """
+        View detailed information about your app's persistent storage container and CloudKit configuration. Useful for verifying setup and debugging.
+        """,
+        tips: [
+            "Access via Settings → Container Details",
+            "Check that 'CloudKit Enabled' shows 'Yes'",
+            "Verify Container ID matches: iCloud.com.headydiscy.reczipes",
+            "Compare configurations on both devices - they should match",
+            "Recipe count shows how many recipes are stored locally",
+            "Use 'Copy Configuration' to save technical details",
+            "Storage location shows where your data is physically stored"
+        ],
+        relatedTopics: ["CloudKit Diagnostics", "iCloud Sync", "Data Storage"]
+    )
+    
     // MARK: - Category Organization
     
     static let allTopics: [String: HelpTopic] = [
@@ -365,6 +457,13 @@ struct AppHelp {
         // Data & Storage
         "dataStorage": dataStorage,
         "exportToReminders": exportToReminders,
+        
+        // CloudKit & Sync
+        "cloudKitSync": cloudKitSync,
+        "cloudKitSetup": cloudKitSetup,
+        "cloudKitDiagnostics": cloudKitDiagnostics,
+        "syncTroubleshooting": syncTroubleshooting,
+        "containerDetails": containerDetails,
         
         // Additional
         "licenseAgreement": licenseAgreement,
@@ -397,6 +496,13 @@ struct AppHelp {
             allergenAnalysis,
             fodmapAnalysis,
             allergenFiltering
+        ]),
+        ("CloudKit & Sync", "icloud.fill", [
+            cloudKitSync,
+            cloudKitSetup,
+            cloudKitDiagnostics,
+            syncTroubleshooting,
+            containerDetails
         ]),
         ("Advanced", "gear", [
             claudeAPI,
