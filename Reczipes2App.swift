@@ -34,6 +34,9 @@ struct Reczipes2App: App {
         Task {
             await CloudKitSyncMonitor.shared.checkAccountStatus()
         }
+        
+        // Log CloudKit sync status for debugging
+        logCloudKitConfiguration()
     }
     
     var sharedModelContainer: ModelContainer = {
@@ -209,6 +212,29 @@ struct Reczipes2App: App {
         @unknown default:
             break
         }
+    }
+    
+    // MARK: - CloudKit Diagnostics
+    
+    private func logCloudKitConfiguration() {
+        print("========================================")
+        print("📱 CLOUDKIT CONFIGURATION")
+        print("========================================")
+        print("Container ID: iCloud.com.headydiscy.reczipes")
+        print("Configuration: Private Database")
+        print("Framework: SwiftData (not Core Data)")
+        print("")
+        print("⚠️  NOTE: SwiftData uses ModelContainer, NOT NSPersistentCloudKitContainer")
+        print("   If you need NSPersistentCloudKitContainer, you must migrate to Core Data")
+        print("")
+        print("Models registered for sync:")
+        print("  - Recipe")
+        print("  - RecipeImageAssignment")
+        print("  - UserAllergenProfile")
+        print("  - CachedDiabeticAnalysis")
+        print("  - SavedLink")
+        print("  - RecipeBook")
+        print("========================================")
     }
 }
 
