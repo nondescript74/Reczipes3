@@ -154,6 +154,11 @@ struct Reczipes2App: App {
                         
                         // Show launch screen on first launch
                         showLaunchScreen = appState.shouldShowLaunchScreen()
+                        
+                        // Check if images need restoration (after app reinstall)
+                        Task {
+                            await checkAndRestoreImages()
+                        }
                     }
                 
                 // Launch screen overlay - shows briefly on every launch
@@ -184,6 +189,27 @@ struct Reczipes2App: App {
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
+            }
+        }
+    }
+    
+    // MARK: - Image Restoration
+    
+    @MainActor
+    private func checkAndRestoreImages() async {
+        let modelContext = sharedModelContainer.mainContext
+        
+        // Check if any images need restoration
+        let needsRestoration = RecipeImageMigrationService.needsImageRestoration(modelContext: modelContext)
+        
+        if needsRestoration {
+            logInfo("Detected missing image files - attempting automatic restoration", category: "image-migration")
+            
+            do {
+                try await RecipeImageMigrationService.restoreAllRecipeImages(modelContext: modelContext)
+                logInfo("Successfully restored images from SwiftData", category: "image-migration")
+            } catch {
+                logError("Failed to restore images: \(error)", category: "image-migration")
             }
         }
     }

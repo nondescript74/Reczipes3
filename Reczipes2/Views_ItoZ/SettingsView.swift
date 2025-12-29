@@ -56,6 +56,20 @@ struct SettingsView: View {
                         Label("iCloud Sync", systemImage: "icloud.fill")
                     }
                     
+                    NavigationLink(destination: RecipeImageMigrationView()) {
+                        Label("Image Migration", systemImage: "photo.stack")
+                    }
+                    
+                    NavigationLink(destination: RecipeBackupView()) {
+                        HStack {
+                            Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
+                            Spacer()
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                        }
+                    }
+                    
                     NavigationLink(destination: CloudKitDiagnosticsView()) {
                         Label("CloudKit Diagnostics", systemImage: "stethoscope")
                     }

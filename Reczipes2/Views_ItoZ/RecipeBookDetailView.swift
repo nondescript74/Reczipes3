@@ -109,7 +109,7 @@ struct RecipeBookDetailView: View {
             }
             .sheet(isPresented: $showingShareSheet) {
                 if let url = exportedFileURL {
-                    ShareSheet(activityItems: [url])
+                    ShareSheet_RBDV(activityItems: [url])
                 }
             }
             .alert("Export Failed", isPresented: $showingExportError) {
@@ -198,8 +198,13 @@ struct RecipeBookDetailView: View {
             // Page turning view
             TabView(selection: $currentPage) {
                 ForEach(Array(bookRecipes.enumerated()), id: \.element.id) { index, recipe in
-                    RecipePageView(recipe: recipe, pageNumber: index + 1, bookColor: bookColor)
-                        .tag(index)
+                    RecipePageView(
+                        recipe: recipe, 
+                        pageNumber: index + 1, 
+                        bookColor: bookColor,
+                        savedRecipes: savedRecipes
+                    )
+                    .tag(index)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -242,6 +247,13 @@ struct RecipePageView: View {
     let recipe: RecipeModel
     let pageNumber: Int
     let bookColor: Color
+    let savedRecipes: [Recipe]
+    
+    @State private var showingFullDetail = false
+    
+    private var isSaved: Bool {
+        savedRecipes.contains { $0.id == recipe.id }
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -274,7 +286,27 @@ struct RecipePageView: View {
                                     .font(.title)
                                     .fontWeight(.bold)
                             }
+                            
+                            Spacer()
                         }
+                        
+                        // View Full Recipe button
+                        Button {
+                            showingFullDetail = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                Text("View Full Recipe")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(bookColor.opacity(0.1))
+                            .foregroundStyle(bookColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .padding(.bottom, 8)
                         
                         // Header notes
                         if let headerNotes = recipe.headerNotes {
@@ -401,6 +433,15 @@ struct RecipePageView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingFullDetail) {
+            NavigationStack {
+                RecipeDetailView(
+                    recipe: recipe,
+                    isSaved: isSaved,
+                    onSave: { }
+                )
+            }
+        }
     }
 }
 
@@ -420,23 +461,23 @@ struct RecipePageView: View {
     return RecipeBookDetailView(book: book)
         .modelContainer(container)
 }
-//// MARK: - Share Sheet
-//
-//import UIKit
-//
-//struct ShareSheet: UIViewControllerRepresentable {
-//    let items: [Any]
-//    
-//    func makeUIViewController(context: Context) -> UIActivityViewController {
-//        let controller = UIActivityViewController(
-//            activityItems: items,
-//            applicationActivities: nil
-//        )
-//        return controller
-//    }
-//    
-//    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
-//        // No updates needed
-//    }
-//}
+// MARK: - Share Sheet
+
+import UIKit
+struct ShareSheet_RBDV: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: nil
+        )
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No updates needed
+    }
+}
+
 

@@ -10,8 +10,8 @@ import SwiftData
 
 @Model
 final class RecipeImageAssignment {
-    var recipeID: UUID
-    var imageName: String
+    var recipeID: UUID = UUID()
+    var imageName: String = ""
     
     init(recipeID: UUID, imageName: String) {
         self.recipeID = recipeID

@@ -10,11 +10,11 @@ import SwiftData
 
 @Model
 final class SavedLink {
-    var id: UUID
-    var title: String
-    var url: String
-    var dateAdded: Date
-    var isProcessed: Bool // Whether the recipe has been extracted from this link
+    var id: UUID = UUID()
+    var title: String = ""
+    var url: String = ""
+    var dateAdded: Date = Date()
+    var isProcessed: Bool = false // Whether the recipe has been extracted from this link
     var extractedRecipeID: UUID? // ID of the recipe extracted from this link
     var processingError: String? // Error message if extraction failed
     var tips: [String]? // Optional array of user tips/notes about this recipe

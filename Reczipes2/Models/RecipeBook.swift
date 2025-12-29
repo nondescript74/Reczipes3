@@ -12,13 +12,13 @@ import SwiftUI
 
 @Model
 final class RecipeBook {
-    var id: UUID
-    var name: String
+    var id: UUID = UUID()
+    var name: String = ""
     var bookDescription: String?
     var coverImageName: String? // Cover image for the book
-    var dateCreated: Date
-    var dateModified: Date
-    var recipeIDs: [UUID] // Ordered list of recipe IDs in this book
+    var dateCreated: Date = Date()
+    var dateModified: Date = Date()
+    var recipeIDs: [UUID] = [] // Ordered list of recipe IDs in this book
     var color: String? // Optional color theme for the book (hex string)
     
     init(id: UUID = UUID(),

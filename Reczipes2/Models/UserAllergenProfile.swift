@@ -38,17 +38,17 @@ enum DiabetesStatus: String, Codable, CaseIterable {
 
 @Model
 final class UserAllergenProfile {
-    var id: UUID
-    var name: String
-    var isActive: Bool
+    var id: UUID = UUID()
+    var name: String = ""
+    var isActive: Bool = false
     var sensitivitiesData: Data?
     
     // Added in Schema V2.0.0
     // Default value ensures automatic migration works without deleting the app
     var diabetesStatusRaw: String = DiabetesStatus.none.rawValue
     
-    var dateCreated: Date
-    var dateModified: Date
+    var dateCreated: Date = Date()
+    var dateModified: Date = Date()
     
     init(id: UUID = UUID(),
          name: String,

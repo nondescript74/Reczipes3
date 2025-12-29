@@ -11,14 +11,15 @@ import SwiftData
 
 @Model
 final class CachedDiabeticAnalysis {
-    @Attribute(.unique) var recipeId: UUID
-    var analysisData: Data // Encoded DiabeticInfo
-    var cachedAt: Date
+    // Removed @Attribute(.unique) - CloudKit doesn't support unique constraints
+    var recipeId: UUID = UUID()
+    var analysisData: Data = Data() // Encoded DiabeticInfo
+    var cachedAt: Date = Date()
     
     // Ingredient change tracking
-    var recipeVersion: Int // Recipe version when analyzed
-    var ingredientsHash: String // Hash of ingredients when analyzed
-    var recipeLastModified: Date // Recipe's lastModified when analyzed
+    var recipeVersion: Int = 1 // Recipe version when analyzed
+    var ingredientsHash: String = "" // Hash of ingredients when analyzed
+    var recipeLastModified: Date = Date() // Recipe's lastModified when analyzed
     
     init(recipeId: UUID, 
          analysisData: Data, 

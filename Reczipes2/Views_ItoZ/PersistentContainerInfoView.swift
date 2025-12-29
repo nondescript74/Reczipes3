@@ -23,6 +23,39 @@ struct PersistentContainerInfoView: View {
                         .foregroundColor(.secondary)
                 }
             } else if let info = containerInfo {
+                // Warning if CloudKit is not enabled
+                if !info.cloudKitEnabled {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("CloudKit Not Active")
+                                    .font(.headline)
+                            }
+                            
+                            Text("Your app is configured to use CloudKit sync (iCloud.com.headydiscy.reczipes), but the container is currently running in local-only mode.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Text("Possible reasons:")
+                                .font(.subheadline)
+                                .bold()
+                                .padding(.top, 4)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("• Not signed into iCloud")
+                                Text("• iCloud Drive disabled")
+                                Text("• CloudKit container not set up in developer portal")
+                                Text("• Network connectivity issues")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
                 Section("Container Configuration") {
                     InfoRow(label: "Container Type", value: info.containerType)
                     InfoRow(label: "CloudKit Enabled", value: info.cloudKitEnabled ? "Yes" : "No")
@@ -30,6 +63,9 @@ struct PersistentContainerInfoView: View {
                     if info.cloudKitEnabled {
                         InfoRow(label: "Container ID", value: info.containerIdentifier)
                         InfoRow(label: "Database Type", value: info.databaseType)
+                    } else {
+                        InfoRow(label: "Status", value: "Local-only (Fallback)")
+                        InfoRow(label: "Intended Container", value: "iCloud.com.headydiscy.reczipes")
                     }
                 }
                 
@@ -107,43 +143,40 @@ struct PersistentContainerInfoView: View {
             info.containerType = "ModelContainer (SwiftData)"
             
             // CloudKit configuration analysis
-            // We check the cloudKitDatabase by examining its description
-            // since it's an enum without directly accessible properties
+            // Since CloudKitDatabase doesn't conform to Equatable, we use the description string
             let cloudKitDB = firstConfig.cloudKitDatabase
             let cloudKitDescription = String(describing: cloudKitDB)
             
-            // Check if CloudKit is enabled by examining the description
-            if cloudKitDescription.contains("none") {
+            // Debug: Print the actual description to console
+            print("🔍 CloudKit Database Description: '\(cloudKitDescription)'")
+            
+            // Parse the description to determine CloudKit configuration
+            // The description format is: CloudKitDatabase(_automatic: bool, _none: bool, _privateDBName: Optional("container.id"))
+            if cloudKitDescription.contains("_none: true") {
                 info.cloudKitEnabled = false
                 info.databaseType = "Local Only"
                 info.containerIdentifier = "None"
-            } else if cloudKitDescription.contains("automatic") {
+            } else if cloudKitDescription.contains("_automatic: true") {
                 info.cloudKitEnabled = true
                 info.databaseType = "CloudKit (Private - Automatic)"
                 info.containerIdentifier = "Default Container"
-            } else if cloudKitDescription.contains("private") {
+            } else if cloudKitDescription.contains("_privateDBName") {
                 info.cloudKitEnabled = true
                 info.databaseType = "CloudKit (Private)"
-                
-                // Try to extract container identifier from description
-                // Format is typically: private("iCloud.com.example.app")
-                if let range = cloudKitDescription.range(of: "\"([^\"]+)\"", options: .regularExpression) {
-                    let extracted = String(cloudKitDescription[range])
-                    info.containerIdentifier = extracted.replacingOccurrences(of: "\"", with: "")
+                // Extract container ID from description
+                // Format: _privateDBName: Optional("iCloud.com.example.container")
+                if let startIdx = cloudKitDescription.range(of: "_privateDBName: Optional(\"")?.upperBound,
+                   let endIdx = cloudKitDescription[startIdx...].firstIndex(of: "\"") {
+                    let containerID = String(cloudKitDescription[startIdx..<endIdx])
+                    info.containerIdentifier = containerID
                 } else {
-                    info.containerIdentifier = "Private Container"
+                    info.containerIdentifier = "Private Container (ID not parsed)"
                 }
-            } else if cloudKitDescription.contains("public") {
-                info.cloudKitEnabled = true
-                info.databaseType = "CloudKit (Public)"
-                info.containerIdentifier = "Public Container"
-            } else if cloudKitDescription.contains("shared") {
-                info.cloudKitEnabled = true
-                info.databaseType = "CloudKit (Shared)"
-                info.containerIdentifier = "Shared Container"
             } else {
+                // Unknown CloudKit configuration
+                print("⚠️ Unknown CloudKit configuration format")
                 info.cloudKitEnabled = false
-                info.databaseType = "Unknown"
+                info.databaseType = "Unknown: \(cloudKitDescription)"
                 info.containerIdentifier = "Unknown"
             }
             

@@ -10,14 +10,18 @@ import SwiftData
 
 @Model
 final class Recipe {
-    var id: UUID
-    var title: String
+    var id: UUID = UUID()
+    var title: String = ""
     var headerNotes: String?
     var recipeYield: String?
     var reference: String?
-    var dateAdded: Date
+    var dateAdded: Date = Date()
     var imageName: String? // Main/primary image (set during extraction, immutable in UI)
     var additionalImageNames: [String]? // Additional images added by user
+    
+    // Image data stored directly in SwiftData for CloudKit sync
+    @Attribute(.externalStorage) var imageData: Data? // Main image data
+    @Attribute(.externalStorage) var additionalImagesData: Data? // JSON array of additional image data
     
     // Store complex structures as JSON Data
     var ingredientSectionsData: Data?
@@ -47,6 +51,8 @@ final class Recipe {
          dateAdded: Date = Date(),
          imageName: String? = nil,
          additionalImageNames: [String]? = nil,
+         imageData: Data? = nil,
+         additionalImagesData: Data? = nil,
          ingredientSectionsData: Data? = nil,
          instructionSectionsData: Data? = nil,
          notesData: Data? = nil,
@@ -61,6 +67,8 @@ final class Recipe {
         self.dateAdded = dateAdded
         self.imageName = imageName
         self.additionalImageNames = additionalImageNames
+        self.imageData = imageData
+        self.additionalImagesData = additionalImagesData
         self.ingredientSectionsData = ingredientSectionsData
         self.instructionSectionsData = instructionSectionsData
         self.notesData = notesData
@@ -86,6 +94,69 @@ final class Recipe {
         if imageName != nil { count += 1 }
         count += additionalImageNames?.count ?? 0
         return count
+    }
+    
+    // MARK: - Image Data Management
+    
+    /// Load image data from file system if not already stored
+    func ensureImageDataLoaded() {
+        // Load main image if we have a filename but no data
+        if let imageName = imageName, imageData == nil {
+            if let data = loadImageData(fileName: imageName) {
+                self.imageData = data
+            }
+        }
+        
+        // Load additional images if we have filenames but no data
+        if let additionalNames = additionalImageNames, !additionalNames.isEmpty, additionalImagesData == nil {
+            var imagesArray: [[String: Data]] = []
+            for imageName in additionalNames {
+                if let data = loadImageData(fileName: imageName) {
+                    imagesArray.append(["fileName": imageName.data(using: .utf8)!, "imageData": data])
+                }
+            }
+            
+            if !imagesArray.isEmpty {
+                // Encode as JSON
+                if let encoded = try? JSONEncoder().encode(imagesArray) {
+                    self.additionalImagesData = encoded
+                }
+            }
+        }
+    }
+    
+    /// Save image data back to file system (for compatibility with existing code)
+    func ensureImageFilesExist() {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        
+        // Restore main image if data exists but file doesn't
+        if let imageData = imageData, let imageName = imageName {
+            let fileURL = documentsPath.appendingPathComponent(imageName)
+            if !FileManager.default.fileExists(atPath: fileURL.path) {
+                try? imageData.write(to: fileURL)
+            }
+        }
+        
+        // Restore additional images
+        if let additionalImagesData = additionalImagesData,
+           let imagesArray = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData) {
+            for imageDict in imagesArray {
+                if let fileNameData = imageDict["fileName"],
+                   let fileName = String(data: fileNameData, encoding: .utf8),
+                   let data = imageDict["imageData"] {
+                    let fileURL = documentsPath.appendingPathComponent(fileName)
+                    if !FileManager.default.fileExists(atPath: fileURL.path) {
+                        try? data.write(to: fileURL)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func loadImageData(fileName: String) -> Data? {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(fileName)
+        return try? Data(contentsOf: fileURL)
     }
     
     // Convenience initializer from RecipeModel

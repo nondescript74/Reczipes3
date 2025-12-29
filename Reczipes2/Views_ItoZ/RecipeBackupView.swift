@@ -2,185 +2,181 @@
 //  RecipeBackupView.swift
 //  Reczipes2
 //
-//  Created by Xcode Assistant on 12/20/25.
+//  Complete backup and restore UI for all recipes
 //
 
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-#if os(macOS)
-import AppKit
-#endif
-
 struct RecipeBackupView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Recipe.dateAdded, order: .reverse) private var savedRecipes: [Recipe]
+    @Query private var recipes: [Recipe]
     
     @State private var isExporting = false
     @State private var isImporting = false
-    @State private var showingImportPicker = false
-    @State private var showingShareSheet = false
-    @State private var showingError = false
-    @State private var showingSuccess = false
-    @State private var errorMessage = ""
-    @State private var successMessage = ""
-    @State private var backupURL: URL?
+    @State private var showImportPicker = false
+    @State private var showExportSuccess = false
+    @State private var showImportSuccess = false
+    @State private var showShareSheet = false
+    @State private var exportedURL: URL?
+    @State private var errorMessage: String?
+    @State private var importResult: RecipeImportResult?
+    @State private var selectedImportMode: ImportOverwriteMode = .keepBoth
     
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Export Recipes", systemImage: "square.and.arrow.up")
-                            .font(.headline)
-                        
-                        Text("Create a backup file containing all your recipes with their images. You can share this file and import it later or on another device.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        
-                        if savedRecipes.isEmpty {
-                            Text("No recipes to export")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        } else {
-                            Text("\(savedRecipes.count) recipe(s) ready to export")
-                                .font(.caption)
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    Button {
-                        Task {
-                            await exportRecipes()
-                        }
-                    } label: {
-                        HStack {
-                            Text("Export All Recipes")
-                            Spacer()
-                            if isExporting {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.up.doc")
-                            }
-                        }
-                    }
-                    .disabled(savedRecipes.isEmpty || isExporting)
-                } header: {
-                    Text("Backup")
+        List {
+            // Current Status
+            Section("Current Database") {
+                HStack {
+                    Image(systemName: "book.fill")
+                        .foregroundColor(.blue)
+                    Text("Total Recipes")
+                    Spacer()
+                    Text("\(recipes.count)")
+                        .bold()
                 }
                 
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
+                if recipes.count > 0 {
+                    HStack {
+                        Image(systemName: "photo.fill")
+                            .foregroundColor(.orange)
+                        Text("With Images")
+                        Spacer()
+                        Text("\(recipesWithImages)")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // Export Section
+            Section {
+                Button {
+                    Task {
+                        await exportRecipes()
+                    }
+                } label: {
+                    if isExporting {
+                        HStack {
+                            ProgressView()
+                            Text("Exporting...")
+                        }
+                    } else {
+                        Label("Export All Recipes", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(recipes.isEmpty || isExporting || isImporting)
+            } header: {
+                Text("Export")
+            } footer: {
+                Text("Creates a backup file (.reczipes) containing all \(recipes.count) recipes with their images. You can import this file later to restore your recipes.")
+            }
+            
+            // Import Section
+            Section {
+                Picker("Import Mode", selection: $selectedImportMode) {
+                    Text("Keep Both").tag(ImportOverwriteMode.keepBoth)
+                    Text("Skip Existing").tag(ImportOverwriteMode.skip)
+                    Text("Overwrite").tag(ImportOverwriteMode.overwrite)
+                }
+                .pickerStyle(.menu)
+                
+                Button {
+                    showImportPicker = true
+                } label: {
+                    if isImporting {
+                        HStack {
+                            ProgressView()
+                            Text("Importing...")
+                        }
+                    } else {
                         Label("Import Recipes", systemImage: "square.and.arrow.down")
-                            .font(.headline)
-                        
-                        Text("Import recipes from a backup file (.reczipes). You can choose how to handle recipes that already exist in your collection.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 8)
+                }
+                .disabled(isExporting || isImporting)
+            } header: {
+                Text("Import")
+            } footer: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Import recipes from a backup file (.reczipes).")
                     
-                    Button {
-                        showingImportPicker = true
-                    } label: {
-                        HStack {
-                            Text("Import Recipes")
-                            Spacer()
-                            if isImporting {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.down.doc")
-                            }
-                        }
-                    }
-                    .disabled(isImporting)
-                } header: {
-                    Text("Restore")
-                }
-                
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "info.circle")
-                                .foregroundStyle(.blue)
-                            Text("Backup files are self-contained")
-                                .font(.subheadline)
-                        }
-                        
-                        Text("Each backup file includes all recipe data, notes, and associated images. Files can be shared via email, AirDrop, or cloud storage.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 32)
-                    }
-                    .padding(.vertical, 4)
+                    Text("Import Modes:")
+                        .font(.caption)
+                        .bold()
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "shield.checkered")
-                                .foregroundStyle(.green)
-                            Text("Compatible across devices")
-                                .font(.subheadline)
-                        }
-                        
-                        Text("Backup files work on iPhone, iPad, and Mac. Use them to sync recipes across your devices or share with friends.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 32)
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    Text("About Backups")
+                    Text("• Keep Both: Imports all recipes, even duplicates")
+                        .font(.caption)
+                    Text("• Skip Existing: Only imports new recipes")
+                        .font(.caption)
+                    Text("• Overwrite: Replaces existing recipes with imported ones")
+                        .font(.caption)
                 }
             }
-            .navigationTitle("Backup & Restore")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    CloudKitSyncBadge()
-                }
-                
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+            
+            // Tips Section
+            Section("Tips") {
+                tipRow(icon: "exclamationmark.triangle", text: "Always backup before reinstalling the app")
+                tipRow(icon: "icloud.and.arrow.up", text: "Store backups in iCloud Drive or Files for safety")
+                tipRow(icon: "arrow.triangle.2.circlepath", text: "Use 'Keep Both' mode to avoid losing any recipes")
             }
-            .fileImporter(
-                isPresented: $showingImportPicker,
-                allowedContentTypes: [UTType(filenameExtension: "reczipes") ?? .data],
-                allowsMultipleSelection: false
-            ) { result in
-                Task {
-                    await handleImport(result)
-                }
+        }
+        .navigationTitle("Backup & Restore")
+        .navigationBarTitleDisplayMode(.inline)
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [.reczipesBackup],
+            allowsMultipleSelection: false
+        ) { result in
+            Task {
+                await handleImport(result: result)
             }
-            .sheet(isPresented: $showingShareSheet) {
-                if let url = backupURL {
-                    #if os(iOS)
-                    ShareSheet(activityItems: [url])
-                    #else
-                    // macOS: Use NSSharingService or save panel
-                    EmptyView()
-                    #endif
-                }
+        }
+        .sheet(isPresented: $showExportSuccess) {
+            if let url = exportedURL {
+                BackupShareSheet(activityItems: [url])
             }
-            .alert("Export Successful", isPresented: $showingSuccess) {
-                Button("OK") {
-                    successMessage = ""
-                }
-            } message: {
-                Text(successMessage)
+        }
+        .alert("Export Successful", isPresented: $showExportSuccess) {
+            Button("Share") {
+                // Sheet will show automatically
             }
-            .alert("Error", isPresented: $showingError) {
-                Button("OK") {
-                    errorMessage = ""
-                }
-            } message: {
-                Text(errorMessage)
+            Button("Done", role: .cancel) { }
+        } message: {
+            Text("Backup created with \(recipes.count) recipes. Share it to save somewhere safe.")
+        }
+        .alert("Import Successful", isPresented: $showImportSuccess) {
+            Button("OK") { }
+        } message: {
+            if let result = importResult {
+                Text("\(result.summary)\n\nTotal: \(result.totalRecipes) recipes")
             }
+        }
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") {
+                errorMessage = nil
+            }
+        } message: {
+            if let error = errorMessage {
+                Text(error)
+            }
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private var recipesWithImages: Int {
+        recipes.filter { $0.imageName != nil || !(($0.additionalImageNames ?? []).isEmpty) }.count
+    }
+    
+    private func tipRow(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.orange)
+                .frame(width: 20)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
     
@@ -188,190 +184,99 @@ struct RecipeBackupView: View {
     
     private func exportRecipes() async {
         isExporting = true
-        defer { isExporting = false }
+        errorMessage = nil
         
         do {
-            let url = try await RecipeBackupManager.shared.createBackup(from: savedRecipes)
-            backupURL = url
-            successMessage = "Backup created successfully with \(savedRecipes.count) recipe(s)"
+            let url = try await RecipeBackupManager.shared.createBackup(from: recipes)
             
-            #if os(iOS)
-            showingShareSheet = true
-            #else
-            // macOS: Show save panel
-            await showMacOSSavePanel(url: url)
-            #endif
-            
-            showingSuccess = true
+            await MainActor.run {
+                exportedURL = url
+                // Show share sheet directly instead of alert
+                showShareSheet = true
+            }
         } catch {
-            errorMessage = error.localizedDescription
-            showingError = true
-        }
-    }
-    
-    #if os(macOS)
-    @MainActor
-    private func showMacOSSavePanel(url: URL) async {
-        let savePanel = NSSavePanel()
-        savePanel.nameFieldStringValue = url.lastPathComponent
-        savePanel.allowedContentTypes = [UTType(filenameExtension: "reczipes") ?? .data]
-        savePanel.canCreateDirectories = true
-        
-        let response = savePanel.runModal()
-        if response == .OK, let destinationURL = savePanel.url {
-            do {
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
-                try FileManager.default.copyItem(at: url, to: destinationURL)
-            } catch {
-                errorMessage = "Failed to save file: \(error.localizedDescription)"
-                showingError = true
+            await MainActor.run {
+                errorMessage = "Export failed: \(error.localizedDescription)"
             }
         }
+        
+        await MainActor.run {
+            isExporting = false
+        }
     }
-    #endif
     
     // MARK: - Import
     
-    private func handleImport(_ result: Result<[URL], Error>) async {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            
-            // Check for duplicate recipes
-            await checkForDuplicatesAndImport(url)
-            
-        case .failure(let error):
-            errorMessage = "Failed to open file: \(error.localizedDescription)"
-            showingError = true
-        }
-    }
-    
-    private func checkForDuplicatesAndImport(_ url: URL) async {
+    private func handleImport(result: Result<[URL], Error>) async {
         isImporting = true
-        defer { isImporting = false }
+        errorMessage = nil
         
-        // First, peek at the backup to check for duplicates
-        guard let package = try? decodeBackupPackage(from: url) else {
-            errorMessage = "Invalid backup file format"
-            showingError = true
-            return
-        }
-        
-        let duplicateIDs = package.recipes.filter { backup in
-            savedRecipes.contains { $0.id == backup.recipe.id }
-        }
-        
-        if duplicateIDs.isEmpty {
-            // No duplicates, import directly
-            await performImport(url, mode: .skip)
-        } else {
-            // Show conflict resolution dialog
-            await showConflictResolution(url, duplicateCount: duplicateIDs.count)
-        }
-    }
-    
-    private func decodeBackupPackage(from url: URL) throws -> RecipeBackupPackage? {
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(RecipeBackupPackage.self, from: data)
-    }
-    
-    @MainActor
-    private func showConflictResolution(_ url: URL, duplicateCount: Int) async {
-        #if os(iOS)
-        // Show alert with options
-        let alert = UIAlertController(
-            title: "Duplicate Recipes Found",
-            message: "\(duplicateCount) recipe(s) already exist in your collection. How would you like to proceed?",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "Skip Existing", style: .default) { _ in
-            Task {
-                await self.performImport(url, mode: .skip)
-            }
-        })
-        
-        alert.addAction(UIAlertAction(title: "Overwrite Existing", style: .destructive) { _ in
-            Task {
-                await self.performImport(url, mode: .overwrite)
-            }
-        })
-        
-        alert.addAction(UIAlertAction(title: "Keep Both", style: .default) { _ in
-            Task {
-                await self.performImport(url, mode: .keepBoth)
-            }
-        })
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        // Present the alert
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootViewController = scene.windows.first?.rootViewController {
-            rootViewController.present(alert, animated: true)
-        }
-        #else
-        // macOS: Show SwiftUI dialog
-        let alert = NSAlert()
-        alert.messageText = "Duplicate Recipes Found"
-        alert.informativeText = "\(duplicateCount) recipe(s) already exist in your collection. How would you like to proceed?"
-        alert.addButton(withTitle: "Skip Existing")
-        alert.addButton(withTitle: "Overwrite Existing")
-        alert.addButton(withTitle: "Keep Both")
-        alert.addButton(withTitle: "Cancel")
-        
-        let response = alert.runModal()
-        switch response {
-        case .alertFirstButtonReturn:
-            await performImport(url, mode: .skip)
-        case .alertSecondButtonReturn:
-            await performImport(url, mode: .overwrite)
-        case .alertThirdButtonReturn:
-            await performImport(url, mode: .keepBoth)
-        default:
-            break
-        }
-        #endif
-    }
-    
-    private func performImport(_ url: URL, mode: ImportOverwriteMode) async {
         do {
+            let urls = try result.get()
+            guard let url = urls.first else {
+                errorMessage = "No file selected"
+                isImporting = false
+                return
+            }
+            
+            // Start accessing security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                errorMessage = "Cannot access file"
+                isImporting = false
+                return
+            }
+            
+            defer {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
             let result = try await RecipeBackupManager.shared.importBackup(
                 from: url,
                 into: modelContext,
-                existingRecipes: savedRecipes,
-                overwriteMode: mode
+                existingRecipes: recipes,
+                overwriteMode: selectedImportMode
             )
             
-            successMessage = "Import complete: \(result.summary)"
-            showingSuccess = true
+            importResult = result
+            showImportSuccess = true
+            
         } catch {
-            errorMessage = error.localizedDescription
-            showingError = true
+            errorMessage = "Import failed: \(error.localizedDescription)"
         }
+        
+        isImporting = false
     }
 }
 
-// MARK: - Share Sheet (iOS)
+// MARK: - Custom UTType for .reczipes files
 
-#if os(iOS)
-struct ShareSheet: UIViewControllerRepresentable {
+extension UTType {
+    static var reczipesBackup: UTType {
+        UTType(exportedAs: "com.reczipes.backup")
+    }
+}
+
+// MARK: - Backup-specific Share Sheet (to avoid conflicts)
+
+struct BackupShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: nil
+        )
         return controller
     }
     
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No updates needed
+    }
 }
-#endif
 
 #Preview {
-    RecipeBackupView()
-        .modelContainer(for: [Recipe.self], inMemory: true)
+    NavigationView {
+        RecipeBackupView()
+            .modelContainer(for: Recipe.self)
+    }
 }
