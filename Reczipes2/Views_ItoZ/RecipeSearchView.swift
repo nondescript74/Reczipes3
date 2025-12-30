@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 struct RecipeSearchView: View {
     @Binding var recipes: [RecipeModel]

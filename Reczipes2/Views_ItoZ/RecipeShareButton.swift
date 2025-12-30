@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// A reusable button for sharing recipes via email, text, or other methods
 struct RecipeShareButton: View {

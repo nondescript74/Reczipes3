@@ -463,7 +463,9 @@ struct RecipePageView: View {
 }
 // MARK: - Share Sheet
 
+#if os(iOS)
 import UIKit
+#endif
 struct ShareSheet_RBDV: UIViewControllerRepresentable {
     let activityItems: [Any]
     

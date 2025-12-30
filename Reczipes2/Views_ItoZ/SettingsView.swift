@@ -52,8 +52,22 @@ struct SettingsView: View {
                 }
                 
                 Section("Data & Sync") {
+                    NavigationLink(destination: QuickSyncStatusView()) {
+                        HStack {
+                            Label("Quick Sync Check", systemImage: "checkmark.circle")
+                            Spacer()
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                                .font(.caption)
+                        }
+                    }
+                    
+                    NavigationLink(destination: CloudKitSyncStatusMonitorView()) {
+                        Label("Sync Monitor", systemImage: "antenna.radiowaves.left.and.right")
+                    }
+                    
                     NavigationLink(destination: CloudKitSettingsView()) {
-                        Label("iCloud Sync", systemImage: "icloud.fill")
+                        Label("iCloud Sync Settings", systemImage: "icloud.fill")
                     }
                     
                     NavigationLink(destination: RecipeImageMigrationView()) {
@@ -71,7 +85,7 @@ struct SettingsView: View {
                     }
                     
                     NavigationLink(destination: CloudKitDiagnosticsView()) {
-                        Label("CloudKit Diagnostics", systemImage: "stethoscope")
+                        Label("Advanced Diagnostics", systemImage: "stethoscope")
                     }
                     
                     NavigationLink(destination: PersistentContainerInfoView()) {

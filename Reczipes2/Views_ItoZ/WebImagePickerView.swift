@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct WebImagePickerView: View {
     let imageURLs: [String]

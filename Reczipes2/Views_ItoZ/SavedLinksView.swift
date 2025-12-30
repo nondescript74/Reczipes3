@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 struct SavedLinksView: View {
     @Environment(\.modelContext) private var modelContext

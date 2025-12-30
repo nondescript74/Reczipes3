@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// View modifier that tracks task progress and saves it to AppStateManager
 struct TaskTrackingModifier: ViewModifier {

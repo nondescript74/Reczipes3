@@ -1,0 +1,428 @@
+//
+//  CloudKitSyncStatusMonitorView.swift
+//  Reczipes2
+//
+//  Real-time sync status monitor for users and debugging
+//
+
+import SwiftUI
+import SwiftData
+import CloudKit
+import Combine
+
+/// Comprehensive sync status view that shows everything needed to debug sync issues
+struct CloudKitSyncStatusMonitorView: View {
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var monitor = CloudKitSyncMonitor.shared
+    @StateObject private var syncLogger = SyncStatusLogger()
+    
+    @State private var recipeCount: Int = 0
+    @State private var userRecordID: String = "Checking..."
+    @State private var isRefreshing: Bool = false
+    @State private var lastRefreshTime: Date?
+    
+    var body: some View {
+        List {
+            // Overall Status
+            Section {
+                StatusRow(
+                    title: "Sync Status",
+                    value: monitor.isSyncEnabled ? "Active" : "Inactive",
+                    icon: monitor.statusIcon,
+                    color: monitor.statusColor
+                )
+                
+                StatusRow(
+                    title: "iCloud Account",
+                    value: accountStatusText,
+                    icon: "person.circle.fill",
+                    color: monitor.statusColor
+                )
+                
+                StatusRow(
+                    title: "User ID",
+                    value: userRecordID,
+                    icon: "key.fill",
+                    color: .blue
+                )
+                .font(.system(.body, design: .monospaced))
+            } header: {
+                Text("Connection Status")
+            } footer: {
+                if let lastRefresh = lastRefreshTime {
+                    Text("Last updated: \(lastRefresh, style: .relative) ago")
+                        .font(.caption)
+                }
+            }
+            
+            // Data Status
+            Section("Local Data") {
+                HStack {
+                    Label("\(recipeCount)", systemImage: "book.fill")
+                        .font(.title2.bold())
+                    Spacer()
+                    Text("Recipes")
+                        .foregroundColor(.secondary)
+                }
+                
+                if recipeCount > 0 {
+                    HStack {
+                        Image(systemName: "icloud.and.arrow.up")
+                        Text("Ready to sync to other devices")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // Activity Log
+            Section {
+                if syncLogger.events.isEmpty {
+                    HStack {
+                        Image(systemName: "hourglass")
+                        Text("Monitoring sync activity...")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                } else {
+                    ForEach(syncLogger.events.reversed()) { event in
+                        SyncEventRow(event: event)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Sync Activity Log")
+                    Spacer()
+                    if !syncLogger.events.isEmpty {
+                        Button("Clear") {
+                            syncLogger.clearEvents()
+                        }
+                        .font(.caption)
+                    }
+                }
+            } footer: {
+                Text("Shows real-time sync activity. Keep this screen open to monitor sync progress.")
+                    .font(.caption)
+            }
+            
+            // Actions
+            Section("Actions") {
+                Button {
+                    Task {
+                        await refreshStatus()
+                    }
+                } label: {
+                    HStack {
+                        if isRefreshing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text("Refresh Status")
+                    }
+                }
+                .disabled(isRefreshing)
+                
+                Button {
+                    copyAllInfoToClipboard()
+                } label: {
+                    Label("Copy Status to Clipboard", systemImage: "doc.on.doc")
+                }
+                
+                NavigationLink {
+                    CloudKitDiagnosticsView()
+                } label: {
+                    Label("Advanced Diagnostics", systemImage: "stethoscope")
+                }
+            }
+            
+            // Troubleshooting Tips
+            Section {
+                SyncTipRow(icon: "wifi", tip: "Keep device connected to Wi-Fi")
+                SyncTipRow(icon: "app.fill", tip: "Keep app open in foreground")
+                SyncTipRow(icon: "bolt.fill", tip: "Plug device into power")
+                SyncTipRow(icon: "clock.fill", tip: "Initial sync can take 20-30 minutes")
+            } header: {
+                Text("Tips for Best Sync Performance")
+            }
+        }
+        .navigationTitle("Sync Monitor")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await initialSetup()
+            startMonitoring()
+        }
+        .refreshable {
+            await refreshStatus()
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var accountStatusText: String {
+        switch monitor.accountStatus {
+        case .available:
+            return "Signed In"
+        case .noAccount:
+            return "Not Signed In"
+        case .restricted:
+            return "Restricted"
+        case .couldNotDetermine:
+            return "Unknown"
+        case .temporarilyUnavailable:
+            return "Temporarily Unavailable"
+        @unknown default:
+            return "Unknown"
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func initialSetup() async {
+        await refreshStatus()
+        syncLogger.addEvent("Monitor started")
+    }
+    
+    private func refreshStatus() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+        
+        // Refresh account status
+        await monitor.checkAccountStatus()
+        
+        // Count recipes
+        let descriptor = FetchDescriptor<Recipe>()
+        if let recipes = try? modelContext.fetch(descriptor) {
+            recipeCount = recipes.count
+        }
+        
+        // Get user record ID
+        do {
+            let container = CKContainer(identifier: "iCloud.com.headydiscy.reczipes")
+            let recordID = try await container.userRecordID()
+            // Show first 12 characters for identification without exposing full ID
+            let idPrefix = String(recordID.recordName.prefix(12))
+            userRecordID = "\(idPrefix)..."
+            
+            syncLogger.addEvent("Status refreshed: \(recipeCount) recipes")
+        } catch {
+            userRecordID = "Unable to fetch"
+            syncLogger.addEvent("Error fetching user ID: \(error.localizedDescription)", type: .error)
+        }
+        
+        lastRefreshTime = Date()
+    }
+    
+    private func startMonitoring() {
+        // Monitor for iCloud account changes
+        NotificationCenter.default.addObserver(
+            forName: .CKAccountChanged,
+            object: nil,
+            queue: .main
+        ) { _ in
+            syncLogger.addEvent("iCloud account changed", type: .warning)
+            Task {
+                await refreshStatus()
+            }
+        }
+        
+        // Monitor for persistent store remote change notifications
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("NSPersistentStoreRemoteChangeNotification"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            syncLogger.addEvent("Remote data change detected", type: .sync)
+            Task {
+                await MainActor.run {
+                    // Refresh recipe count
+                    let descriptor = FetchDescriptor<Recipe>()
+                    if let recipes = try? modelContext.fetch(descriptor) {
+                        let oldCount = recipeCount
+                        recipeCount = recipes.count
+                        
+                        if recipeCount != oldCount {
+                            let diff = recipeCount - oldCount
+                            if diff > 0 {
+                                syncLogger.addEvent("Downloaded \(diff) new recipe(s)", type: .success)
+                            } else {
+                                syncLogger.addEvent("Removed \(abs(diff)) recipe(s)", type: .info)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func copyAllInfoToClipboard() {
+        var text = "=== CloudKit Sync Status ===\n\n"
+        text += "Date: \(Date())\n"
+        text += "Sync Status: \(monitor.isSyncEnabled ? "Active" : "Inactive")\n"
+        text += "iCloud Account: \(accountStatusText)\n"
+        text += "User ID: \(userRecordID)\n"
+        text += "Local Recipes: \(recipeCount)\n\n"
+        
+        text += "=== Activity Log ===\n"
+        for event in syncLogger.events.reversed() {
+            text += "[\(event.timestamp.formatted(date: .omitted, time: .standard))] \(event.icon) \(event.message)\n"
+        }
+        
+        UIPasteboard.general.string = text
+        
+        syncLogger.addEvent("Status copied to clipboard", type: .info)
+    }
+}
+
+// MARK: - Supporting Views
+
+struct StatusRow: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .frame(width: 30)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(value)
+                    .font(.body)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct SyncEventRow: View {
+    let event: SyncEvent
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(event.icon)
+                .font(.caption)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.message)
+                    .font(.caption)
+                    .foregroundColor(event.type.color)
+                
+                Text(event.timestamp, style: .relative)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct SyncTipRow: View {
+    let icon: String
+    let tip: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.blue)
+                .frame(width: 24)
+            
+            Text(tip)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+// MARK: - Sync Status Logger
+
+class SyncStatusLogger: ObservableObject {
+    @Published var events: [SyncEvent] = []
+    private let maxEvents = 50
+    
+    func addEvent(_ message: String, type: SyncEventType = .info) {
+        let event = SyncEvent(message: message, type: type)
+        
+        DispatchQueue.main.async {
+            self.events.append(event)
+            
+            // Keep only recent events
+            if self.events.count > self.maxEvents {
+                self.events.removeFirst(self.events.count - self.maxEvents)
+            }
+        }
+        
+        // Also log to console for Xcode debugging
+        print("\(event.icon) \(message)")
+    }
+    
+    func clearEvents() {
+        events.removeAll()
+    }
+}
+
+// MARK: - Supporting Types
+
+struct SyncEvent: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let message: String
+    let type: SyncEventType
+    
+    init(message: String, type: SyncEventType = .info) {
+        self.timestamp = Date()
+        self.message = message
+        self.type = type
+    }
+    
+    var icon: String {
+        type.icon
+    }
+}
+
+enum SyncEventType {
+    case info
+    case success
+    case warning
+    case error
+    case sync
+    
+    var icon: String {
+        switch self {
+        case .info: return "ℹ️"
+        case .success: return "✅"
+        case .warning: return "⚠️"
+        case .error: return "❌"
+        case .sync: return "🔄"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .info: return .primary
+        case .success: return .green
+        case .warning: return .orange
+        case .error: return .red
+        case .sync: return .blue
+        }
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    NavigationStack {
+        CloudKitSyncStatusMonitorView()
+    }
+}
