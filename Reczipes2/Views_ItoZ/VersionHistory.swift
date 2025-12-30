@@ -58,6 +58,20 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
+                // ADD NEW CHANGES HERE as you commit
+                // Use emoji prefixes from the guide at the bottom of this file
+                // Example: "✨ Added: New feature description"
+            ]
+        ))
+        
+        // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
+        // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "11.5",
+            buildNumber: "48",
+            releaseDate: Date(),
+            changes: [
                 "✨ Added: Dynamic Version History System",
                 "🎨 Enhanced: Launch screen now shows every app launch",
                 "📱 Added: Version History viewer in Settings",
@@ -69,12 +83,10 @@ class VersionHistoryManager {
                 "🔄 Added: Share changelog functionality",
                 "🗂️ Added: Expandable/collapsible version entries",
                 "📊 Added: Automatic version/build detection from Info.plist",
-                "🐛 Added: Developer reset button for version tracking (DEBUG)"
+                "🐛 Added: Developer reset button for version tracking (DEBUG)",
+                "🐛 Fixed: Version history debug function mutation error"
             ]
         ))
-        
-        // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
-        // These represent past releases and should not change
         
         history.append(VersionHistoryEntry(
             version: "11.5",
@@ -209,37 +221,33 @@ class VersionHistoryManager {
         UserDefaults.standard.removeObject(forKey: lastShownVersionKey)
     }
     
-    #if DEBUG
-    /// Get version history with sample data for testing/preview
-    func getHistoryWithSampleData() -> [VersionHistoryEntry] {
-        var history = versionHistory
-        
-        // Add a few sample versions for testing the UI
-        history.append(contentsOf: [
-            VersionHistoryEntry(
-                version: "11.6",
-                buildNumber: "49",
-                releaseDate: Calendar.current.date(byAdding: .day, value: -30, to: Date())!,
-                changes: [
-                    "✨ Added: Recipe backup to iCloud",
-                    "🎨 Redesigned: Settings interface",
-                    "⚡️ Improved: App performance by 30%",
-                ]
-            ),
-            VersionHistoryEntry(
-                version: "1.8",
-                buildNumber: "3",
-                releaseDate: Calendar.current.date(byAdding: .day, value: -60, to: Date())!,
-                changes: [
-                    "📸 Added: Photo library integration",
-                    "🐛 Fixed: Crash when importing large recipes",
-                ]
-            ),
-        ])
-        
-        return history
-    }
-    #endif
+//    #if DEBUG
+//    /// Add sample history data for testing/preview
+//    func addSampleHistoryForTesting() {
+//        // Add a few sample versions for testing the UI
+//        versionHistory.append(contentsOf: [
+//            VersionHistoryEntry(
+//                version: "1.9",
+//                buildNumber: "5",
+//                releaseDate: Calendar.current.date(byAdding: .day, value: -30, to: Date())!,
+//                changes: [
+//                    "✨ Added: Recipe backup to iCloud",
+//                    "🎨 Redesigned: Settings interface",
+//                    "⚡️ Improved: App performance by 30%",
+//                ]
+//            ),
+//            VersionHistoryEntry(
+//                version: "1.8",
+//                buildNumber: "3",
+//                releaseDate: Calendar.current.date(byAdding: .day, value: -60, to: Date())!,
+//                changes: [
+//                    "📸 Added: Photo library integration",
+//                    "🐛 Fixed: Crash when importing large recipes",
+//                ]
+//            ),
+//        ])
+//    }
+//    #endif
 }
 
 // MARK: - Emoji Prefix Guide

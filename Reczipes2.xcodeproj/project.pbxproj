@@ -84,7 +84,10 @@
 				DIABETIC_INTEGRATION_GUIDE.md,
 				DIABETIC_QUICKSTART.md,
 				DOCUMENTATION_UPDATE_SUMMARY.md,
+				DYNAMIC_VERSION_HISTORY_ARCHITECTURE.md,
+				DYNAMIC_VERSION_HISTORY_SUMMARY.md,
 				FILE_ORGANIZATION_NOTE.md,
+				FILE_STRUCTURE.md,
 				FIXED_VERSION_11_6_48.md,
 				FODMAP_ALLERGEN_INTEGRATION.md,
 				FODMAP_IMPLEMENTATION_GUIDE.md,
@@ -100,7 +103,9 @@
 				HTML_TAG_URL_FIX.md,
 				IMAGE_MIGRATION_TESTING_CHECKLIST.md,
 				IMPLEMENTATION_GUIDE.md,
+				IMPLEMENTATION_NOTES.md,
 				IMPLEMENTATION_SUMMARY.md,
+				"INTEGRATION_CHECKLIST 2.md",
 				INTEGRATION_CHECKLIST.md,
 				JSONLINKVALIDATOR_CONSOLIDATED.md,
 				JSONLINKVALIDATOR_TIPS_FIX.md,
@@ -123,7 +128,9 @@
 				QUICK_START.md,
 				QUICK_TEST_CHECKLIST.md,
 				QUICKSTART.md,
+				README_EXPORT_IMPORT.md,
 				README.md,
+				RECIPE_BOOK_EXPORT_GUIDE.md,
 				RECIPE_COLLECTION_REFACTOR.md,
 				RECIPE_EDITING_GUIDE.md,
 				RECIPE_EDITING_QUICKSTART.md,
@@ -327,7 +334,6 @@
 			mainGroup = F8C80F3B2EE246D200AA52E7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				F8D232D52F01E93A00B998FA /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = F8C80F452EE246D200AA52E7 /* Products */;
@@ -771,17 +777,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		F8D232D52F01E93A00B998FA /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.9.20;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = F8C80F3C2EE246D200AA52E7 /* Project object */;
 }
