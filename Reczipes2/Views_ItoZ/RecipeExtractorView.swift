@@ -14,6 +14,8 @@ struct RecipeExtractorView: View {
     @EnvironmentObject private var appState: AppStateManager
     @State private var showImagePicker = false
     @State private var showCamera = false
+    @State private var showImageCrop = false
+    @State private var imageToCrop: UIImage?
     @State private var showImageComparison = false
     @State private var showingSaveConfirmation = false
     @State private var showURLInput = false
@@ -133,41 +135,52 @@ struct RecipeExtractorView: View {
                 }
             }
             .sheet(isPresented: $showImagePicker) {
-                ImagePicker(image: $viewModel.selectedImage, sourceType: .photoLibrary) { image in
-                    // Save input data for task restoration
-                    if let imageData = image.jpegData(compressionQuality: 0.8) {
-                        let inputData = ExtractionInputData(
-                            imageData: imageData,
-                            textInput: nil,
-                            timestamp: Date()
-                        )
-                        if let encoded = try? JSONEncoder().encode(inputData) {
-                            appState.startTask(type: .extraction, inputData: encoded)
-                        }
-                    }
-                    
-                    Task {
-                        await viewModel.extractRecipe(from: image)
-                    }
+                ImagePicker(image: $imageToCrop, sourceType: .photoLibrary) { image in
+                    // Show crop view after image is selected
+                    imageToCrop = image
+                    showImageCrop = true
                 }
             }
             .sheet(isPresented: $showCamera) {
-                ImagePicker(image: $viewModel.selectedImage, sourceType: .camera) { image in
-                    // Save input data for task restoration
-                    if let imageData = image.jpegData(compressionQuality: 0.8) {
-                        let inputData = ExtractionInputData(
-                            imageData: imageData,
-                            textInput: nil,
-                            timestamp: Date()
-                        )
-                        if let encoded = try? JSONEncoder().encode(inputData) {
-                            appState.startTask(type: .extraction, inputData: encoded)
+                ImagePicker(image: $imageToCrop, sourceType: .camera) { image in
+                    // Show crop view after image is captured
+                    imageToCrop = image
+                    showImageCrop = true
+                }
+            }
+            .fullScreenCover(isPresented: $showImageCrop) {
+                if let image = imageToCrop {
+                    ImageCropView(
+                        image: image,
+                        onCrop: { croppedImage in
+                            // After cropping, proceed with extraction
+                            viewModel.selectedImage = croppedImage
+                            
+                            // Save input data for task restoration
+                            if let imageData = croppedImage.jpegData(compressionQuality: 0.8) {
+                                let inputData = ExtractionInputData(
+                                    imageData: imageData,
+                                    textInput: nil,
+                                    timestamp: Date()
+                                )
+                                if let encoded = try? JSONEncoder().encode(inputData) {
+                                    appState.startTask(type: .extraction, inputData: encoded)
+                                }
+                            }
+                            
+                            showImageCrop = false
+                            imageToCrop = nil
+                            
+                            Task {
+                                await viewModel.extractRecipe(from: croppedImage)
+                            }
+                        },
+                        onCancel: {
+                            // User cancelled cropping
+                            showImageCrop = false
+                            imageToCrop = nil
                         }
-                    }
-                    
-                    Task {
-                        await viewModel.extractRecipe(from: image)
-                    }
+                    )
                 }
             }
             .sheet(isPresented: $showImageComparison) {

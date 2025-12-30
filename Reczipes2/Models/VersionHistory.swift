@@ -61,6 +61,13 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
+                "✨ Added: Image cropping before recipe extraction",
+                "📸 Added: Crop view with pinch-to-zoom and drag controls",
+                "🎨 Enhanced: Grid overlay for better composition (rule of thirds)",
+                "⚡️ Improved: Option to skip cropping and use original image",
+                "📱 Removed: Spoonacular minor reference in url",
+                "📱 Added: Version History viewer in Settings",
+                "🎨 Enhanced: Launch screen now shows every app launch"
             ]
         ))
         
@@ -68,11 +75,23 @@ class VersionHistoryManager {
         // These represent past releases and should not change
         
         history.append(VersionHistoryEntry(
-            version: "11.5",
+            version: "11.7",
+            buildNumber: "49",
+            releaseDate: Date(),
+            changes: [
+                "✨ Added: Image cropping before recipe extraction",
+                "📸 Added: Crop view with pinch-to-zoom and drag controls",
+                "🎨 Enhanced: Grid overlay for better composition (rule of thirds)",
+                "⚡️ Improved: Option to skip cropping and use original image",
+                "✨ Removed: Spoonacular minor reference in url"
+            ]
+        ))
+        
+        history.append(VersionHistoryEntry(
+            version: "11.6",
             buildNumber: "48",
             releaseDate: Date(),
             changes: [
-                "✨ Added: Dynamic Version History System",
                 "🎨 Enhanced: Launch screen now shows every app launch",
                 "📱 Added: Version History viewer in Settings",
                 "🔧 Added: Version Debug view for troubleshooting",

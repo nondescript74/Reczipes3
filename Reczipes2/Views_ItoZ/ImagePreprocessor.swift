@@ -7,6 +7,7 @@
 
 #if os(iOS)
 import UIKit
+import SwiftUI
 #endif
 import CoreImage
 import CoreImage.CIFilterBuiltins
