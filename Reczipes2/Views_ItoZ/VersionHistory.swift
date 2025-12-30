@@ -43,31 +43,42 @@ class VersionHistoryManager {
     
     /// Complete version history - ADD NEW VERSIONS AT THE TOP
     /// Each commit should add a new entry here with concise bullet points
-    private var versionHistory: [VersionHistoryEntry] = [
-        // Version 11.5 Build 47 - Current (Dec 30, 2024)
-        VersionHistoryEntry(
-            version: "11.5",
-            buildNumber: "47",
+    ///
+    /// IMPORTANT: The first entry ALWAYS represents the current version from Info.plist.
+    /// When you update your app version in Xcode, just update the changes array below.
+    /// The version/build numbers are automatically pulled from Info.plist.
+    private var versionHistory: [VersionHistoryEntry] {
+        var history: [VersionHistoryEntry] = []
+        
+        // CURRENT VERSION - Automatically uses Info.plist values
+        // When you increment version/build in Xcode, this entry automatically updates
+        // You only need to update the changes array with new features
+        history.append(VersionHistoryEntry(
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown",
+            buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
                 "✨ Added: Dynamic Version History System",
                 "🎨 Enhanced: Launch screen now shows every app launch",
                 "📱 Added: Version History viewer in Settings",
-                "🔧 Added: Developer reset button for version tracking (DEBUG)",
+                "🔧 Added: Version Debug view for troubleshooting",
                 "📝 Improved: What's New section auto-populated from version database",
                 "⚡️ Improved: Launch screen uses dynamic data from VersionHistoryManager",
                 "📚 Added: Comprehensive documentation for version management",
                 "🎯 Added: Emoji categorization guide for changelog entries",
                 "🔄 Added: Share changelog functionality",
                 "🗂️ Added: Expandable/collapsible version entries",
-                "📊 Added: Automatic version/build detection from Info.plist"
+                "📊 Added: Automatic version/build detection from Info.plist",
+                "🐛 Added: Developer reset button for version tracking (DEBUG)"
             ]
-        ),
+        ))
         
-        // Version 11.5 Build 46 - Previous
-        VersionHistoryEntry(
+        // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
+        // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
             version: "11.5",
-            buildNumber: "46",
+            buildNumber: "47",
             releaseDate: Calendar.current.date(byAdding: .day, value: -1, to: Date())!,
             changes: [
                 "📚 Export & Import Recipe Books",
@@ -84,45 +95,21 @@ class VersionHistoryManager {
                 "🎨 Liquid Glass Design Elements",
                 "📱 State Preservation & Task Restoration"
             ]
-        ),
+        ))
         
-        // Template for next version - uncomment and fill in when you commit new features:
-        /*
-        VersionHistoryEntry(
-            version: "2.1",
-            buildNumber: "2",
-            releaseDate: Date(),
-            changes: [
-                "✨ New Feature: Description",
-                "🐛 Fixed: Bug description",
-                "⚡️ Improved: Performance enhancement",
-            ]
-        ),
-        */
-        
-        // Version 1.0 Build 1 - Initial Release (example)
-        // VersionHistoryEntry(
-        //     version: "1.0",
-        //     buildNumber: "1",
-        //     releaseDate: Calendar.current.date(from: DateComponents(year: 2024, month: 12, day: 4))!,
-        //     changes: [
-        //         "🎉 Initial Release",
-        //         "📖 Recipe Storage & Management",
-        //         "🔍 Basic Search Functionality"
-        //     ]
-        // ),
-    ]
+        return history
+    }
     
     // MARK: - Public Methods
     
     /// Get the current app version
     var currentVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "11.5"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
     
     /// Get the current build number
     var currentBuildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "47"
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
     }
     
     /// Get the current version string
@@ -223,13 +210,15 @@ class VersionHistoryManager {
     }
     
     #if DEBUG
-    /// Add sample history data for testing/preview
-    func addSampleHistoryForTesting() {
+    /// Get version history with sample data for testing/preview
+    func getHistoryWithSampleData() -> [VersionHistoryEntry] {
+        var history = versionHistory
+        
         // Add a few sample versions for testing the UI
-        versionHistory.append(contentsOf: [
+        history.append(contentsOf: [
             VersionHistoryEntry(
-                version: "1.9",
-                buildNumber: "5",
+                version: "11.6",
+                buildNumber: "49",
                 releaseDate: Calendar.current.date(byAdding: .day, value: -30, to: Date())!,
                 changes: [
                     "✨ Added: Recipe backup to iCloud",
@@ -247,6 +236,8 @@ class VersionHistoryManager {
                 ]
             ),
         ])
+        
+        return history
     }
     #endif
 }

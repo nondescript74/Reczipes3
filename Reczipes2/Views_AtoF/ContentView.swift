@@ -59,7 +59,7 @@ struct ContentView: View {
         let recipes = allRecipes.map { recipe in
             // First check if the recipe model itself has an imageName (directly from Recipe object)
             if let existingImageName = recipe.imageName {
-                logDebug("Recipe '\(recipe.title)' already has imageName: '\(existingImageName)' (ID: \(recipe.id))", category: "recipe")
+                //logDebug("Recipe '\(recipe.title)' already has imageName: '\(existingImageName)' (ID: \(recipe.id))", category: "recipe")
                 return recipe
             }
             // Fallback to checking RecipeImageAssignment (for legacy support)

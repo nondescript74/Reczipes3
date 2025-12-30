@@ -23,9 +23,9 @@ final class RecipeCollection {
         print("📚 RecipeCollection.allRecipes called with \(savedRecipes.count) saved recipes")
         let models = savedRecipes.compactMap { recipe -> RecipeModel? in
             let model = recipe.toRecipeModel()
-            if let model = model {
-                print("📚 Converting Recipe '\(recipe.title)' - imageName in Recipe: '\(recipe.imageName ?? "nil")' -> imageName in Model: '\(model.imageName ?? "nil")'")
-            }
+//            if let model = model {
+//                print("📚 Converting Recipe '\(recipe.title)' - imageName in Recipe: '\(recipe.imageName ?? "nil")' -> imageName in Model: '\(model.imageName ?? "nil")'")
+//            }
             return model
         }
         print("📚 RecipeCollection.allRecipes returning \(models.count) models")

@@ -229,9 +229,19 @@ struct SettingsView: View {
                     }
                     
                     #if DEBUG
+                    NavigationLink(destination: VersionDebugView()) {
+                        HStack {
+                            Label("Version Debug Info", systemImage: "ant.circle")
+                                .foregroundColor(.orange)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
                     Button {
                         VersionHistoryManager.shared.resetVersionTracking()
-                        // Force show launch screen on next launch
                     } label: {
                         HStack {
                             Label("Reset Version Tracking", systemImage: "arrow.counterclockwise")
