@@ -61,13 +61,12 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "✨ Added: Image cropping before recipe extraction",
-                "📸 Added: Crop view with pinch-to-zoom and drag controls",
-                "🎨 Enhanced: Grid overlay for better composition (rule of thirds)",
-                "⚡️ Improved: Option to skip cropping and use original image",
-                "📱 Removed: Spoonacular minor reference in url",
-                "📱 Added: Version History viewer in Settings",
-                "🎨 Enhanced: Launch screen now shows every app launch"
+                "🎨 Enhanced: Animated loading indicators for recipe extraction with rotating status messages",
+                "⚡️ Added: 'Preparing image...' spinner between photo selection and crop screen",
+                "🐛 Fixed: Crop screen not appearing after selecting library photo (timing conflict)",
+                "🐛 Fixed: Loading indicator hidden behind UI elements during extraction",
+                "⚡️ Improved: UI now hides all controls during extraction to focus on progress",
+                "🔧 Added: Debug logging for image selection and extraction flow",
             ]
         ))
         
@@ -75,15 +74,33 @@ class VersionHistoryManager {
         // These represent past releases and should not change
         
         history.append(VersionHistoryEntry(
+            version: "11.8",
+            buildNumber: "50",
+            releaseDate: Date(),
+            changes: [
+                "🎨 Enhanced: Animated loading indicators for recipe extraction with rotating status messages",
+                "⚡️ Added: 'Preparing image...' spinner between photo selection and crop screen",
+                "🐛 Fixed: Crop screen not appearing after selecting library photo (timing conflict)",
+                "🐛 Fixed: Loading indicator hidden behind UI elements during extraction",
+                "⚡️ Improved: UI now hides all controls during extraction to focus on progress",
+                "🔧 Added: Debug logging for image selection and extraction flow",
+                "✅ Added 0.6s delay between sheet dismiss and fullScreenCover present (prevents SwiftUI conflict)",
+                "✅ Hide source buttons when imageToCrop != nil (shows preparing spinner instead)",
+                "✅ Added Preparing image... indicator between picker and crop",
+                "✅ Added debug logging to trace the flow",
+                "✅ Hide UI elements during extraction to show only loading indicator",
+                "📱 Fixed: Hang on image extraction",
+            ]
+        ))
+        
+        history.append(VersionHistoryEntry(
             version: "11.7",
             buildNumber: "49",
             releaseDate: Date(),
             changes: [
-                "✨ Added: Image cropping before recipe extraction",
-                "📸 Added: Crop view with pinch-to-zoom and drag controls",
-                "🎨 Enhanced: Grid overlay for better composition (rule of thirds)",
-                "⚡️ Improved: Option to skip cropping and use original image",
-                "✨ Removed: Spoonacular minor reference in url"
+                "📱 Removed: Spoonacular minor reference in url",
+                "📱 Added: Version History viewer in Settings",
+                "🎨 Enhanced: Launch screen now shows every app launch"
             ]
         ))
         

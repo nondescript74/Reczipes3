@@ -46,21 +46,35 @@ struct RecipeExtractorView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Source Selection Section
-                    sourceSelectionSection
+                    // Source Selection Section (hide when loading)
+                    if !viewModel.isLoading && imageToCrop == nil {
+                        sourceSelectionSection
+                    }
                     
-                    // URL Input (if URL source selected)
-                    if extractionSource == .url {
+                    // Preparing image indicator (between picker and crop)
+                    if imageToCrop != nil && !showImageCrop {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("Preparing image...")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(40)
+                    }
+                    
+                    // URL Input (if URL source selected and not loading)
+                    if extractionSource == .url && !viewModel.isLoading {
                         urlInputSection
                     }
                     
-                    // Preprocessing Toggle (only for images)
-                    if viewModel.selectedImage != nil && extractionSource != .url {
+                    // Preprocessing Toggle (only for images and not loading)
+                    if viewModel.selectedImage != nil && extractionSource != .url && !viewModel.isLoading {
                         preprocessingToggle
                     }
                     
-                    // Image Preview
-                    if let image = viewModel.selectedImage, extractionSource != .url {
+                    // Image Preview (hide during loading to keep focus on spinner)
+                    if let image = viewModel.selectedImage, extractionSource != .url && !viewModel.isLoading {
                         imagePreviewSection(image: image)
                     }
                     
@@ -135,18 +149,39 @@ struct RecipeExtractorView: View {
                 }
             }
             .sheet(isPresented: $showImagePicker) {
-                ImagePicker(image: $imageToCrop, sourceType: .photoLibrary) { image in
-                    // Show crop view after image is selected
-                    imageToCrop = image
-                    showImageCrop = true
-                }
+                ImagePicker(
+                    sourceType: .photoLibrary,
+                    onImageSelected: { image in
+                        logInfo("Image selected from library, size: \(image.size)", category: "ui")
+                        // Store the image and wait for sheet to dismiss before showing crop
+                        imageToCrop = image
+                        // Delay to ensure sheet dismisses before fullScreenCover presents
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            logInfo("Presenting crop view", category: "ui")
+                            showImageCrop = true
+                        }
+                    },
+                    onCancel: {
+                        logInfo("Image picker cancelled", category: "ui")
+                        // User cancelled, do nothing
+                    }
+                )
             }
             .sheet(isPresented: $showCamera) {
-                ImagePicker(image: $imageToCrop, sourceType: .camera) { image in
-                    // Show crop view after image is captured
-                    imageToCrop = image
-                    showImageCrop = true
-                }
+                ImagePicker(
+                    sourceType: .camera,
+                    onImageSelected: { image in
+                        // Store the image and wait for sheet to dismiss before showing crop
+                        imageToCrop = image
+                        // Delay to ensure sheet dismisses before fullScreenCover presents
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            showImageCrop = true
+                        }
+                    },
+                    onCancel: {
+                        // User cancelled, do nothing
+                    }
+                )
             }
             .fullScreenCover(isPresented: $showImageCrop) {
                 if let image = imageToCrop {
@@ -391,27 +426,9 @@ struct RecipeExtractorView: View {
     }
     
     private var loadingSection: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-            if extractionSource == .url {
-                Text("Claude is analyzing the webpage...")
-                    .font(.headline)
-                Text("This may take a few moments")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("Claude is analyzing your recipe...")
-                    .font(.headline)
-                Text("This may take a few moments")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(16)
+        ExtractionLoadingView(
+            extractionType: extractionSource == .url ? .url : .image
+        )
     }
     
     private func errorSection(message: String) -> some View {
@@ -685,12 +702,19 @@ struct RecipeExtractorView: View {
             }
         } label: {
             if isDownloadingImage {
-                HStack {
+                HStack(spacing: 12) {
                     ProgressView()
                         .tint(.white)
-                    Text("Downloading Images...")
+                        .scaleEffect(0.9)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Downloading Images...")
+                            .font(.headline)
+                        Text("Please wait")
+                            .font(.caption)
+                            .opacity(0.9)
+                    }
                 }
-                .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.blue.opacity(0.7))

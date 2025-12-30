@@ -31,11 +31,16 @@ class RecipeExtractorViewModel: ObservableObject {
     
     /// Extract recipe from a web URL
     func extractRecipe(from url: String) async {
-        isLoading = true
-        errorMessage = nil
-        extractedRecipe = nil
-        selectedImage = nil // Clear image when extracting from URL
-        processedImage = nil
+        // Explicitly set loading state on main actor
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+            extractedRecipe = nil
+            selectedImage = nil // Clear image when extracting from URL
+            processedImage = nil
+        }
+        
+        logInfo("Starting URL extraction from: \(url)", category: "extraction")
         
         do {
             // Fetch web content
@@ -56,6 +61,8 @@ class RecipeExtractorViewModel: ObservableObject {
             } else {
                 contentToSend = cleanedContent
             }
+            
+            logInfo("Calling Claude API for URL extraction...", category: "extraction")
             
             // Extract recipe using Claude
             var recipe = try await apiClient.extractRecipe(from: contentToSend)
@@ -90,32 +97,57 @@ class RecipeExtractorViewModel: ObservableObject {
                 )
             }
             
-            self.extractedRecipe = recipe
+            await MainActor.run {
+                self.extractedRecipe = recipe
+                logInfo("URL extraction successful: \(recipe.title)", category: "extraction")
+            }
         } catch let error as WebExtractionError {
-            self.errorMessage = error.errorDescription
+            await MainActor.run {
+                self.errorMessage = error.errorDescription
+                logError("Web extraction error: \(error.errorDescription ?? "unknown")", category: "extraction")
+            }
         } catch let error as ClaudeAPIError {
-            self.errorMessage = error.errorDescription
+            await MainActor.run {
+                self.errorMessage = error.errorDescription
+                logError("Claude API error during URL extraction: \(error.errorDescription ?? "unknown")", category: "extraction")
+            }
         } catch {
-            self.errorMessage = "Unexpected error: \(error.localizedDescription)"
+            await MainActor.run {
+                self.errorMessage = "Unexpected error: \(error.localizedDescription)"
+                logError("Unexpected error during URL extraction: \(error.localizedDescription)", category: "extraction")
+            }
         }
         
-        isLoading = false
+        await MainActor.run {
+            isLoading = false
+            logInfo("URL extraction complete, isLoading set to false", category: "extraction")
+        }
     }
     
     /// Extract recipe from the selected image
     func extractRecipe(from image: UIImage) async {
-        isLoading = true
-        errorMessage = nil
-        selectedImage = image
+        // Explicitly set loading state on main actor
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+            extractedRecipe = nil // Clear any previous recipe
+            selectedImage = image
+        }
+        
+        logInfo("Starting image extraction, isLoading set to true", category: "extraction")
         
         // Generate processed preview if preprocessing is enabled
         if usePreprocessing {
             if let processedData = imagePreprocessor.preprocessForOCR(image),
                let processedUIImage = UIImage(data: processedData) {
-                processedImage = processedUIImage
+                await MainActor.run {
+                    processedImage = processedUIImage
+                }
             }
         } else {
-            processedImage = nil
+            await MainActor.run {
+                processedImage = nil
+            }
         }
         
         do {
@@ -123,19 +155,32 @@ class RecipeExtractorViewModel: ObservableObject {
                 throw ClaudeAPIError.invalidResponse
             }
             
+            logInfo("Calling Claude API for image extraction...", category: "extraction")
             let recipe = try await apiClient.extractRecipe(
                 from: imageData,
                 usePreprocessing: usePreprocessing
             )
             
-            self.extractedRecipe = recipe
+            await MainActor.run {
+                self.extractedRecipe = recipe
+                logInfo("Recipe extraction successful", category: "extraction")
+            }
         } catch let error as ClaudeAPIError {
-            self.errorMessage = error.errorDescription
+            await MainActor.run {
+                self.errorMessage = error.errorDescription
+                logError("Claude API error during extraction: \(error.errorDescription ?? "unknown")", category: "extraction")
+            }
         } catch {
-            self.errorMessage = "Unexpected error: \(error.localizedDescription)"
+            await MainActor.run {
+                self.errorMessage = "Unexpected error: \(error.localizedDescription)"
+                logError("Unexpected error during extraction: \(error.localizedDescription)", category: "extraction")
+            }
         }
         
-        isLoading = false
+        await MainActor.run {
+            isLoading = false
+            logInfo("Image extraction complete, isLoading set to false", category: "extraction")
+        }
     }
     
     /// Clear all current data

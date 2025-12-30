@@ -11,9 +11,9 @@ import UIKit
 #endif
 
 struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
     let sourceType: UIImagePickerController.SourceType
     let onImageSelected: (UIImage) -> Void
+    let onCancel: () -> Void
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -38,15 +38,22 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                parent.image = image
-                parent.onImageSelected(image)
-            }
+            // Dismiss immediately
             parent.dismiss()
+            
+            // Then handle the image after dismiss completes
+            if let image = info[.originalImage] as? UIImage {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.parent.onImageSelected(image)
+                }
+            }
         }
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.parent.onCancel()
+            }
         }
     }
 }

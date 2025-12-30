@@ -302,6 +302,14 @@ actor ExtractionRetryManager {
         case .networkError:
             // Network error - retryable
             return .retryable
+            
+        case .timeout:
+            // Request timed out - retryable (might succeed with more time)
+            return .retryable
+            
+        case .notARecipe:
+            // Image doesn't contain a recipe - terminal (won't improve with retry)
+            return .terminal
         }
     }
     

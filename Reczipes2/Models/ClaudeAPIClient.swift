@@ -17,6 +17,10 @@ class ClaudeAPIClient {
     private let imagePreprocessor = ImagePreprocessor()
     private let retryManager = ExtractionRetryManager()
     
+    // Timeout configuration
+    private let requestTimeout: TimeInterval = 120.0 // 2 minutes for recipe extraction
+    private let validationTimeout: TimeInterval = 30.0 // 30 seconds for API key validation
+    
     // Model fallback list - try these in order for validation
     private let validationModels = [
         "claude-sonnet-4-20250514",      // Latest Sonnet 4 (primary)
@@ -27,6 +31,21 @@ class ClaudeAPIClient {
     
     // Primary model for recipe extraction
     private let recipeExtractionModel = "claude-sonnet-4-20250514"
+    
+    // URLSession with custom configuration
+    private lazy var urlSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = requestTimeout
+        config.timeoutIntervalForResource = requestTimeout
+        return URLSession(configuration: config)
+    }()
+    
+    private lazy var validationSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = validationTimeout
+        config.timeoutIntervalForResource = validationTimeout
+        return URLSession(configuration: config)
+    }()
     
     init(apiKey: String) {
         self.apiKey = apiKey
@@ -73,7 +92,7 @@ class ClaudeAPIClient {
                 logDebug("Request body size: \(request.httpBody?.count ?? 0) bytes", category: "network")
                 logInfo("Sending validation request to: \(baseURL)", category: "network")
                 
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await validationSession.data(for: request)
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     logError("Invalid response type (not HTTPURLResponse)", category: "network")
@@ -276,7 +295,21 @@ class ClaudeAPIClient {
         }
         
         logInfo("Sending request to Anthropic", category: "network")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        // Use do-catch to handle timeouts specifically
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            logError("Request timed out after \(requestTimeout) seconds", category: "network")
+            throw ClaudeAPIError.timeout
+        } catch let error as URLError {
+            logError("Network error: \(error.localizedDescription)", category: "network")
+            throw ClaudeAPIError.networkError(error)
+        } catch {
+            logError("Unexpected error: \(error)", category: "network")
+            throw ClaudeAPIError.networkError(error)
+        }
         
         logInfo("Received response", category: "network")
         logDebug("Response data size: \(data.count) bytes", category: "network")
@@ -518,7 +551,20 @@ class ClaudeAPIClient {
         logDebug("URL: \(baseURL)", category: "network")
         logDebug("Headers: \(request.allHTTPHeaderFields ?? [:])", category: "network")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // Use do-catch to handle timeouts specifically
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            logError("Request timed out after \(requestTimeout) seconds", category: "network")
+            throw ClaudeAPIError.timeout
+        } catch let error as URLError {
+            logError("Network error: \(error.localizedDescription)", category: "network")
+            throw ClaudeAPIError.networkError(error)
+        } catch {
+            logError("Unexpected error: \(error)", category: "network")
+            throw ClaudeAPIError.networkError(error)
+        }
         
         logInfo("Received response", category: "network")
         logDebug("Response data size: \(data.count) bytes", category: "network")
@@ -762,6 +808,8 @@ enum ClaudeAPIError: LocalizedError {
     case noRecipeFound
     case invalidJSON
     case networkError(Error)
+    case timeout
+    case notARecipe
     
     var errorDescription: String? {
         switch self {
@@ -770,11 +818,15 @@ enum ClaudeAPIError: LocalizedError {
         case .apiError(let statusCode, let message):
             return "API Error (\(statusCode)): \(message)"
         case .noRecipeFound:
-            return "No recipe could be extracted from the image"
+            return "No recipe could be extracted from the image. Please ensure the image contains a recipe with clear text."
         case .invalidJSON:
             return "Could not parse recipe JSON"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        case .timeout:
+            return "Request timed out. This may happen with very complex images or slow connections. Please try again or use a simpler image."
+        case .notARecipe:
+            return "This image doesn't appear to contain a recipe. Please select an image with recipe text, ingredients, and instructions."
         }
     }
 }

@@ -127,19 +127,7 @@ struct LinkExtractionView: View {
     }
     
     private var loadingSection: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-            Text("Claude is analyzing the webpage...")
-                .font(.headline)
-            Text("This may take a few moments")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(16)
+        ExtractionLoadingView(extractionType: .link)
     }
     
     private func errorSection(message: String) -> some View {
@@ -358,12 +346,19 @@ struct LinkExtractionView: View {
             }
         } label: {
             if isDownloadingImage {
-                HStack {
+                HStack(spacing: 12) {
                     ProgressView()
                         .tint(.white)
-                    Text("Downloading Images...")
+                        .scaleEffect(0.9)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Downloading Images...")
+                            .font(.headline)
+                        Text("Please wait")
+                            .font(.caption)
+                            .opacity(0.9)
+                    }
                 }
-                .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.blue.opacity(0.7))
