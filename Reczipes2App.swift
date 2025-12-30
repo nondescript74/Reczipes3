@@ -152,8 +152,10 @@ struct Reczipes2App: App {
                             showAPIKeySetup = !APIKeyHelper.isConfigured
                         }
                         
-                        // Show launch screen on first launch
-                        showLaunchScreen = appState.shouldShowLaunchScreen()
+                        // Show launch screen every launch (only if onboarding is complete)
+                        if LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
+                            showLaunchScreen = appState.shouldShowLaunchScreen()
+                        }
                         
                         // Check if images need restoration (after app reinstall)
                         Task {
@@ -161,13 +163,12 @@ struct Reczipes2App: App {
                         }
                     }
                 
-                // Launch screen overlay - shows briefly on every launch
-                if showLaunchScreen {
+                // Launch screen overlay - shows briefly on every launch (after onboarding)
+                if showLaunchScreen && LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
                     LaunchScreenView {
-                        // Dismiss launch screen and mark first launch as complete
+                        // Dismiss launch screen
                         withAnimation {
                             showLaunchScreen = false
-                            appState.isFirstLaunch = false
                         }
                     }
                     .transition(.opacity)

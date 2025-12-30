@@ -17,11 +17,11 @@ struct LaunchScreenView: View {
     
     // App version information
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0"
+        VersionHistoryManager.shared.currentVersion
     }
     
     private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        VersionHistoryManager.shared.currentBuildNumber
     }
     
     private var appName: String {
@@ -32,13 +32,10 @@ struct LaunchScreenView: View {
         DiagnosticLogger.shared.getFormattedLogFileSize()
     }
     
-    // Latest features to highlight
-    private let latestFeatures = [
-        "📚 Export & Import Recipe Books",
-        "🔄 Share Collections with Friends",
-        "🤖 AI-Powered Recipe Extraction",
-        "☁️ iCloud Sync Enabled"
-    ]
+    // Latest features - dynamically loaded from version history
+    private var latestFeatures: [String] {
+        VersionHistoryManager.shared.getWhatsNew()
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -258,6 +255,8 @@ struct LaunchScreenView: View {
             // Complete after 2.2 seconds total
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                 isComplete = true
+                // Mark this version as shown
+                VersionHistoryManager.shared.markWhatsNewAsShown()
                 onComplete()
             }
         }

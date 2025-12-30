@@ -192,8 +192,9 @@ class AppStateManager: ObservableObject {
     // MARK: - Should Show Launch Screen
     
     func shouldShowLaunchScreen() -> Bool {
-        // Show launch screen only on first launch
-        return isFirstLaunch
+        // Show launch screen every time the app launches
+        // This allows users to see version updates and what's new
+        return true
     }
 }
 

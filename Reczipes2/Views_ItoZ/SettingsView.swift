@@ -211,12 +211,37 @@ struct SettingsView: View {
                 }
                 
                 Section("About") {
+                    NavigationLink(destination: VersionHistoryView()) {
+                        HStack {
+                            Label("Version History", systemImage: "clock.arrow.circlepath")
+                            Spacer()
+                            Text(versionString)
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                    
                     HStack {
-                        Text("Version")
+                        Text("Current Version")
                         Spacer()
                         Text(versionString)
                             .foregroundColor(.secondary)
                     }
+                    
+                    #if DEBUG
+                    Button {
+                        VersionHistoryManager.shared.resetVersionTracking()
+                        // Force show launch screen on next launch
+                    } label: {
+                        HStack {
+                            Label("Reset Version Tracking", systemImage: "arrow.counterclockwise")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    #endif
                     
                     Link("Powered by Claude AI",
                          destination: URL(string: "https://www.anthropic.com")!)

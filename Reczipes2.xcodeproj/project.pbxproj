@@ -62,6 +62,7 @@
 				AUTOMATIC_IMAGE_ASSIGNMENT.md,
 				BACKUP_RESTORE_GUIDE.md,
 				BATCH_EXTRACTION_IMPROVEMENTS.md,
+				BUILD_2_RELEASE_NOTES.md,
 				CLOUDKIT_BACKGROUND_MODE_FIX.md,
 				CLOUDKIT_DEBUGGING_GUIDE.md,
 				CLOUDKIT_HELP_INTEGRATION_SUMMARY.md,
@@ -69,6 +70,8 @@
 				CLOUDKIT_SYNC_FIX_SUMMARY.md,
 				CLOUDKIT_SYNC_GUIDE.md,
 				COMPLETE_APP_HELP_GUIDE.md,
+				COMPLETE_SUMMARY_11_5_47.md,
+				COMPLETE_SUMMARY.md,
 				CONTEXTUAL_HELP_IMPLEMENTATION.md,
 				DIABETES_PROFILE_FEATURE.md,
 				DIABETIC_ANALYSIS_USER_GUIDE.md,
@@ -101,6 +104,7 @@
 				JSONLINKVALIDATOR_CONSOLIDATED.md,
 				JSONLINKVALIDATOR_TIPS_FIX.md,
 				LAUNCH_SCREEN_SETUP.md,
+				LAUNCH_SCREEN_UPDATES.md,
 				LICENSE_IMPLEMENTATION.md,
 				MIGRATION_IMPLEMENTATION_SUMMARY.md,
 				MIGRATION_QUICK_REFERENCE.md,
@@ -114,6 +118,7 @@
 				QUICK_REFERENCE_CLOUDKIT.md,
 				QUICK_SETUP_SAVED_LINKS.md,
 				QUICK_START_URL_FIXER.md,
+				QUICK_START_VERSION_11_5_BUILD_47.md,
 				QUICK_START.md,
 				QUICK_TEST_CHECKLIST.md,
 				QUICKSTART.md,
@@ -142,6 +147,7 @@
 				TIPS_INTEGRATION.md,
 				UI_TESTING_SETUP.md,
 				URL_FIXER_GUIDE.md,
+				VERSION_HISTORY_GUIDE.md,
 				WEB_IMAGE_EXTRACTION_FEATURE.md,
 				WEB_IMAGE_FLOW_DIAGRAM.md,
 				WEB_IMAGE_TESTING_CHECKLIST.md,
@@ -513,7 +519,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -540,11 +546,11 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 11.4;
+				MARKETING_VERSION = 11.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -570,7 +576,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -597,11 +603,11 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 11.4;
+				MARKETING_VERSION = 11.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.ImageExtract;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
