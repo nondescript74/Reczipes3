@@ -7,10 +7,13 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
+/// A comprehensive, guided recipe editor with separate detail views for each section
 struct RecipeEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     let recipe: Recipe
     
@@ -27,6 +30,13 @@ struct RecipeEditorView: View {
     
     @State private var showingSaveConfirmation = false
     @State private var hasUnsavedChanges = false
+    
+    // Navigation states for separate detail views
+    @State private var showingBasicInfo = false
+    @State private var showingIngredients = false
+    @State private var showingInstructions = false
+    @State private var showingNotes = false
+    @State private var showingImages = false
     
     init(recipe: Recipe) {
         self.recipe = recipe
@@ -73,101 +83,139 @@ struct RecipeEditorView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                // Basic Info Section
-                Section("Basic Information") {
-                    TextField("Recipe Title", text: $title)
-                        .onChange(of: title) { hasUnsavedChanges = true }
-                    
-                    TextField("Header Notes", text: $headerNotes, axis: .vertical)
-                        .lineLimit(3...6)
-                        .onChange(of: headerNotes) { hasUnsavedChanges = true }
-                    
-                    TextField("Yield (e.g., Serves 4)", text: $recipeYield)
-                        .onChange(of: recipeYield) { hasUnsavedChanges = true }
-                    
-                    TextField("Reference", text: $reference)
-                        .onChange(of: reference) { hasUnsavedChanges = true }
+            List {
+                // Hero Section with Recipe Title
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if !title.isEmpty {
+                            Text(title)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                        } else {
+                            Text("Untitled Recipe")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        if hasUnsavedChanges {
+                            Label("You have unsaved changes", systemImage: "exclamationmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                .listRowBackground(Color.clear)
+                
+                // Guide Text
+                Section {
+                    Text("Edit your recipe by tapping on any section below. Each part of your recipe can be edited in its own dedicated view.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Basic Information
+                Section {
+                    NavigationLink {
+                        BasicInfoEditorView(
+                            title: $title,
+                            headerNotes: $headerNotes,
+                            recipeYield: $recipeYield,
+                            reference: $reference,
+                            hasUnsavedChanges: $hasUnsavedChanges
+                        )
+                    } label: {
+                        EditorSectionRow(
+                            icon: "info.circle.fill",
+                            title: "Basic Information",
+                            subtitle: "Title, notes, yield, and reference",
+                            color: .blue,
+                            isComplete: !title.trimmingCharacters(in: .whitespaces).isEmpty
+                        )
+                    }
+                } header: {
+                    Text("Essential Details")
                 }
                 
                 // Ingredients Section
                 Section {
-                    ForEach($ingredientSections) { $section in
-                        IngredientSectionEditor(section: $section, onChange: { hasUnsavedChanges = true })
-                    }
-                    .onDelete { indices in
-                        ingredientSections.remove(atOffsets: indices)
-                        hasUnsavedChanges = true
-                    }
-                    .onMove { source, destination in
-                        ingredientSections.move(fromOffsets: source, toOffset: destination)
-                        hasUnsavedChanges = true
-                    }
-                    
-                    Button {
-                        ingredientSections.append(EditableIngredientSection())
-                        hasUnsavedChanges = true
+                    NavigationLink {
+                        IngredientsEditorView(
+                            sections: $ingredientSections,
+                            hasUnsavedChanges: $hasUnsavedChanges
+                        )
                     } label: {
-                        Label("Add Ingredient Section", systemImage: "plus.circle.fill")
+                        EditorSectionRow(
+                            icon: "list.bullet.clipboard.fill",
+                            title: "Ingredients",
+                            subtitle: ingredientCountText,
+                            color: .green,
+                            isComplete: !ingredientSections.isEmpty
+                        )
                     }
                 } header: {
-                    HStack {
-                        Text("Ingredients")
-                        Spacer()
-                        EditButton()
-                    }
+                    Text("What You'll Need")
                 }
                 
                 // Instructions Section
                 Section {
-                    ForEach($instructionSections) { $section in
-                        InstructionSectionEditor(section: $section, onChange: { hasUnsavedChanges = true })
-                    }
-                    .onDelete { indices in
-                        instructionSections.remove(atOffsets: indices)
-                        hasUnsavedChanges = true
-                    }
-                    .onMove { source, destination in
-                        instructionSections.move(fromOffsets: source, toOffset: destination)
-                        hasUnsavedChanges = true
-                    }
-                    
-                    Button {
-                        instructionSections.append(EditableInstructionSection())
-                        hasUnsavedChanges = true
+                    NavigationLink {
+                        InstructionsEditorView(
+                            sections: $instructionSections,
+                            hasUnsavedChanges: $hasUnsavedChanges
+                        )
                     } label: {
-                        Label("Add Instruction Section", systemImage: "plus.circle.fill")
+                        EditorSectionRow(
+                            icon: "list.number",
+                            title: "Instructions",
+                            subtitle: instructionCountText,
+                            color: .orange,
+                            isComplete: !instructionSections.isEmpty
+                        )
                     }
                 } header: {
-                    HStack {
-                        Text("Instructions")
-                        Spacer()
-                        EditButton()
-                    }
+                    Text("How to Make It")
                 }
                 
                 // Notes Section
                 Section {
-                    ForEach($notes) { $note in
-                        RecipeNoteEditor(note: $note, onChange: { hasUnsavedChanges = true })
-                    }
-                    .onDelete { indices in
-                        notes.remove(atOffsets: indices)
-                        hasUnsavedChanges = true
-                    }
-                    
-                    Button {
-                        notes.append(EditableRecipeNote())
-                        hasUnsavedChanges = true
+                    NavigationLink {
+                        NotesEditorView(
+                            notes: $notes,
+                            hasUnsavedChanges: $hasUnsavedChanges
+                        )
                     } label: {
-                        Label("Add Note", systemImage: "plus.circle.fill")
+                        EditorSectionRow(
+                            icon: "note.text",
+                            title: "Notes & Tips",
+                            subtitle: notesCountText,
+                            color: .purple,
+                            isComplete: false // Notes are optional
+                        )
                     }
                 } header: {
-                    HStack {
-                        Text("Notes")
-                        Spacer()
-                        EditButton()
+                    Text("Additional Information")
+                }
+                
+                // Images Section
+                Section {
+                    NavigationLink {
+                        RecipeImagesEditorView(recipe: recipe)
+                    } label: {
+                        EditorSectionRow(
+                            icon: "photo.on.rectangle.angled",
+                            title: "Images",
+                            subtitle: imageCountText,
+                            color: .pink,
+                            isComplete: recipe.imageCount > 0
+                        )
                     }
+                } header: {
+                    Text("Visual Content")
+                } footer: {
+                    Text("Add additional photos to complement your recipe")
                 }
             }
             .navigationTitle("Edit Recipe")
@@ -194,6 +242,7 @@ struct RecipeEditorView: View {
                         saveChanges()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .fontWeight(.semibold)
                 }
             }
             .alert("Unsaved Changes", isPresented: $showingSaveConfirmation) {
@@ -204,6 +253,54 @@ struct RecipeEditorView: View {
             } message: {
                 Text("You have unsaved changes. Are you sure you want to discard them?")
             }
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var ingredientCountText: String {
+        let ingredientCount = ingredientSections.flatMap { $0.ingredients }.count
+        let sectionCount = ingredientSections.count
+        
+        if sectionCount == 0 {
+            return "No ingredients yet"
+        } else if sectionCount == 1 {
+            return "\(ingredientCount) ingredient\(ingredientCount == 1 ? "" : "s")"
+        } else {
+            return "\(ingredientCount) ingredients in \(sectionCount) sections"
+        }
+    }
+    
+    private var instructionCountText: String {
+        let stepCount = instructionSections.flatMap { $0.steps }.count
+        let sectionCount = instructionSections.count
+        
+        if sectionCount == 0 {
+            return "No instructions yet"
+        } else if sectionCount == 1 {
+            return "\(stepCount) step\(stepCount == 1 ? "" : "s")"
+        } else {
+            return "\(stepCount) steps in \(sectionCount) sections"
+        }
+    }
+    
+    private var notesCountText: String {
+        let count = notes.count
+        if count == 0 {
+            return "No notes yet"
+        } else {
+            return "\(count) note\(count == 1 ? "" : "s")"
+        }
+    }
+    
+    private var imageCountText: String {
+        let count = recipe.imageCount
+        if count == 0 {
+            return "No images"
+        } else if count == 1 {
+            return "1 image"
+        } else {
+            return "\(count) images"
         }
     }
     
@@ -252,6 +349,1036 @@ struct RecipeEditorView: View {
         }
         
         dismiss()
+    }
+}
+
+// MARK: - Editor Section Row
+
+/// A row displaying an editor section with icon, title, subtitle, and completion status
+struct EditorSectionRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let color: Color
+    let isComplete: Bool
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+                .frame(width: 44, height: 44)
+                .background(color.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            if isComplete {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Basic Info Editor View
+
+struct BasicInfoEditorView: View {
+    @Binding var title: String
+    @Binding var headerNotes: String
+    @Binding var recipeYield: String
+    @Binding var reference: String
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        Form {
+            Section {
+                TextField("Recipe Title", text: $title)
+                    .font(.title3)
+                    .onChange(of: title) { hasUnsavedChanges = true }
+            } header: {
+                Text("Recipe Title")
+            } footer: {
+                Text("Give your recipe a memorable name")
+            }
+            
+            Section {
+                TextField("Add header notes here...", text: $headerNotes, axis: .vertical)
+                    .lineLimit(5...10)
+                    .onChange(of: headerNotes) { hasUnsavedChanges = true }
+            } header: {
+                Text("Header Notes")
+            } footer: {
+                Text("Add a brief description or introduction to your recipe")
+            }
+            
+            Section {
+                TextField("e.g., Serves 4, Makes 12 cookies", text: $recipeYield)
+                    .onChange(of: recipeYield) { hasUnsavedChanges = true }
+            } header: {
+                Text("Yield")
+            } footer: {
+                Text("How many servings or portions does this recipe make?")
+            }
+            
+            Section {
+                TextField("Source, book, website, or author", text: $reference)
+                    .onChange(of: reference) { hasUnsavedChanges = true }
+            } header: {
+                Text("Reference")
+            } footer: {
+                Text("Where did you find this recipe?")
+            }
+        }
+        .navigationTitle("Basic Information")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Ingredients Editor View
+
+struct IngredientsEditorView: View {
+    @Binding var sections: [EditableIngredientSection]
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    
+    @State private var editMode: EditMode = .inactive
+    @State private var selectedSection: EditableIngredientSection?
+    
+    var body: some View {
+        List {
+            if sections.isEmpty {
+                Section {
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.bullet.clipboard")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Ingredients Yet")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Tap the + button to add your first ingredient section")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(Array($sections.enumerated()), id: \.element.id) { index, $section in
+                    Section {
+                        NavigationLink {
+                            IngredientSectionDetailView(
+                                section: $section,
+                                hasUnsavedChanges: $hasUnsavedChanges
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(sectionTitle(for: section, at: index))
+                                    .font(.headline)
+                                
+                                Text("\(section.ingredients.count) ingredient\(section.ingredients.count == 1 ? "" : "s")")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+                .onDelete { indices in
+                    sections.remove(atOffsets: indices)
+                    hasUnsavedChanges = true
+                }
+                .onMove { source, destination in
+                    sections.move(fromOffsets: source, toOffset: destination)
+                    hasUnsavedChanges = true
+                }
+            }
+        }
+        .navigationTitle("Ingredients")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    let newSection = EditableIngredientSection()
+                    sections.append(newSection)
+                    hasUnsavedChanges = true
+                } label: {
+                    Label("Add Section", systemImage: "plus")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                EditButton()
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        .environment(\.editMode, $editMode)
+    }
+    
+    // Helper function to generate contextual section titles
+    private func sectionTitle(for section: EditableIngredientSection, at index: Int) -> String {
+        if !section.title.isEmpty {
+            return section.title
+        }
+        
+        // If there's only one section, just call it "Ingredients"
+        if sections.count == 1 {
+            return "Ingredients"
+        }
+        
+        // If multiple sections, use "Section 1", "Section 2", etc.
+        return "Section \(index + 1)"
+    }
+}
+
+// MARK: - Ingredient Section Detail View
+
+struct IngredientSectionDetailView: View {
+    @Binding var section: EditableIngredientSection
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var editMode: EditMode = .inactive
+    
+    var body: some View {
+        Form {
+            Section {
+                TextField("Section Title (Optional)", text: $section.title)
+                    .font(.headline)
+                    .onChange(of: section.title) { hasUnsavedChanges = true }
+            } header: {
+                Text("Section Title")
+            } footer: {
+                Text("e.g., 'For the Dough', 'Sauce Ingredients', or leave blank")
+            }
+            
+            Section {
+                ForEach($section.ingredients) { $ingredient in
+                    NavigationLink {
+                        IngredientDetailView(
+                            ingredient: $ingredient,
+                            hasUnsavedChanges: $hasUnsavedChanges
+                        )
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ingredient.name.isEmpty ? "New Ingredient" : ingredient.name)
+                                .font(.body)
+                            
+                            if !ingredient.quantity.isEmpty || !ingredient.unit.isEmpty {
+                                Text("\(ingredient.quantity) \(ingredient.unit)".trimmingCharacters(in: .whitespaces))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+                .onDelete { indices in
+                    section.ingredients.remove(atOffsets: indices)
+                    hasUnsavedChanges = true
+                }
+                .onMove { source, destination in
+                    section.ingredients.move(fromOffsets: source, toOffset: destination)
+                    hasUnsavedChanges = true
+                }
+                
+                Button {
+                    section.ingredients.append(EditableIngredient())
+                    hasUnsavedChanges = true
+                } label: {
+                    Label("Add Ingredient", systemImage: "plus.circle.fill")
+                }
+            } header: {
+                Text("Ingredients")
+            }
+            
+            Section {
+                TextField("Transition note (Optional)", text: $section.transitionNote, axis: .vertical)
+                    .lineLimit(2...4)
+                    .onChange(of: section.transitionNote) { hasUnsavedChanges = true }
+            } header: {
+                Text("Transition Note")
+            } footer: {
+                Text("Add a note that appears after this ingredient section, like 'Set aside while preparing the next step'")
+            }
+        }
+        .navigationTitle("Edit Section")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                EditButton()
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        .environment(\.editMode, $editMode)
+    }
+}
+
+// MARK: - Ingredient Detail View
+
+struct IngredientDetailView: View {
+    @Binding var ingredient: EditableIngredient
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        Form {
+            Section {
+                TextField("Ingredient Name", text: $ingredient.name)
+                    .font(.title3)
+                    .onChange(of: ingredient.name) { hasUnsavedChanges = true }
+            } header: {
+                Text("Ingredient Name")
+            } footer: {
+                Text("e.g., 'All-purpose flour', 'Eggs', 'Olive oil'")
+            }
+            
+            Section {
+                HStack {
+                    TextField("Amount", text: $ingredient.quantity)
+                        .keyboardType(.decimalPad)
+                        .onChange(of: ingredient.quantity) { hasUnsavedChanges = true }
+                    
+                    Divider()
+                    
+                    TextField("Unit", text: $ingredient.unit)
+                        .onChange(of: ingredient.unit) { hasUnsavedChanges = true }
+                }
+            } header: {
+                Text("Quantity")
+            } footer: {
+                Text("Enter the amount and unit (e.g., '2' 'cups', '1' 'tablespoon')")
+            }
+            
+            Section {
+                TextField("Preparation instructions", text: $ingredient.preparation, axis: .vertical)
+                    .lineLimit(2...4)
+                    .onChange(of: ingredient.preparation) { hasUnsavedChanges = true }
+            } header: {
+                Text("Preparation")
+            } footer: {
+                Text("How should this ingredient be prepared? (e.g., 'diced', 'beaten', 'at room temperature')")
+            }
+            
+            Section {
+                HStack {
+                    TextField("Metric Amount", text: $ingredient.metricQuantity)
+                        .keyboardType(.decimalPad)
+                        .onChange(of: ingredient.metricQuantity) { hasUnsavedChanges = true }
+                    
+                    Divider()
+                    
+                    TextField("Metric Unit", text: $ingredient.metricUnit)
+                        .onChange(of: ingredient.metricUnit) { hasUnsavedChanges = true }
+                }
+            } header: {
+                Text("Metric Conversion (Optional)")
+            } footer: {
+                Text("Provide metric measurements for international users")
+            }
+        }
+        .navigationTitle("Edit Ingredient")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Instructions Editor View
+
+struct InstructionsEditorView: View {
+    @Binding var sections: [EditableInstructionSection]
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var editMode: EditMode = .inactive
+    
+    var body: some View {
+        List {
+            if sections.isEmpty {
+                Section {
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.number")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Instructions Yet")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Tap the + button to add your first instruction section")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(Array($sections.enumerated()), id: \.element.id) { index, $section in
+                    Section {
+                        NavigationLink {
+                            InstructionSectionDetailView(
+                                section: $section,
+                                hasUnsavedChanges: $hasUnsavedChanges
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(sectionTitle(for: section, at: index))
+                                    .font(.headline)
+                                
+                                Text("\(section.steps.count) step\(section.steps.count == 1 ? "" : "s")")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+                .onDelete { indices in
+                    sections.remove(atOffsets: indices)
+                    hasUnsavedChanges = true
+                }
+                .onMove { source, destination in
+                    sections.move(fromOffsets: source, toOffset: destination)
+                    hasUnsavedChanges = true
+                }
+            }
+        }
+        .navigationTitle("Instructions")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    let newSection = EditableInstructionSection()
+                    sections.append(newSection)
+                    hasUnsavedChanges = true
+                } label: {
+                    Label("Add Section", systemImage: "plus")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                EditButton()
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        .environment(\.editMode, $editMode)
+    }
+    
+    // Helper function to generate contextual section titles
+    private func sectionTitle(for section: EditableInstructionSection, at index: Int) -> String {
+        if !section.title.isEmpty {
+            return section.title
+        }
+        
+        // If there's only one section, just call it "Instructions"
+        if sections.count == 1 {
+            return "Instructions"
+        }
+        
+        // If multiple sections, use "Section 1", "Section 2", etc.
+        return "Section \(index + 1)"
+    }
+}
+
+// MARK: - Instruction Section Detail View
+
+struct InstructionSectionDetailView: View {
+    @Binding var section: EditableInstructionSection
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var editMode: EditMode = .inactive
+    
+    var body: some View {
+        Form {
+            Section {
+                TextField("Section Title (Optional)", text: $section.title)
+                    .font(.headline)
+                    .onChange(of: section.title) { hasUnsavedChanges = true }
+            } header: {
+                Text("Section Title")
+            } footer: {
+                Text("e.g., 'Preparing the Dough', 'Baking Instructions', or leave blank")
+            }
+            
+            Section {
+                ForEach($section.steps) { $step in
+                    NavigationLink {
+                        InstructionStepDetailView(
+                            step: $step,
+                            hasUnsavedChanges: $hasUnsavedChanges
+                        )
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            if !step.stepNumber.isEmpty {
+                                Text(step.stepNumber)
+                                    .font(.headline)
+                                    .foregroundColor(.orange)
+                                    .frame(width: 30, alignment: .leading)
+                            }
+                            
+                            Text(step.text.isEmpty ? "New Step" : step.text)
+                                .lineLimit(3)
+                        }
+                    }
+                }
+                .onDelete { indices in
+                    section.steps.remove(atOffsets: indices)
+                    hasUnsavedChanges = true
+                }
+                .onMove { source, destination in
+                    section.steps.move(fromOffsets: source, toOffset: destination)
+                    hasUnsavedChanges = true
+                }
+                
+                Button {
+                    let stepNumber = section.steps.count + 1
+                    section.steps.append(EditableInstructionStep(stepNumber: "\(stepNumber)"))
+                    hasUnsavedChanges = true
+                } label: {
+                    Label("Add Step", systemImage: "plus.circle.fill")
+                }
+            } header: {
+                Text("Steps")
+            }
+        }
+        .navigationTitle("Edit Section")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                EditButton()
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        .environment(\.editMode, $editMode)
+    }
+}
+
+// MARK: - Instruction Step Detail View
+
+struct InstructionStepDetailView: View {
+    @Binding var step: EditableInstructionStep
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        Form {
+            Section {
+                TextField("Step Number", text: $step.stepNumber)
+                    .keyboardType(.numberPad)
+                    .onChange(of: step.stepNumber) { hasUnsavedChanges = true }
+            } header: {
+                Text("Step Number")
+            } footer: {
+                Text("Optional - Steps will be numbered automatically if left blank")
+            }
+            
+            Section {
+                TextEditor(text: $step.text)
+                    .frame(minHeight: 200)
+                    .onChange(of: step.text) { hasUnsavedChanges = true }
+            } header: {
+                Text("Instructions")
+            } footer: {
+                Text("Describe what needs to be done in this step. Be clear and detailed.")
+            }
+        }
+        .navigationTitle("Edit Step")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Notes Editor View
+
+struct NotesEditorView: View {
+    @Binding var notes: [EditableRecipeNote]
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var editMode: EditMode = .inactive
+    
+    var body: some View {
+        List {
+            if notes.isEmpty {
+                Section {
+                    VStack(spacing: 16) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Notes Yet")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Add tips, substitutions, warnings, or other helpful information")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach($notes) { $note in
+                    Section {
+                        NavigationLink {
+                            NoteDetailView(
+                                note: $note,
+                                hasUnsavedChanges: $hasUnsavedChanges
+                            )
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: note.type.icon)
+                                    .foregroundColor(note.type.color)
+                                    .frame(width: 30)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(note.type.displayName)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Text(note.text.isEmpty ? "New Note" : note.text)
+                                        .lineLimit(2)
+                                }
+                            }
+                        }
+                    }
+                }
+                .onDelete { indices in
+                    notes.remove(atOffsets: indices)
+                    hasUnsavedChanges = true
+                }
+            }
+        }
+        .navigationTitle("Notes & Tips")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    notes.append(EditableRecipeNote())
+                    hasUnsavedChanges = true
+                } label: {
+                    Label("Add Note", systemImage: "plus")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                EditButton()
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        .environment(\.editMode, $editMode)
+    }
+}
+
+// MARK: - Note Detail View
+
+struct NoteDetailView: View {
+    @Binding var note: EditableRecipeNote
+    @Binding var hasUnsavedChanges: Bool
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        Form {
+            Section {
+                Picker("Note Type", selection: $note.type) {
+                    ForEach(RecipeNote.NoteType.allCases, id: \.self) { type in
+                        Label(type.displayName, systemImage: type.icon)
+                            .tag(type)
+                    }
+                }
+                .pickerStyle(.inline)
+                .onChange(of: note.type) { hasUnsavedChanges = true }
+            } header: {
+                Text("Type")
+            }
+            
+            Section {
+                TextEditor(text: $note.text)
+                    .frame(minHeight: 200)
+                    .onChange(of: note.text) { hasUnsavedChanges = true }
+            } header: {
+                Text("Note Content")
+            } footer: {
+                Text(note.type.helpText)
+            }
+        }
+        .navigationTitle("Edit Note")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Recipe Images Editor View
+
+struct RecipeImagesEditorView: View {
+    let recipe: Recipe
+    
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var isProcessingImage = false
+    @State private var showingDeleteConfirmation = false
+    @State private var imageToDelete: String?
+    
+    var body: some View {
+        List {
+            // Main Image Section
+            if let mainImage = recipe.imageName {
+                Section {
+                    VStack(spacing: 16) {
+                        RecipeImageView(
+                            imageName: mainImage,
+                            size: CGSize(width: 300, height: 300),
+                            cornerRadius: 12
+                        )
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        
+                        Text("Main recipe image")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                } header: {
+                    Text("Main Image")
+                } footer: {
+                    Text("The main image is set during recipe extraction and cannot be changed here.")
+                }
+            }
+            
+            // Additional Images Section
+            Section {
+                if let additionalImages = recipe.additionalImageNames, !additionalImages.isEmpty {
+                    ForEach(additionalImages, id: \.self) { imageName in
+                        HStack {
+                            RecipeImageView(
+                                imageName: imageName,
+                                size: CGSize(width: 80, height: 80),
+                                cornerRadius: 8
+                            )
+                            
+                            Spacer()
+                            
+                            Button(role: .destructive) {
+                                imageToDelete = imageName
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No additional images")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Tap the + button to add photos")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                }
+                
+                // Photo Picker Button
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Label("Add Photo", systemImage: "plus.circle.fill")
+                }
+                .disabled(isProcessingImage)
+                
+                if isProcessingImage {
+                    HStack {
+                        ProgressView()
+                        Text("Processing image...")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Additional Images")
+            } footer: {
+                Text("Add step-by-step photos or additional views of the finished dish")
+            }
+            
+            // Info Section
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Tips for Great Recipe Photos", systemImage: "lightbulb.fill")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    
+                    Text("• Use natural lighting when possible")
+                    Text("• Show key steps or techniques")
+                    Text("• Include the finished dish from multiple angles")
+                    Text("• Keep backgrounds clean and simple")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.vertical, 4)
+            }
+        }
+        .navigationTitle("Images")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            Task {
+                await loadImage(from: newItem)
+            }
+        }
+        .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                if let imageToDelete = imageToDelete {
+                    deleteImage(imageToDelete)
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this image? This action cannot be undone.")
+        }
+    }
+    
+    // MARK: - Image Loading
+    
+    private func loadImage(from photoItem: PhotosPickerItem?) async {
+        guard let photoItem = photoItem else { return }
+        
+        isProcessingImage = true
+        defer { isProcessingImage = false }
+        
+        do {
+            guard let data = try await photoItem.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else {
+                print("❌ Failed to load image data")
+                return
+            }
+            
+            // Resize image if it's too large
+            let maxDimension: CGFloat = 2048
+            let resizedImage: UIImage
+            
+            if uiImage.size.width > maxDimension || uiImage.size.height > maxDimension {
+                let scale = min(maxDimension / uiImage.size.width, maxDimension / uiImage.size.height)
+                let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                
+                UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                resizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? uiImage
+                UIGraphicsEndImageContext()
+            } else {
+                resizedImage = uiImage
+            }
+            
+            // Save the image
+            let imageName = "recipe_\(recipe.id.uuidString)_\(UUID().uuidString).jpg"
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let fileURL = documentsPath.appendingPathComponent(imageName)
+            
+            // Compress and save
+            if let jpegData = resizedImage.jpegData(compressionQuality: 0.8) {
+                try jpegData.write(to: fileURL)
+                
+                await MainActor.run {
+                    // Add to recipe's additional images
+                    if recipe.additionalImageNames == nil {
+                        recipe.additionalImageNames = []
+                    }
+                    recipe.additionalImageNames?.append(imageName)
+                    
+                    // Save context
+                    do {
+                        try modelContext.save()
+                        print("✅ Added image: \(imageName)")
+                    } catch {
+                        print("❌ Failed to save context: \(error)")
+                    }
+                }
+            }
+        } catch {
+            print("❌ Error loading image: \(error)")
+        }
+        
+        // Clear the selection for next time
+        await MainActor.run {
+            selectedPhotoItem = nil
+        }
+    }
+    
+    // MARK: - Image Deletion
+    
+    private func deleteImage(_ imageName: String) {
+        // Remove from recipe's additional images
+        recipe.additionalImageNames?.removeAll { $0 == imageName }
+        
+        // Delete the file
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(imageName)
+        try? FileManager.default.removeItem(at: fileURL)
+        
+        // Save context
+        do {
+            try modelContext.save()
+            print("✅ Deleted image: \(imageName)")
+        } catch {
+            print("❌ Failed to save context: \(error)")
+        }
+        
+        imageToDelete = nil
+    }
+}
+
+// MARK: - RecipeNote.NoteType Extension
+
+extension RecipeNote.NoteType {
+    var displayName: String {
+        switch self {
+        case .general: return "General"
+        case .tip: return "Tip"
+        case .substitution: return "Substitution"
+        case .warning: return "Warning"
+        case .timing: return "Timing"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .general: return "note.text"
+        case .tip: return "lightbulb.fill"
+        case .substitution: return "arrow.left.arrow.right"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .timing: return "clock.fill"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .general: return .blue
+        case .tip: return .yellow
+        case .substitution: return .green
+        case .warning: return .red
+        case .timing: return .orange
+        }
+    }
+    
+    var helpText: String {
+        switch self {
+        case .general: return "General information or notes about the recipe"
+        case .tip: return "Helpful tips to improve the recipe or technique"
+        case .substitution: return "Alternative ingredients or methods"
+        case .warning: return "Important warnings or things to watch out for"
+        case .timing: return "Timing-related notes and guidance"
+        }
+    }
+    
+    static var allCases: [RecipeNote.NoteType] {
+        [.general, .tip, .substitution, .warning, .timing]
     }
 }
 

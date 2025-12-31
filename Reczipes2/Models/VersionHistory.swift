@@ -61,23 +61,79 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "⚡️ Added: Tips can be added to existing recipes",
-                "🎨 Fixed: AppClip not compiling",
-                "⚡️ Added: Adds an image size reduction function to ImagePreprocessor",
-                "⚡️ Added: Updates the ViewModel to reduce image sizes before sending to Claude",
-                "⚡️ Added: Handles this for camera, library, and web URL images",
-                "⚡️ Improved: Image cropping performance - crop handles now respond instantly to touch",
-                "🎨 Fixed: Laggy crop rectangle dragging during recipe image extraction",
-                "🐛 Fixed: Slow response when adjusting crop corners and moving crop area",
-                "⚡️ Added: Added tip creation UI to RecipeDetailView with Add a Tip button",
-                "⚡️ Added: Pending tips shown with orange border and badge before save",
-                "⚡️ Added: Tips automatically included when recipe is saved",
-                "⚡️ Added: Save button displays pending tip count"
+                "✨ Added: Comprehensive Recipe Editor with guided workflow",
+                "🎨 Added: Separate detail views for each recipe section (Basic Info, Ingredients, Instructions, Notes, Images)",
+                "⚡️ Added: Real-time unsaved changes tracking with confirmation dialog",
+                "📝 Added: Basic Info editor for title, header notes, yield, and reference",
+                "🥕 Added: Ingredients editor with multi-section support",
+                "📋 Added: Full ingredient editing (name, amount, unit, preparation notes, optional flag)",
+                "🔄 Added: Drag-and-drop reordering for ingredients within sections",
+                "➕ Added: Add/delete ingredient sections with custom titles",
+                "👨‍🍳 Added: Instructions editor with multi-section support",
+                "📝 Added: Step-by-step instruction editing with detail view",
+                "🔄 Added: Drag-and-drop reordering for instruction steps",
+                "➕ Added: Add/delete instruction sections with custom titles",
+                "📓 Added: Notes editor with support for multiple note types",
+                "🏷️ Added: Note type categorization (General, Tip, Substitution, Warning, Timing)",
+                "✏️ Added: Individual note detail editor with type picker",
+                "🔄 Added: Drag-and-drop reordering for notes",
+                "📸 Added: Recipe Images editor with photo library integration",
+                "🖼️ Added: Primary image management with PhotosPicker",
+                "📱 Added: Additional images gallery with add/delete functionality",
+                "🗑️ Added: Image deletion with confirmation dialog",
+                "⚡️ Added: Async image processing and thumbnail generation",
+                "💾 Added: Save changes button with validation",
+                "❌ Added: Discard changes with unsaved work warning",
+                "📊 Added: Visual completion indicators showing item counts for each section",
+                "🎯 Added: Section-level editing with dedicated detail screens",
+                "🔍 Added: Empty state guidance for each editor section",
+                "🎨 Added: Icon-based navigation for editor sections",
+                "✅ Added: Checkmark badges showing completed sections",
+                "📏 Added: Responsive layout adapting to device size",
+                "🔒 Added: Data validation before saving changes to recipe model"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.",
+            buildNumber: "52",
+            releaseDate: Date(),
+            changes: [
+                "✨ Added: Comprehensive Recipe Editor with guided workflow",
+                "🎨 Added: Separate detail views for each recipe section (Basic Info, Ingredients, Instructions, Notes, Images)",
+                "⚡️ Added: Real-time unsaved changes tracking with confirmation dialog",
+                "📝 Added: Basic Info editor for title, header notes, yield, and reference",
+                "🥕 Added: Ingredients editor with multi-section support",
+                "📋 Added: Full ingredient editing (name, amount, unit, preparation notes, optional flag)",
+                "🔄 Added: Drag-and-drop reordering for ingredients within sections",
+                "➕ Added: Add/delete ingredient sections with custom titles",
+                "👨‍🍳 Added: Instructions editor with multi-section support",
+                "📝 Added: Step-by-step instruction editing with detail view",
+                "🔄 Added: Drag-and-drop reordering for instruction steps",
+                "➕ Added: Add/delete instruction sections with custom titles",
+                "📓 Added: Notes editor with support for multiple note types",
+                "🏷️ Added: Note type categorization (General, Tip, Substitution, Warning, Timing)",
+                "✏️ Added: Individual note detail editor with type picker",
+                "🔄 Added: Drag-and-drop reordering for notes",
+                "📸 Added: Recipe Images editor with photo library integration",
+                "🖼️ Added: Primary image management with PhotosPicker",
+                "📱 Added: Additional images gallery with add/delete functionality",
+                "🗑️ Added: Image deletion with confirmation dialog",
+                "⚡️ Added: Async image processing and thumbnail generation",
+                "💾 Added: Save changes button with validation",
+                "❌ Added: Discard changes with unsaved work warning",
+                "📊 Added: Visual completion indicators showing item counts for each section",
+                "🎯 Added: Section-level editing with dedicated detail screens",
+                "🔍 Added: Empty state guidance for each editor section",
+                "🎨 Added: Icon-based navigation for editor sections",
+                "✅ Added: Checkmark badges showing completed sections",
+                "📏 Added: Responsive layout adapting to device size",
+                "🔒 Added: Data validation before saving changes to recipe model"
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "12.0",

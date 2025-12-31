@@ -894,19 +894,34 @@ struct RecipeDetailView: View {
     private func getAllImageNames(for recipe: RecipeModel) -> [String] {
         var names: [String] = []
         
-        // Add main image
-        if let imageName = recipe.imageName {
-            names.append(imageName)
-        }
-        
-        // Add additionalImageNames if available
-        if let additionalNames = recipe.additionalImageNames {
-            names.append(contentsOf: additionalNames)
-        }
-        
-        // Add imageURLs if available (these might be local file names)
-        if let imageURLs = recipe.imageURLs {
-            names.append(contentsOf: imageURLs)
+        // If this is a saved recipe, get images from the live SwiftData entity
+        // This ensures we see newly added images from the editor
+        if let savedRecipe = savedRecipe {
+            // Add main image
+            if let imageName = savedRecipe.imageName {
+                names.append(imageName)
+            }
+            
+            // Add additionalImageNames from the live entity
+            if let additionalNames = savedRecipe.additionalImageNames {
+                names.append(contentsOf: additionalNames)
+            }
+        } else {
+            // For unsaved recipes, use the RecipeModel data
+            // Add main image
+            if let imageName = recipe.imageName {
+                names.append(imageName)
+            }
+            
+            // Add additionalImageNames if available
+            if let additionalNames = recipe.additionalImageNames {
+                names.append(contentsOf: additionalNames)
+            }
+            
+            // Add imageURLs if available (these might be local file names)
+            if let imageURLs = recipe.imageURLs {
+                names.append(contentsOf: imageURLs)
+            }
         }
         
         // Remove duplicates while preserving order
