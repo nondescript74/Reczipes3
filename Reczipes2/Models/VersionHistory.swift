@@ -61,17 +61,43 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "🎨 Enhanced: Animated loading indicators for recipe extraction with rotating status messages",
-                "⚡️ Added: 'Preparing image...' spinner between photo selection and crop screen",
-                "🐛 Fixed: Crop screen not appearing after selecting library photo (timing conflict)",
-                "🐛 Fixed: Loading indicator hidden behind UI elements during extraction",
-                "⚡️ Improved: UI now hides all controls during extraction to focus on progress",
-                "🔧 Added: Debug logging for image selection and extraction flow",
+                "⚡️ Added: Tips can be added to existing recipes",
+                "🎨 Fixed: AppClip not compiling",
+                "⚡️ Added: Adds an image size reduction function to ImagePreprocessor",
+                "⚡️ Added: Updates the ViewModel to reduce image sizes before sending to Claude",
+                "⚡️ Added: Handles this for camera, library, and web URL images",
+                "⚡️ Improved: Image cropping performance - crop handles now respond instantly to touch",
+                "🎨 Fixed: Laggy crop rectangle dragging during recipe image extraction",
+                "🐛 Fixed: Slow response when adjusting crop corners and moving crop area",
+                "⚡️ Added: Added tip creation UI to RecipeDetailView with Add a Tip button",
+                "⚡️ Added: Pending tips shown with orange border and badge before save",
+                "⚡️ Added: Tips automatically included when recipe is saved",
+                "⚡️ Added: Save button displays pending tip count"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.0",
+            buildNumber: "51",
+            releaseDate: Date(),
+            changes: [
+                "⚡️ Added: Tips can be added to existing recipes",
+                "🎨 Fixed: AppClip not compiling",
+                "⚡️ Added: Adds an image size reduction function to ImagePreprocessor",
+                "⚡️ Added: Updates the ViewModel to reduce image sizes before sending to Claude",
+                "⚡️ Added: Handles this for camera, library, and web URL images",
+                "⚡️ Improved: Image cropping performance - crop handles now respond instantly to touch",
+                "🎨 Fixed: Laggy crop rectangle dragging during recipe image extraction",
+                "🐛 Fixed: Slow response when adjusting crop corners and moving crop area",
+                "⚡️ Added: Added tip creation UI to RecipeDetailView with Add a Tip button",
+                "⚡️ Added: Pending tips shown with orange border and badge before save",
+                "⚡️ Added: Tips automatically included when recipe is saved",
+                "⚡️ Added: Save button displays pending tip count"
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "11.8",

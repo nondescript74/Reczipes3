@@ -30,6 +30,9 @@ struct RecipeDetailView: View {
     @State private var showingAllergenDetail = false
     @State private var showingFODMAPSubstitutions = true // Default to showing substitutions
     @State private var showingFODMAPGuide = false
+    @State private var showingAddTip = false
+    @State private var newTipText = ""
+    @State private var pendingTips: [RecipeNote] = [] // Tips to be saved with the recipe
     
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
@@ -143,16 +146,44 @@ struct RecipeDetailView: View {
                         Spacer()
                         
                         VStack(spacing: 8) {
-                            Button(action: onSave) {
-                                Label(
-                                    isSaved ? "Saved" : "Save Recipe",
-                                    systemImage: isSaved ? "checkmark.circle.fill" : "plus.circle.fill"
-                                )
-                                .font(.headline)
+                            // Show Save/Update button based on state
+                            if !isSaved {
+                                // Unsaved recipe - show Save button
+                                Button(action: { 
+                                    saveRecipeWithTips()
+                                }) {
+                                    Label("Save Recipe", systemImage: "plus.circle.fill")
+                                        .font(.headline)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.blue)
+                            } else if !pendingTips.isEmpty {
+                                // Saved recipe with pending tips - show Update button
+                                Button(action: { 
+                                    savePendingTipsToExistingRecipe()
+                                }) {
+                                    Label("Save Tips", systemImage: "arrow.down.circle.fill")
+                                        .font(.headline)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.blue)
+                            } else {
+                                // Saved recipe with no pending tips - show Saved badge
+                                Label("Saved", systemImage: "checkmark.circle.fill")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Color.green)
+                                    .clipShape(Capsule())
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(isSaved ? .green : .blue)
-                            .disabled(isSaved)
+                            
+                            // Show badge if there are pending tips
+                            if !pendingTips.isEmpty {
+                                Text("\(pendingTips.count) tip\(pendingTips.count == 1 ? "" : "s") to save")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                             
                             // Show diabetic badge if diabetic mode is enabled or profile has diabetes concern
                             if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
@@ -419,37 +450,109 @@ struct RecipeDetailView: View {
                     }
                 }
                 
-                // Notes Section
-                if !recipe.notes.isEmpty {
-                    Divider()
+                // Notes Section - Always show to allow adding tips
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Notes", systemImage: "note.text")
+                        .font(.title2)
+                        .fontWeight(.bold)
                     
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Notes", systemImage: "note.text")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        ForEach(recipe.notes) { note in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: iconForNoteType(note.type))
-                                    .font(.title3)
+                    // Show existing notes
+                    ForEach(recipe.notes) { note in
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: iconForNoteType(note.type))
+                                .font(.title3)
+                                .foregroundStyle(colorForNoteType(note.type))
+                                .frame(width: 32)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(note.type.rawValue.capitalized)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
                                     .foregroundStyle(colorForNoteType(note.type))
-                                    .frame(width: 32)
                                 
-                                VStack(alignment: .leading, spacing: 4) {
+                                Text(note.text)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+                        .padding(12)
+                        .background(colorForNoteType(note.type).opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    
+                    // Show pending tips (not yet saved)
+                    ForEach(pendingTips) { note in
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: iconForNoteType(note.type))
+                                .font(.title3)
+                                .foregroundStyle(colorForNoteType(note.type))
+                                .frame(width: 32)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
                                     Text(note.type.rawValue.capitalized)
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundStyle(colorForNoteType(note.type))
                                     
-                                    Text(note.text)
-                                        .font(.body)
-                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    
+                                    Text("Pending")
+                                        .font(.caption2)
+                                        .fontWeight(.semibold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.orange.opacity(0.2))
+                                        .foregroundStyle(.orange)
+                                        .clipShape(Capsule())
                                 }
+                                
+                                Text(note.text)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
                             }
-                            .padding(12)
-                            .background(colorForNoteType(note.type).opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            
+                            Button {
+                                removePendingTip(note)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        .padding(12)
+                        .background(colorForNoteType(note.type).opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, dash: [5]))
+                        )
+                    }
+                    
+                    // Show helpful message if no notes exist yet
+                    if recipe.notes.isEmpty && pendingTips.isEmpty {
+                        Text("No notes yet. Add cooking tips, substitutions, or important reminders.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .italic()
+                            .padding(.vertical, 8)
+                    }
+                    
+                    // Add Tip Button - Always visible
+                    Button {
+                        showingAddTip = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Add a Tip")
+                        }
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundStyle(.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 
@@ -533,6 +636,19 @@ struct RecipeDetailView: View {
         }
         .sheet(isPresented: $showingFODMAPGuide) {
             FODMAPQuickReferenceView()
+        }
+        .sheet(isPresented: $showingAddTip) {
+            AddTipSheet(
+                tipText: $newTipText,
+                onSave: {
+                    addPendingTip()
+                },
+                onCancel: {
+                    newTipText = ""
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .alert("Reminders", isPresented: $showingRemindersAlert) {
             Button("OK", role: .cancel) { }
@@ -675,6 +791,106 @@ struct RecipeDetailView: View {
     
     // MARK: - Helper Functions
     
+    private func addPendingTip() {
+        guard !newTipText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            showingAddTip = false
+            return
+        }
+        
+        let tip = RecipeNote(type: .tip, text: newTipText)
+        pendingTips.append(tip)
+        newTipText = ""
+        showingAddTip = false
+    }
+    
+    private func removePendingTip(_ tip: RecipeNote) {
+        pendingTips.removeAll { $0.id == tip.id }
+    }
+    
+    private func saveRecipeWithTips() {
+        // If there are pending tips, we need to create an updated recipe with them
+        if !pendingTips.isEmpty {
+            // Create a new RecipeModel with the pending tips included
+            let updatedNotes = recipe.notes + pendingTips
+            
+            // Create updated recipe model
+            let updatedRecipe = RecipeModel(
+                id: recipe.id,
+                title: recipe.title,
+                headerNotes: recipe.headerNotes,
+                yield: recipe.yield,
+                ingredientSections: recipe.ingredientSections,
+                instructionSections: recipe.instructionSections,
+                notes: updatedNotes,
+                reference: recipe.reference,
+                imageName: recipe.imageName,
+                additionalImageNames: recipe.additionalImageNames,
+                imageURLs: recipe.imageURLs
+            )
+            
+            // Save the updated recipe to SwiftData
+            let savedRecipe = Recipe(from: updatedRecipe)
+            modelContext.insert(savedRecipe)
+            
+            // Clear pending tips after saving
+            pendingTips.removeAll()
+            
+            // Call the original onSave callback (for UI updates)
+            onSave()
+        } else {
+            // No pending tips, just call the original save
+            onSave()
+        }
+    }
+    
+    private func savePendingTipsToExistingRecipe() {
+        guard let savedRecipe = savedRecipe, !pendingTips.isEmpty else {
+            logWarning("Cannot save tips - recipe not found or no pending tips", category: "tips")
+            return
+        }
+        
+        // Store count before clearing for the success message
+        let tipCount = pendingTips.count
+        
+        // Get existing notes from the saved recipe
+        let decoder = JSONDecoder()
+        var existingNotes: [RecipeNote] = []
+        if let notesData = savedRecipe.notesData,
+           let notes = try? decoder.decode([RecipeNote].self, from: notesData) {
+            existingNotes = notes
+        }
+        
+        // Add pending tips to existing notes
+        let updatedNotes = existingNotes + pendingTips
+        
+        // Encode and save
+        let encoder = JSONEncoder()
+        if let encodedNotes = try? encoder.encode(updatedNotes) {
+            savedRecipe.notesData = encodedNotes
+            
+            // Update version tracking
+            savedRecipe.version = savedRecipe.currentVersion + 1
+            savedRecipe.lastModified = Date()
+            
+            // Try to save context
+            do {
+                try modelContext.save()
+                logInfo("Successfully saved \(tipCount) tip(s) to recipe: \(recipe.title)", category: "tips")
+                
+                // Clear pending tips after successful save
+                pendingTips.removeAll()
+                
+                // Show success feedback with correct count
+                remindersAlertMessage = "Successfully added \(tipCount) tip\(tipCount == 1 ? "" : "s") to the recipe!"
+                showingRemindersAlert = true
+            } catch {
+                logError("Failed to save tips: \(error)", category: "tips")
+                remindersAlertMessage = "Failed to save tips: \(error.localizedDescription)"
+                showingRemindersAlert = true
+            }
+        }
+    }
+    
     private func getAllImageNames(for recipe: RecipeModel) -> [String] {
         var names: [String] = []
         
@@ -723,6 +939,102 @@ struct RecipeDetailView: View {
         case .warning: return .red
         case .timing: return .purple
         case .general: return .gray
+        }
+    }
+}
+
+// MARK: - Add Tip Sheet
+
+struct AddTipSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var tipText: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Add a Tip", systemImage: "lightbulb.fill")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.blue)
+                    
+                    Text("Share your cooking tips, tricks, or modifications for this recipe.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+                .padding(.top)
+                
+                // Add character count
+                HStack {
+                    Spacer()
+                    Text("\(tipText.count) characters")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+                
+                TextEditor(text: $tipText)
+                    .frame(minHeight: 150)
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    )
+                    .focused($isFocused)
+                    .padding(.horizontal)
+                
+                // Add a prominent save button at the bottom as well
+                Button {
+                    onSave()
+                    dismiss()
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Add Tip")
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(tipText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.blue)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(tipText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .padding(.horizontal)
+                .padding(.bottom)
+                
+                Spacer()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        onSave()
+                        dismiss()
+                    }
+                    .disabled(tipText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                // Auto-focus the text editor
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isFocused = true
+                }
+            }
         }
     }
 }

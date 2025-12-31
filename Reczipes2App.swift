@@ -124,6 +124,8 @@ struct Reczipes2App: App {
     @State private var showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
     @State private var showAPIKeySetup = false
     @State private var showLaunchScreen = false
+    @State private var showAppClipImportBanner = false
+    @State private var importedRecipeName = ""
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -161,6 +163,9 @@ struct Reczipes2App: App {
                         Task {
                             await checkAndRestoreImages()
                         }
+                        
+                        // Check for App Clip data
+                        checkForAppClipData()
                     }
                 
                 // Launch screen overlay - shows briefly on every launch (after onboarding)
@@ -173,6 +178,19 @@ struct Reczipes2App: App {
                     }
                     .transition(.opacity)
                     .zIndex(1)
+                }
+                
+                // App Clip import banner
+                if showAppClipImportBanner {
+                    VStack {
+                        AppClipImportBanner(
+                            recipeName: importedRecipeName,
+                            isPresented: $showAppClipImportBanner
+                        )
+                        .padding()
+                        Spacer()
+                    }
+                    .zIndex(2)
                 }
                 
                 // Task restoration prompt
@@ -211,6 +229,36 @@ struct Reczipes2App: App {
                 logInfo("Successfully restored images from SwiftData", category: "image-migration")
             } catch {
                 logError("Failed to restore images: \(error)", category: "image-migration")
+            }
+        }
+    }
+    
+    // MARK: - App Clip Data Import
+    
+    private func checkForAppClipData() {
+        let modelContext = sharedModelContainer.mainContext
+        
+        Task { @MainActor in
+            let didImport = AppClipDataHandler.checkForPendingRecipe(modelContext: modelContext)
+            
+            if didImport {
+                // Show success banner
+                withAnimation {
+                    importedRecipeName = "Recipe imported successfully"
+                    showAppClipImportBanner = true
+                }
+                
+                // Auto-dismiss after 5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    withAnimation {
+                        showAppClipImportBanner = false
+                    }
+                }
+                
+                // Share API key with App Clip if available
+                if let apiKey = APIKeyHelper.getAPIKey() {
+                    AppClipDataHandler.shareAPIKeyWithAppClip(apiKey)
+                }
             }
         }
     }

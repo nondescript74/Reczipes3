@@ -268,7 +268,7 @@ struct CropOverlayView: View {
     // MARK: - Gestures
     
     private func handleDragGesture(_ corner: DragState) -> some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
                 var newRect = cropRect
                 
@@ -317,8 +317,13 @@ struct CropOverlayView: View {
                     break
                 }
                 
-                // Constrain to view bounds
-                cropRect = constrainRect(newRect)
+                // Constrain to view bounds and update without animation
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                transaction.animation = nil
+                withTransaction(transaction) {
+                    cropRect = constrainRect(newRect)
+                }
             }
     }
     
@@ -369,14 +374,31 @@ struct DimmedOverlay: View {
     let viewSize: CGSize
     
     var body: some View {
-        GeometryReader { _ in
-            Path { path in
-                // Create outer rectangle (full view)
-                path.addRect(CGRect(origin: .zero, size: viewSize))
-                // Subtract crop rectangle
-                path.addRect(cropRect)
-            }
-            .fill(Color.black.opacity(0.6), style: FillStyle(eoFill: true))
+        // Use four separate rectangles instead of eoFill for better performance
+        ZStack {
+            // Top
+            Rectangle()
+                .fill(Color.black.opacity(0.6))
+                .frame(width: viewSize.width, height: cropRect.minY)
+                .position(x: viewSize.width / 2, y: cropRect.minY / 2)
+            
+            // Bottom
+            Rectangle()
+                .fill(Color.black.opacity(0.6))
+                .frame(width: viewSize.width, height: viewSize.height - cropRect.maxY)
+                .position(x: viewSize.width / 2, y: cropRect.maxY + (viewSize.height - cropRect.maxY) / 2)
+            
+            // Left
+            Rectangle()
+                .fill(Color.black.opacity(0.6))
+                .frame(width: cropRect.minX, height: cropRect.height)
+                .position(x: cropRect.minX / 2, y: cropRect.midY)
+            
+            // Right
+            Rectangle()
+                .fill(Color.black.opacity(0.6))
+                .frame(width: viewSize.width - cropRect.maxX, height: cropRect.height)
+                .position(x: cropRect.maxX + (viewSize.width - cropRect.maxX) / 2, y: cropRect.midY)
         }
     }
 }

@@ -977,10 +977,14 @@ struct RecipeExtractorView: View {
     // MARK: - Image Management
     
     private func saveImageToDisk(_ image: UIImage, filename: String) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            logError("Failed to convert image to JPEG data", category: "storage")
+        // Reduce image size to 500KB max before saving
+        let preprocessor = ImagePreprocessor()
+        guard let imageData = preprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
+            logError("Failed to reduce image size", category: "storage")
             return
         }
+        
+        logInfo("Saving image with size: \(imageData.count) bytes", category: "storage")
         
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileURL = documentsPath.appendingPathComponent(filename)
@@ -1002,11 +1006,14 @@ struct RecipeExtractorView: View {
             filename = "recipe_\(recipeID.uuidString)_\(imageIndex).jpg"
         }
         
-        // Save to documents directory
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            logError("Failed to convert image to JPEG data", category: "storage")
+        // Reduce image size to 500KB max before saving
+        let preprocessor = ImagePreprocessor()
+        guard let imageData = preprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
+            logError("Failed to reduce image size", category: "storage")
             return
         }
+        
+        logInfo("Saving image with size: \(imageData.count) bytes", category: "storage")
         
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileURL = documentsPath.appendingPathComponent(filename)

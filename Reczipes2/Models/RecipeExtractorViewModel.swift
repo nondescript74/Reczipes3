@@ -151,9 +151,12 @@ class RecipeExtractorViewModel: ObservableObject {
         }
         
         do {
-            guard let imageData = image.jpegData(compressionQuality: 0.9) else {
+            // Reduce image size to 500KB max before sending to Claude
+            logInfo("Reducing image size before sending to Claude...", category: "extraction")
+            guard let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
                 throw ClaudeAPIError.invalidResponse
             }
+            logInfo("Image size after reduction: \(imageData.count) bytes", category: "extraction")
             
             logInfo("Calling Claude API for image extraction...", category: "extraction")
             let recipe = try await apiClient.extractRecipe(
