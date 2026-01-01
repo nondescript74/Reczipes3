@@ -336,6 +336,152 @@ struct AppHelp {
         relatedTopics: ["App Launch"]
     )
     
+    // MARK: - Cooking Mode Features
+    
+    static let cookingMode = HelpTopic(
+        title: "Cooking Mode",
+        icon: "flame.fill",
+        description: """
+        A specialized hands-free cooking interface that lets you view up to two recipes side-by-side while you cook. Perfect for following multiple recipes simultaneously or referencing a recipe while keeping your device awake.
+        """,
+        tips: [
+            "View one or two recipes at the same time",
+            "On iPad and Mac, recipes appear side-by-side for easy comparison",
+            "On iPhone, swipe between recipes using the page dots at the bottom",
+            "Your cooking session is automatically saved and restored when you return",
+            "Enable 'Keep Awake' to prevent your screen from going to sleep while cooking",
+            "Perfect for complex recipes that require timing multiple dishes",
+            "Tap the swap icon to change recipes without losing your other selections"
+        ],
+        relatedTopics: ["Dual Recipe View", "Keep Awake Mode", "Recipe Panel Controls"]
+    )
+    
+    static let dualRecipeView = HelpTopic(
+        title: "Dual Recipe View",
+        icon: "rectangle.split.2x1",
+        description: """
+        View two recipes simultaneously in cooking mode. Compare recipes, follow main dish and side dish together, or reference one recipe while cooking another.
+        """,
+        tips: [
+            "On iPad and Mac, both recipes are visible at once with a divider between them",
+            "On iPhone, swipe left or right to switch between your two recipes",
+            "Page indicator dots show which recipe you're currently viewing (iPhone only)",
+            "Each recipe slot can be independently filled, changed, or cleared",
+            "Empty slots show a '+' button - tap to select a recipe",
+            "Great for cooking a main dish and side dish that need different timing",
+            "Perfect for comparing similar recipes or ingredient lists"
+        ],
+        relatedTopics: ["Cooking Mode", "Recipe Panel Controls", "Session Persistence"]
+    )
+    
+    static let keepAwakeMode = HelpTopic(
+        title: "Keep Awake Mode",
+        icon: "eye.fill",
+        description: """
+        Prevent your device screen from sleeping while you're cooking. Essential for keeping recipes visible without constantly touching the screen with messy hands.
+        """,
+        tips: [
+            "Tap the eye icon in the top-right corner to toggle Keep Awake on/off",
+            "Eye icon = Keep Awake is ON, screen won't sleep",
+            "Eye with slash icon = Keep Awake is OFF, normal sleep behavior",
+            "Your preference is saved with your cooking session",
+            "Works even when your device would normally sleep after 30 seconds or 1 minute",
+            "Turn it off when you're done cooking to save battery",
+            "Automatically disabled when you exit cooking mode"
+        ],
+        relatedTopics: ["Cooking Mode", "Battery Management", "Session Persistence"]
+    )
+    
+    static let recipePanelControls = HelpTopic(
+        title: "Recipe Panel Controls",
+        icon: "slider.horizontal.3",
+        description: """
+        Manage your active recipes in cooking mode with intuitive controls. Swap recipes, clear slots, or select new recipes without leaving cooking mode.
+        """,
+        tips: [
+            "Tap the circular swap icon (↻) in the top-right to choose a different recipe",
+            "Tap the 'X' icon to clear a recipe from its slot",
+            "Controls appear as floating buttons over each recipe",
+            "Both recipe panels have independent controls",
+            "Clearing a recipe returns that panel to the empty '+' state",
+            "Swapping recipes opens the recipe picker filtered to your collection",
+            "Recipe picker remembers the current recipe to help you avoid duplicates"
+        ],
+        relatedTopics: ["Cooking Mode", "Recipe Selection", "Session Management"]
+    )
+    
+    static let recipeSelection = HelpTopic(
+        title: "Recipe Selection in Cooking Mode",
+        icon: "list.bullet.rectangle",
+        description: """
+        Choose recipes for your cooking session from your entire recipe collection. The recipe picker makes it easy to find and select the recipes you need.
+        """,
+        tips: [
+            "Tap the '+' button on an empty slot to open the recipe picker",
+            "Tap the swap icon (↻) on a filled slot to choose a different recipe",
+            "Search by recipe title to quickly find specific recipes",
+            "Scroll through your collection to browse available recipes",
+            "The current recipe in that slot is highlighted (if swapping)",
+            "Tap any recipe to select it for cooking",
+            "The sheet automatically dismisses when you select a recipe"
+        ],
+        relatedTopics: ["Cooking Mode", "Recipe Panel Controls", "Session Persistence"]
+    )
+    
+    static let sessionPersistence = HelpTopic(
+        title: "Session Persistence",
+        icon: "arrow.clockwise",
+        description: """
+        Your cooking session is automatically saved, so you can leave and return without losing your selected recipes or settings.
+        """,
+        tips: [
+            "Selected recipes are automatically saved when you make changes",
+            "Keep Awake preference is remembered across sessions",
+            "Return to cooking mode to find your recipes exactly as you left them",
+            "Session persists even if you force-quit the app",
+            "On iPhone, your current page (recipe 1 or 2) is saved",
+            "Works across app launches - start cooking, check another tab, come back",
+            "Only one cooking session is active at a time (most recent)"
+        ],
+        relatedTopics: ["Cooking Mode", "Keep Awake Mode", "Data Storage"]
+    )
+    
+    static let cookingModeLayouts = HelpTopic(
+        title: "Cooking Mode Layouts",
+        icon: "rectangle.on.rectangle",
+        description: """
+        Cooking mode adapts to your device with optimized layouts for iPhone, iPad, and Mac. Each layout is designed for the best cooking experience on that device.
+        """,
+        tips: [
+            "iPad & Mac: Side-by-side layout with vertical divider between recipes",
+            "iPhone Portrait: Swipeable pages with indicator dots to switch recipes",
+            "iPhone Landscape: Swipeable pages optimized for horizontal viewing",
+            "The layout automatically adjusts when you rotate your device",
+            "Controls remain in consistent positions regardless of layout",
+            "Both layouts provide full access to all recipe details",
+            "No functionality is lost on smaller screens - just a different presentation"
+        ],
+        relatedTopics: ["Cooking Mode", "Dual Recipe View", "Device Optimization"]
+    )
+    
+    static let emptyRecipeSlots = HelpTopic(
+        title: "Empty Recipe Slots",
+        icon: "plus.circle",
+        description: """
+        When a cooking slot is empty, you'll see a friendly prompt to select a recipe. Each slot can be filled independently.
+        """,
+        tips: [
+            "Empty slots show a large '+' icon with 'Select a Recipe' text",
+            "Tap anywhere on the empty slot to open recipe picker",
+            "You can have one or two recipes active at the same time",
+            "Having only one recipe selected is perfectly fine",
+            "Use both slots when you need to reference multiple recipes",
+            "Clearing a filled recipe returns it to the empty state",
+            "Empty slots don't interfere with Keep Awake mode functionality"
+        ],
+        relatedTopics: ["Recipe Selection", "Cooking Mode", "Recipe Panel Controls"]
+    )
+    
     // MARK: - CloudKit & Sync Features
     
     static let cloudKitSync = HelpTopic(
@@ -465,6 +611,16 @@ struct AppHelp {
         "syncTroubleshooting": syncTroubleshooting,
         "containerDetails": containerDetails,
         
+        // Cooking Mode
+        "cookingMode": cookingMode,
+        "dualRecipeView": dualRecipeView,
+        "keepAwakeMode": keepAwakeMode,
+        "recipePanelControls": recipePanelControls,
+        "recipeSelection": recipeSelection,
+        "sessionPersistence": sessionPersistence,
+        "cookingModeLayouts": cookingModeLayouts,
+        "emptyRecipeSlots": emptyRecipeSlots,
+        
         // Additional
         "licenseAgreement": licenseAgreement,
         "launchScreen": launchScreen
@@ -486,6 +642,16 @@ struct AppHelp {
             extractTab,
             recipeDetail,
             recipeEditing
+        ]),
+        ("Cooking Mode", "flame.fill", [
+            cookingMode,
+            dualRecipeView,
+            keepAwakeMode,
+            recipePanelControls,
+            recipeSelection,
+            sessionPersistence,
+            cookingModeLayouts,
+            emptyRecipeSlots
         ]),
         ("Images", "photo.fill", [
             imageAssignment,

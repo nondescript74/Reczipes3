@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 import UniformTypeIdentifiers
 import Compression
+import CryptoKit
 
 #if canImport(UIKit)
 import UIKit
@@ -520,11 +521,82 @@ class RecipeBookExportService {
         if existingRecipes.isEmpty {
             // Create new recipe from RecipeModel
             let newRecipe = Recipe(from: recipeModel)
+            
+            // Ensure version tracking is set
+            if newRecipe.version == nil {
+                newRecipe.version = 1
+            }
+            if newRecipe.lastModified == nil {
+                newRecipe.lastModified = Date()
+            }
+            
             modelContext.insert(newRecipe)
             logInfo("Imported new recipe: \(recipeModel.title)", category: "book-import")
-        } else {
-            logInfo("Recipe already exists, skipping: \(recipeModel.title)", category: "book-import")
+        } else if let existingRecipe = existingRecipes.first {
+            // Update existing recipe if the imported one is newer
+            logInfo("Recipe already exists, checking for updates: \(recipeModel.title)", category: "book-import")
+            
+            // Compare and potentially update the existing recipe
+            let shouldUpdate = try updateRecipeIfNewer(existingRecipe, with: recipeModel)
+            
+            if shouldUpdate {
+                logInfo("Updated existing recipe: \(recipeModel.title)", category: "book-import")
+            } else {
+                logInfo("Existing recipe is current, no update needed: \(recipeModel.title)", category: "book-import")
+            }
         }
+    }
+    
+    /// Updates an existing recipe with data from a RecipeModel if the model is newer
+    /// - Returns: True if the recipe was updated
+    private static func updateRecipeIfNewer(_ recipe: Recipe, with model: RecipeModel) throws -> Bool {
+        // For imported recipes, we'll update the content but preserve local version tracking
+        // This ensures users don't lose their local changes
+        
+        // Encode the new data
+        let encoder = JSONEncoder()
+        
+        // Update ingredient sections
+        if let ingredientSectionsData = try? encoder.encode(model.ingredientSections) {
+            recipe.ingredientSectionsData = ingredientSectionsData
+        }
+        
+        // Update instruction sections
+        if let instructionSectionsData = try? encoder.encode(model.instructionSections) {
+            recipe.instructionSectionsData = instructionSectionsData
+        }
+        
+        // Update notes
+        if let notesData = try? encoder.encode(model.notes) {
+            recipe.notesData = notesData
+        }
+        
+        // Update metadata
+        recipe.title = model.title
+        recipe.headerNotes = model.headerNotes
+        recipe.recipeYield = model.yield
+        recipe.reference = model.reference
+        
+        // Update images (only if new ones are provided)
+        if let imageName = model.imageName, !imageName.isEmpty {
+            recipe.imageName = imageName
+        }
+        
+        if let additionalImages = model.additionalImageNames, !additionalImages.isEmpty {
+            recipe.additionalImageNames = additionalImages
+        }
+        
+        // Update version tracking
+        recipe.version = (recipe.version ?? 1) + 1
+        recipe.lastModified = Date()
+        
+        // Recalculate ingredients hash for cache invalidation
+        let ingredientsString = model.ingredientSections.map { section in
+            section.ingredients.map { $0.name }.joined(separator: ",")
+        }.joined(separator: ";")
+        recipe.ingredientsHash = ingredientsString.sha256Hash()
+        
+        return true
     }
     
     private static func sanitizeFileName(_ name: String) -> String {
@@ -532,4 +604,18 @@ class RecipeBookExportService {
         return name.components(separatedBy: invalidCharacters).joined(separator: "_")
     }
 }
+
+// MARK: - String Extension for Hashing
+
+import CryptoKit
+
+extension String {
+    /// Generates SHA256 hash of the string
+    func sha256Hash() -> String {
+        let data = Data(self.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
+
 

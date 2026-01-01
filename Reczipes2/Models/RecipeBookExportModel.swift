@@ -9,7 +9,7 @@ import Foundation
 
 /// Represents a complete recipe book package for export/import
 struct RecipeBookExportPackage: Codable {
-    var version: String = "1.0"
+    var version: String = "2.0"
     let exportDate: Date
     let book: ExportableRecipeBook
     let recipes: [RecipeModel]

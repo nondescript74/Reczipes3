@@ -33,6 +33,7 @@ struct RecipeDetailView: View {
     @State private var showingAddTip = false
     @State private var newTipText = ""
     @State private var pendingTips: [RecipeNote] = [] // Tips to be saved with the recipe
+    @State private var showingCookingMode = false
     
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
@@ -583,6 +584,15 @@ struct RecipeDetailView: View {
                 CloudKitSyncBadge()
             }
             
+            // Cooking Mode button
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingCookingMode = true
+                } label: {
+                    Label("Cooking Mode", systemImage: "frying.pan")
+                }
+            }
+            
             // Share button
             ToolbarItem(placement: .primaryAction) {
                 RecipeShareButton(recipe: recipe)
@@ -627,6 +637,11 @@ struct RecipeDetailView: View {
         .sheet(isPresented: $showingEditor) {
             if let savedRecipe = savedRecipe {
                 RecipeEditorView(recipe: savedRecipe)
+            }
+        }
+        .sheet(isPresented: $showingCookingMode) {
+            NavigationStack {
+                CookingModeView(recipe: recipe)
             }
         }
         .sheet(isPresented: $showingAllergenDetail) {

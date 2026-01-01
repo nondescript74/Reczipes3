@@ -8,6 +8,203 @@
 import Foundation
 import SwiftData
 
+// MARK: - CookingMode Compatibility
+
+extension Recipe {
+    
+    // MARK: Flat Ingredients List
+    
+    /// Returns a flat array of all ingredients across all sections
+    /// Formatted as "quantity unit name" for CookingMode display
+    ///
+    /// Example: ["2 cups flour", "1 tsp salt", "3 eggs"]
+    var ingredients: [String] {
+        // Decode the ingredientSections from stored Data
+        guard let sectionsData = ingredientSectionsData,
+              let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
+            return []
+        }
+        
+        // Flatten all sections and format each ingredient
+        return sections.flatMap { section in
+            section.ingredients.map { ingredient in
+                formatIngredient(ingredient)
+            }
+        }
+    }
+    
+    // MARK: Flat Instructions List
+    
+    /// Returns a flat array of all instruction steps across all sections
+    /// Just the text of each step for CookingMode display
+    ///
+    /// Example: ["Preheat oven to 350°F", "Mix dry ingredients", "Add wet ingredients"]
+    var instructions: [String] {
+        // Decode the instructionSections from stored Data
+        guard let sectionsData = instructionSectionsData,
+              let sections = try? JSONDecoder().decode([InstructionSection].self, from: sectionsData) else {
+            return []
+        }
+        
+        // Flatten all sections and extract step text
+        return sections.flatMap { section in
+            section.steps.map { $0.text }
+        }
+    }
+    
+    // MARK: - Private Helpers
+    
+    /// Formats an Ingredient into a readable string
+    /// Combines quantity, unit, and name with proper spacing
+    private func formatIngredient(_ ingredient: Ingredient) -> String {
+        var parts: [String] = []
+        
+        // Add quantity if present (safely unwrap optional)
+        if let quantity = ingredient.quantity, !quantity.trimmingCharacters(in: .whitespaces).isEmpty {
+            parts.append(quantity)
+        }
+        
+        // Add unit if present (safely unwrap optional)
+        if let unit = ingredient.unit, !unit.trimmingCharacters(in: .whitespaces).isEmpty {
+            parts.append(unit)
+        }
+        
+        // Always add name (required)
+        parts.append(ingredient.name)
+        
+        // Join with spaces
+        return parts.joined(separator: " ")
+    }
+}
+
+// MARK: - Optional: Enhanced CookingMode Features
+
+extension Recipe {
+    
+    /// Number of servings (if available from yield string)
+    /// CookingMode can use this for scaling ingredients
+    var servings: Int? {
+        guard let yieldString = recipeYield else { return nil }
+        
+        // Try to extract number from yield string
+        // Example: "Serves 4" → 4, "Makes 12 cookies" → 12
+        let numbers = yieldString.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .compactMap { Int($0) }
+        
+        return numbers.first
+    }
+    
+    /// Cuisine type (if you add this to your model in the future)
+    /// Placeholder for now - returns nil
+    var cuisine: String? {
+        // TODO: Add cuisine field to Recipe model if desired
+        // For now, could parse from headerNotes or reference
+        return nil
+    }
+    
+    /// Prep time (if you add this to your model in the future)
+    /// Placeholder for now - returns nil
+    var prepTime: String? {
+        // TODO: Add prepTime field to Recipe model if desired
+        // For now, could parse from headerNotes or notes
+        return nil
+    }
+    
+    // Note: imageData is now a stored property in the main Recipe class
+    // No need for computed property here since we store it directly
+}
+
+// MARK: - Data Validation
+
+extension Recipe {
+    
+    /// Checks if recipe has minimum required data for CookingMode
+    var isValidForCookingMode: Bool {
+        return !title.isEmpty &&
+               !ingredients.isEmpty &&
+               !instructions.isEmpty
+    }
+    
+    /// Returns missing fields for CookingMode compatibility
+    var cookingModeMissingFields: [String] {
+        var missing: [String] = []
+        
+        if title.isEmpty {
+            missing.append("title")
+        }
+        if ingredients.isEmpty {
+            missing.append("ingredients")
+        }
+        if instructions.isEmpty {
+            missing.append("instructions")
+        }
+        
+        return missing
+    }
+}
+
+// MARK: - Usage Notes
+
+/*
+ USAGE:
+ 
+ This extension provides computed properties that CookingMode expects
+ without modifying your existing Recipe model structure.
+ 
+ BEFORE:
+ - Recipe stored: ingredientSectionsData (complex)
+ - CookingMode wanted: ingredients (simple array)
+ - ❌ Incompatible
+ 
+ AFTER:
+ - Recipe still stores: ingredientSectionsData (complex)
+ - Extension provides: ingredients (computed property)
+ - ✅ Compatible!
+ 
+ BENEFITS:
+ - ✅ No schema migration needed
+ - ✅ No data changes required
+ - ✅ Existing code still works
+ - ✅ CookingMode gets what it needs
+ - ✅ Can remove extension anytime
+ 
+ TESTING:
+ 
+ // In your code:
+ let recipe: Recipe = // get a recipe
+ print("Ingredients: \(recipe.ingredients)")
+ print("Instructions: \(recipe.instructions)")
+ print("Valid for cooking: \(recipe.isValidForCookingMode)")
+ 
+ CUSTOMIZATION:
+ 
+ If your Recipe model uses different property names:
+ 1. Update the property names in this extension
+ 2. Common variations:
+    - ingredientSectionsData vs ingredientsData
+    - instructionSectionsData vs instructionsData
+ 
+ If your data structures are different:
+ 1. Adjust the decoder logic
+ 2. Update IngredientSection/InstructionSection types if needed
+ 
+ TROUBLESHOOTING:
+ 
+ "Cannot find IngredientSection in scope"
+ → Import the file where IngredientSection is defined
+ → Or define the struct here if needed
+ 
+ "ingredients returns empty array"
+ → Check decoder is successful: add debug prints
+ → Verify data is actually stored in ingredientSectionsData
+ → Check IngredientSection structure matches what's stored
+ 
+ "Recipe already has ingredients property"
+ → You might have a stored property named ingredients
+ → Rename this computed property to flatIngredients
+ → Update CookingMode files to use flatIngredients
+ */
+
 @Model
 final class Recipe {
     var id: UUID = UUID()
@@ -251,17 +448,60 @@ final class Recipe {
             additionalImageNames: additionalImageNames
         )
     }
-}
-// MARK: - String Extension for SHA256 Hashing
-
-import CryptoKit
-
-extension String {
-    /// Generate SHA256 hash of the string
-    func sha256Hash() -> String {
-        let inputData = Data(self.utf8)
-        let hashed = SHA256.hash(data: inputData)
-        return hashed.compactMap { String(format: "%02x", $0) }.joined()
+    
+    // MARK: - Preview Helper
+    
+    static var preview: Recipe {
+        let sampleIngredients = [
+            IngredientSection(
+                title: "Main Ingredients",
+                ingredients: [
+                    Ingredient(quantity: "2", unit: "cups", name: "flour"),
+                    Ingredient(quantity: "1", unit: "tsp", name: "salt"),
+                    Ingredient(quantity: "3", unit: "", name: "eggs")
+                ]
+            )
+        ]
+        
+        let sampleInstructions = [
+            InstructionSection(
+                title: "Preparation",
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Preheat oven to 350°F"),
+                    InstructionStep(stepNumber: 2, text: "Mix dry ingredients in a bowl"),
+                    InstructionStep(stepNumber: 3, text: "Add wet ingredients and stir until combined")
+                ]
+            )
+        ]
+        
+        let sampleNotes = [
+            RecipeNote(type: .tip, text: "Make sure all ingredients are at room temperature")
+        ]
+        
+        let recipe = Recipe(
+            title: "Sample Recipe",
+            headerNotes: "A delicious sample recipe for testing",
+            recipeYield: "Serves 4",
+            reference: "Test Recipe",
+            ingredientSectionsData: try? JSONEncoder().encode(sampleIngredients),
+            instructionSectionsData: try? JSONEncoder().encode(sampleInstructions),
+            notesData: try? JSONEncoder().encode(sampleNotes)
+        )
+        
+        return recipe
     }
 }
+
+// MARK: - String Extension for SHA256 Hashing
+
+//import CryptoKit
+//
+//extension String {
+//    /// Generate SHA256 hash of the string
+//    func sha256Hash() -> String {
+//        let inputData = Data(self.utf8)
+//        let hashed = SHA256.hash(data: inputData)
+//        return hashed.compactMap { String(format: "%02x", $0) }.joined()
+//    }
+//}
 

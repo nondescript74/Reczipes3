@@ -13,6 +13,7 @@ struct ContentView: View {
     @Query(sort: \Recipe.dateAdded, order: .reverse) private var savedRecipes: [Recipe]
     @Query private var imageAssignments: [RecipeImageAssignment]
     @Query private var allergenProfiles: [UserAllergenProfile]
+    @Query(sort: \RecipeBook.dateModified, order: .reverse) private var books: [RecipeBook]
     
     @EnvironmentObject private var appState: AppStateManager
     
@@ -58,8 +59,8 @@ struct ContentView: View {
         
         let recipes = allRecipes.map { recipe in
             // First check if the recipe model itself has an imageName (directly from Recipe object)
-            if let existingImageName = recipe.imageName {
-                //logDebug("Recipe '\(recipe.title)' already has imageName: '\(existingImageName)' (ID: \(recipe.id))", category: "recipe")
+            if recipe.imageName != nil {
+                //logDebug("Recipe '\(recipe.title)' already has imageName: '\(recipe.imageName!)' (ID: \(recipe.id))", category: "recipe")
                 return recipe
             }
             // Fallback to checking RecipeImageAssignment (for legacy support)
@@ -303,6 +304,46 @@ struct ContentView: View {
                             }
                         }
                         .contextMenu {
+                            // Add to Book submenu
+                            Menu {
+                                if books.isEmpty {
+                                    Button {
+                                        // Switch to books tab to create a book
+                                        appState.currentTab = .books
+                                    } label: {
+                                        Label("Create First Book", systemImage: "plus.circle")
+                                    }
+                                } else {
+                                    ForEach(books) { book in
+                                        Button {
+                                            toggleRecipeInBook(recipe, book: book)
+                                        } label: {
+                                            HStack {
+                                                Text(book.name)
+                                                Spacer()
+                                                if book.recipeIDs.contains(recipe.id) {
+                                                    Image(systemName: "checkmark")
+                                                        .foregroundStyle(.blue)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button {
+                                        // Switch to books tab to create a new book
+                                        appState.currentTab = .books
+                                    } label: {
+                                        Label("Create New Book", systemImage: "plus.circle")
+                                    }
+                                }
+                            } label: {
+                                Label("Add to Book", systemImage: "book.closed")
+                            }
+                            
+                            Divider()
+                            
                             Button(role: .destructive) {
                                 deleteRecipe(recipe)
                             } label: {
@@ -353,6 +394,14 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     CloudKitSyncBadge()
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        appState.currentTab = .books
+                    } label: {
+                        Label("View Books", systemImage: "books.vertical")
+                    }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -475,6 +524,18 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                
+                // Show books this recipe is in
+                if !booksContaining(recipe).isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "book.closed.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.purple)
+                        Text(bookBadgeText(for: recipe))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             
             Spacer()
@@ -486,7 +547,54 @@ struct ContentView: View {
         }
     }
     
+    // MARK: - Book Helper Methods
+    
+    /// Returns all books that contain the given recipe
+    private func booksContaining(_ recipe: RecipeModel) -> [RecipeBook] {
+        books.filter { $0.recipeIDs.contains(recipe.id) }
+    }
+    
+    /// Returns a formatted string describing which books contain this recipe
+    private func bookBadgeText(for recipe: RecipeModel) -> String {
+        let containingBooks = booksContaining(recipe)
+        if containingBooks.count == 1 {
+            return "in \(containingBooks[0].name)"
+        } else if containingBooks.count > 1 {
+            return "in \(containingBooks.count) books"
+        }
+        return ""
+    }
+    
+    /// Returns the primary color for a book, or a default color
+    private func bookColor(for book: RecipeBook) -> Color {
+        if let colorHex = book.color {
+            return Color(hex: colorHex) ?? .purple
+        }
+        return .purple
+    }
+    
     // MARK: - Helper Methods
+    
+    private func toggleRecipeInBook(_ recipe: RecipeModel, book: RecipeBook) {
+        withAnimation {
+            if book.recipeIDs.contains(recipe.id) {
+                // Remove from book
+                book.removeRecipe(recipe.id)
+                logInfo("Removed '\(recipe.title)' from book '\(book.name)'", category: "books")
+            } else {
+                // Add to book
+                book.addRecipe(recipe.id)
+                logInfo("Added '\(recipe.title)' to book '\(book.name)'", category: "books")
+            }
+            
+            // Save the context
+            do {
+                try modelContext.save()
+            } catch {
+                logError("Failed to update book membership: \(error)", category: "books")
+            }
+        }
+    }
     
     private func restoreSelectedRecipe() {
         // Restore selected recipe from app state if available
@@ -570,5 +678,85 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Recipe.self, RecipeImageAssignment.self, UserAllergenProfile.self, RecipeBook.self], inMemory: true)
+        .modelContainer(for: [Recipe.self, RecipeImageAssignment.self, UserAllergenProfile.self, RecipeBook.self, SavedLink.self], inMemory: true)
+        .environmentObject(AppStateManager.shared)
 }
+// MARK: - Recipe Book Badge View
+
+/// A compact badge showing which books contain a recipe
+struct RecipeBookBadge: View {
+    let books: [RecipeBook]
+    let compact: Bool
+    
+    init(books: [RecipeBook], compact: Bool = true) {
+        self.books = books
+        self.compact = compact
+    }
+    
+    var body: some View {
+        if books.isEmpty {
+            EmptyView()
+        } else if compact {
+            compactBadge
+        } else {
+            expandedBadge
+        }
+    }
+    
+    private var compactBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "book.closed.fill")
+                .font(.caption2)
+                .foregroundStyle(.purple)
+            
+            if books.count == 1 {
+                Text("in \(books[0].name)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("in \(books.count) books")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+    
+    private var expandedBadge: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("In Recipe Books", systemImage: "books.vertical.fill")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.purple)
+            
+            ForEach(books) { book in
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(bookColor(for: book))
+                        .frame(width: 6, height: 6)
+                    
+                    Text(book.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Text("\(book.recipeCount) recipes")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.purple.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    private func bookColor(for book: RecipeBook) -> Color {
+        if let colorHex = book.color {
+            return Color(hex: colorHex) ?? .purple
+        }
+        return .purple
+    }
+}
+
+

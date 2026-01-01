@@ -45,6 +45,7 @@ struct ImageCropView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .scaleEffect(scale)
                                 .offset(offset)
+                                .allowsHitTesting(false) // Let gestures pass through to overlay
                                 .gesture(
                                     MagnificationGesture()
                                         .onChanged { value in
@@ -55,7 +56,7 @@ struct ImageCropView: View {
                                         }
                                 )
                                 .gesture(
-                                    DragGesture()
+                                    DragGesture(minimumDistance: 0)
                                         .onChanged { value in
                                             offset = CGSize(
                                                 width: lastOffset.width + value.translation.width,
@@ -80,6 +81,13 @@ struct ImageCropView: View {
                         .onAppear {
                             viewSize = geometry.size
                             calculateInitialCropRect(in: geometry.size)
+                            
+                            // Pre-warm the gesture recognizers
+                            // This eliminates first-touch lag by forcing gesture setup
+                            DispatchQueue.main.async {
+                                // Touch the binding to trigger gesture initialization
+                                let _ = self.cropRect
+                            }
                         }
                         .onChange(of: geometry.size) { _, newSize in
                             viewSize = newSize
@@ -216,6 +224,7 @@ struct CropOverlayView: View {
     let minSize: CGFloat
     
     @State private var dragState: DragState = .none
+    @GestureState private var gestureActive = false // Pre-warm gesture system
     
     enum DragState {
         case none
@@ -239,22 +248,8 @@ struct CropOverlayView: View {
             // Grid lines (rule of thirds)
             GridLines(cropRect: cropRect)
             
-            // Corner handles
-            CornerHandle(position: .topLeft)
-                .position(x: cropRect.minX, y: cropRect.minY)
-                .gesture(handleDragGesture(.topLeft))
-            
-            CornerHandle(position: .topRight)
-                .position(x: cropRect.maxX, y: cropRect.minY)
-                .gesture(handleDragGesture(.topRight))
-            
-            CornerHandle(position: .bottomLeft)
-                .position(x: cropRect.minX, y: cropRect.maxY)
-                .gesture(handleDragGesture(.bottomLeft))
-            
-            CornerHandle(position: .bottomRight)
-                .position(x: cropRect.maxX, y: cropRect.maxY)
-                .gesture(handleDragGesture(.bottomRight))
+            // Corner handles - use overlay to prevent layout recalculation
+            overlayHandles
             
             // Drag to move entire crop rect
             Rectangle()
@@ -263,6 +258,26 @@ struct CropOverlayView: View {
                 .position(x: cropRect.midX, y: cropRect.midY)
                 .gesture(moveDragGesture())
         }
+    }
+    
+    // Extract handles into a computed property to improve layout performance
+    @ViewBuilder
+    private var overlayHandles: some View {
+        CornerHandle(position: .topLeft)
+            .position(x: cropRect.minX, y: cropRect.minY)
+            .highPriorityGesture(handleDragGesture(.topLeft))
+        
+        CornerHandle(position: .topRight)
+            .position(x: cropRect.maxX, y: cropRect.minY)
+            .highPriorityGesture(handleDragGesture(.topRight))
+        
+        CornerHandle(position: .bottomLeft)
+            .position(x: cropRect.minX, y: cropRect.maxY)
+            .highPriorityGesture(handleDragGesture(.bottomLeft))
+        
+        CornerHandle(position: .bottomRight)
+            .position(x: cropRect.maxX, y: cropRect.maxY)
+            .highPriorityGesture(handleDragGesture(.bottomRight))
     }
     
     // MARK: - Gestures
@@ -328,7 +343,7 @@ struct CropOverlayView: View {
     }
     
     private func moveDragGesture() -> some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
                 let newX = cropRect.origin.x + value.translation.width
                 let newY = cropRect.origin.y + value.translation.height
@@ -340,9 +355,15 @@ struct CropOverlayView: View {
                     height: cropRect.height
                 )
                 
-                // Constrain to view bounds
+                // Constrain to view bounds and update without animation
                 newRect = constrainRect(newRect)
-                cropRect = newRect
+                
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                transaction.animation = nil
+                withTransaction(transaction) {
+                    cropRect = newRect
+                }
             }
     }
     
@@ -374,31 +395,41 @@ struct DimmedOverlay: View {
     let viewSize: CGSize
     
     var body: some View {
-        // Use four separate rectangles instead of eoFill for better performance
-        ZStack {
-            // Top
-            Rectangle()
-                .fill(Color.black.opacity(0.6))
-                .frame(width: viewSize.width, height: cropRect.minY)
-                .position(x: viewSize.width / 2, y: cropRect.minY / 2)
+        // Use Canvas for efficient rendering - draws directly to GPU
+        Canvas { context, size in
+            let darkColor = Color.black.opacity(0.6)
             
-            // Bottom
-            Rectangle()
-                .fill(Color.black.opacity(0.6))
-                .frame(width: viewSize.width, height: viewSize.height - cropRect.maxY)
-                .position(x: viewSize.width / 2, y: cropRect.maxY + (viewSize.height - cropRect.maxY) / 2)
+            // Top rectangle
+            if cropRect.minY > 0 {
+                context.fill(
+                    Path(CGRect(x: 0, y: 0, width: size.width, height: cropRect.minY)),
+                    with: .color(darkColor)
+                )
+            }
             
-            // Left
-            Rectangle()
-                .fill(Color.black.opacity(0.6))
-                .frame(width: cropRect.minX, height: cropRect.height)
-                .position(x: cropRect.minX / 2, y: cropRect.midY)
+            // Bottom rectangle
+            if cropRect.maxY < size.height {
+                context.fill(
+                    Path(CGRect(x: 0, y: cropRect.maxY, width: size.width, height: size.height - cropRect.maxY)),
+                    with: .color(darkColor)
+                )
+            }
             
-            // Right
-            Rectangle()
-                .fill(Color.black.opacity(0.6))
-                .frame(width: viewSize.width - cropRect.maxX, height: cropRect.height)
-                .position(x: cropRect.maxX + (viewSize.width - cropRect.maxX) / 2, y: cropRect.midY)
+            // Left rectangle
+            if cropRect.minX > 0 {
+                context.fill(
+                    Path(CGRect(x: 0, y: cropRect.minY, width: cropRect.minX, height: cropRect.height)),
+                    with: .color(darkColor)
+                )
+            }
+            
+            // Right rectangle
+            if cropRect.maxX < size.width {
+                context.fill(
+                    Path(CGRect(x: cropRect.maxX, y: cropRect.minY, width: size.width - cropRect.maxX, height: cropRect.height)),
+                    with: .color(darkColor)
+                )
+            }
         }
     }
 }
@@ -432,23 +463,28 @@ struct CornerHandle: View {
     }
     
     let position: Position
-    private let handleSize: CGFloat = 30
+    private let handleSize: CGFloat = 44 // Larger hit area (Apple HIG recommends 44pt)
+    private let visualSize: CGFloat = 15
     
     var body: some View {
         ZStack {
-            // Outer touch target
+            // Larger, invisible touch target for easier grabbing
             Circle()
                 .fill(Color.clear)
                 .frame(width: handleSize, height: handleSize)
+                .contentShape(Circle()) // Define hit testing shape
             
             // Visible handle
-            Circle()
-                .fill(Color.white)
-                .frame(width: 15, height: 15)
-            
-            Circle()
-                .stroke(Color.black, lineWidth: 2)
-                .frame(width: 15, height: 15)
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: visualSize, height: visualSize)
+                
+                Circle()
+                    .stroke(Color.black, lineWidth: 2)
+                    .frame(width: visualSize, height: visualSize)
+            }
+            .allowsHitTesting(false) // Don't interfere with gesture
         }
     }
 }

@@ -59,7 +59,7 @@ struct RecipeDiabeticBadge: View {
                             .foregroundStyle(.green)
                     }
                 } else {
-                    Image(systemName: "exclamationmark.heart.fill")
+                    Image(systemName: "heart.fill.badge.exclamationmark")
                         .foregroundStyle(impactColor(info))
                     
                     if !compact {

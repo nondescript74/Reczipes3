@@ -70,6 +70,7 @@ struct Reczipes2App: App {
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
                 RecipeBook.self,
+                CookingSession.self,
             ])
             
             let container = try ModelContainer(
@@ -333,14 +334,18 @@ struct MainTabView: View {
                     Label("Books", systemImage: "books.vertical.fill")
                 }
                 .tag(AppTab.books)
-            
+            // NEW: Cooking Mode tab
+            CookingView()
+                .tabItem {
+                    Label("Cooking", systemImage: "flame.fill")
+                }
+                .tag(AppTab.cooking)
             // Extraction tab - always visible
             RecipeExtractorTabWrapper()
                 .tabItem {
                     Label("Extract", systemImage: "camera.fill")
                 }
                 .tag(AppTab.extract)
-            
             // Settings tab
             SettingsView()
                 .tabItem {
