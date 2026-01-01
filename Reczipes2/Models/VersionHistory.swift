@@ -77,6 +77,16 @@ class VersionHistoryManager {
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.4",
+            buildNumber: "55",
+            releaseDate: Date(),
+            changes: [
+
+            ]
+        ))
+        
         history.append(VersionHistoryEntry(
             version: "12.3",
             buildNumber: "54",
