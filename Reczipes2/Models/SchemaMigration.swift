@@ -17,7 +17,13 @@ enum SchemaV1: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
+            Recipe.self,
+            RecipeImageAssignment.self,
             UserAllergenProfile.self,
+            CachedDiabeticAnalysis.self,
+            SavedLink.self,
+            RecipeBook.self,
+            CookingSession.self,
         ]
     }
     
@@ -54,7 +60,13 @@ enum SchemaV2: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
+            Recipe.self,
+            RecipeImageAssignment.self,
             UserAllergenProfile.self,
+            CachedDiabeticAnalysis.self,
+            SavedLink.self,
+            RecipeBook.self,
+            CookingSession.self,
         ]
     }
     
@@ -142,7 +154,13 @@ enum SchemaV3: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
+            Recipe.self,
+            RecipeImageAssignment.self,
             UserAllergenProfile.self,
+            CachedDiabeticAnalysis.self,
+            SavedLink.self,
+            RecipeBook.self,
+            CookingSession.self,
         ]
     }
     
@@ -172,7 +190,13 @@ enum SchemaV3: VersionedSchema {
             self.isActive = isActive
             self.sensitivitiesData = sensitivitiesData
             self.diabetesStatusRaw = diabetesStatus.rawValue
-            self.nutritionalGoalsData = try? JSONEncoder().encode(nutritionalGoals)
+            // Encode nutritional goals data
+            if let goals = nutritionalGoals {
+                let encoder = JSONEncoder()
+                self.nutritionalGoalsData = try? encoder.encode(goals)
+            } else {
+                self.nutritionalGoalsData = nil
+            }
             self.dateCreated = dateCreated
             self.dateModified = dateModified
         }

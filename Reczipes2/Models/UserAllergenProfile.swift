@@ -56,7 +56,7 @@ final class UserAllergenProfile {
     var dateCreated: Date
     var dateModified: Date
     
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         name: String = "",
         isActive: Bool = false,
@@ -77,7 +77,7 @@ final class UserAllergenProfile {
     }
     
     // Computed property for diabetes status
-    nonisolated var diabetesStatus: DiabetesStatus {
+    var diabetesStatus: DiabetesStatus {
         get {
             DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
         }
@@ -88,7 +88,7 @@ final class UserAllergenProfile {
     }
     
     // Computed property for nutritional goals
-    nonisolated var nutritionalGoals: NutritionalGoals? {
+    var nutritionalGoals: NutritionalGoals? {
         get {
             guard let data = nutritionalGoalsData else { return nil }
             return try? JSONDecoder().decode(NutritionalGoals.self, from: data)
@@ -100,17 +100,17 @@ final class UserAllergenProfile {
     }
     
     // Convenience property to check if diabetes filtering is needed
-    nonisolated var hasDiabetesConcern: Bool {
+    var hasDiabetesConcern: Bool {
         diabetesStatus != .none
     }
     
     // Convenience property to check if nutritional goals are set
-    nonisolated var hasNutritionalGoals: Bool {
+    var hasNutritionalGoals: Bool {
         nutritionalGoals != nil
     }
     
     // Computed property to get sensitivities
-    nonisolated var sensitivities: [UserSensitivity] {
+    var sensitivities: [UserSensitivity] {
         get {
             guard let data = sensitivitiesData else { return [] }
             return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
@@ -122,21 +122,21 @@ final class UserAllergenProfile {
     }
     
     // Add a sensitivity
-    nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
+    func addSensitivity(_ sensitivity: UserSensitivity) {
         var current = sensitivities
         current.append(sensitivity)
         sensitivities = current
     }
     
     // Remove a sensitivity
-    nonisolated func removeSensitivity(id: UUID) {
+    func removeSensitivity(id: UUID) {
         var current = sensitivities
         current.removeAll { $0.id == id }
         sensitivities = current
     }
     
     // Update a sensitivity
-    nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
+    func updateSensitivity(_ sensitivity: UserSensitivity) {
         var current = sensitivities
         if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
             current[index] = sensitivity

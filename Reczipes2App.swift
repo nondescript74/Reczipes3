@@ -41,16 +41,19 @@ struct Reczipes2App: App {
     
     var sharedModelContainer: ModelContainer = {
         // Log schema version information
+        print("🚀 STARTING MODEL CONTAINER INITIALIZATION")
+        print("   Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
         SchemaVersionManager.logSchemaInfo()
         
         // MARK: - CloudKit Configuration with Migration Support
         // To disable CloudKit and use local-only storage, comment out the cloudKitDatabase parameter below
         
         // CloudKit configuration with migration plan
+        // TEMPORARILY DISABLED FOR DEBUGGING
         let cloudKitConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             allowsSave: true,
-            cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
+            cloudKitDatabase: .none  // Temporarily disabled to debug startup crash
         )
         
         // Fallback configuration without CloudKit
@@ -62,7 +65,17 @@ struct Reczipes2App: App {
 
         // Try CloudKit configuration first
         // Using SchemaMigrationPlan for automatic schema versioning and migration
+        print("📦 Attempting to create ModelContainer...")
         do {
+            print("   Creating container with models:")
+            print("     - Recipe")
+            print("     - RecipeImageAssignment")
+            print("     - UserAllergenProfile")
+            print("     - CachedDiabeticAnalysis")
+            print("     - SavedLink")
+            print("     - RecipeBook")
+            print("     - CookingSession")
+            
             let container = try ModelContainer(
                 for: Recipe.self,
                 RecipeImageAssignment.self,
@@ -83,6 +96,10 @@ struct Reczipes2App: App {
         } catch {
             // CloudKit failed, try local-only as fallback
             print("⚠️ CloudKit ModelContainer creation failed: \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            if let underlyingError = (error as NSError).userInfo[NSUnderlyingErrorKey] as? Error {
+                print("   Underlying error: \(underlyingError)")
+            }
             print("   Attempting fallback to local-only container...")
             
             do {

@@ -61,6 +61,34 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
+                "🐛 Fixed: Startup crash caused by SchemaV3 initialization with nil nutritional goals",
+                "🔧 Fixed: Main actor isolation warnings in UserAllergenProfile schema definitions",
+                "⚡️ Improved: Enhanced ModelContainer initialization logging for better debugging",
+                "🔍 Added: Detailed error logging during container creation to diagnose CloudKit issues"
+            ]
+        ))
+        
+        // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
+        // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.6",
+            buildNumber: "58",
+            releaseDate: Date(),
+            changes: [
+                "🐛 Fixed: Startup crash caused by SchemaV3 initialization with nil nutritional goals",
+                "🔧 Fixed: Main actor isolation warnings in UserAllergenProfile schema definitions",
+                "⚡️ Improved: Enhanced ModelContainer initialization logging for better debugging",
+                "🔍 Added: Detailed error logging during container creation to diagnose CloudKit issues"
+            
+            ]
+        ))
+        
+        history.append(VersionHistoryEntry(
+            version: "12.5",
+            buildNumber: "57",
+            releaseDate: Date(),
+            changes: [
                 "🐛 Fixed: Recipe Book import decompression error when importing .recipebook files",
                 "🔧 Enhanced: ZIP file extraction now properly handles raw DEFLATE compression with zlib wrapper",
                 "⚡️ Improved: More descriptive error messages when archive decompression fails",
@@ -72,18 +100,6 @@ class VersionHistoryManager {
                 "⚡️ Added: Smart nutrition alerts for high sodium, saturated fat, sugar, and positive fiber content",
                 "🎯 Added: Recipe compatibility scoring (0-100) based on nutritional goals",
                 "💾 Added: Schema V3.0.0 for UserAllergenProfile with nutritional goals data storage"
-            ]
-        ))
-        
-        // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
-        // These represent past releases and should not change
-        
-        history.append(VersionHistoryEntry(
-            version: "12.5",
-            buildNumber: "57",
-            releaseDate: Date(),
-            changes: [
-
             ]
         ))
         
