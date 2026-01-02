@@ -5,6 +5,6 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:TIMEOUT_FIX.md">
+      location = "group:RECIPE_BOOK_IMPORT_GUIDE.md">
    </FileRef>
 </Workspace>

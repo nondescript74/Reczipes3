@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var showingRecipeExtractor = false
     @State private var showingAllergenProfiles = false
     @State private var showingBackup = false
+    @State private var showingImport = false
     @State private var showingSearch = false
     @State private var showingSavedLinks = false
     @State private var filterMode: RecipeFilterMode = .none
@@ -476,6 +477,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingBackup) {
                 RecipeBackupView()
+            }
+            .sheet(isPresented: $showingImport) {
+                RecipeBookImportView()
             }
             .sheet(isPresented: $showingSearch) {
                 RecipeSearchModalView(

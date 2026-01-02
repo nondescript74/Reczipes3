@@ -9,79 +9,33 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+/// View for importing recipe books from files
 struct RecipeBookImportView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     
     @State private var isImporting = false
-    @State private var showingFilePicker = false
-    @State private var importError: Error?
-    @State private var showingError = false
-    @State private var importedBook: RecipeBook?
-    @State private var showingSuccess = false
+    @State private var showFileImporter = false
+    @State private var showPreview = false
+    @State private var previewPackage: RecipeBookExportPackage?
+    @State private var importURL: URL?
+    @State private var errorMessage: String?
+    @State private var showError = false
+    @State private var importMode: RecipeBookImportMode = .keepBoth
+    @State private var existingBook: RecipeBook?
+    @State private var showSuccessAlert = false
+    @State private var importResult: RecipeBookImportResult?
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                // Icon
-                Image(systemName: "book.closed.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.blue.gradient)
-                
-                // Title and description
-                VStack(spacing: 8) {
-                    Text("Import Recipe Book")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    
-                    Text("Import a recipe book from a .recipebook file shared from another device")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+            VStack(spacing: 20) {
+                if let package = previewPackage {
+                    previewContent(package)
+                } else {
+                    emptyState
                 }
-                
-                // Import button
-                Button {
-                    showingFilePicker = true
-                } label: {
-                    Label("Choose File", systemImage: "folder")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.horizontal)
-                .disabled(isImporting)
-                
-                // Info section
-                VStack(alignment: .leading, spacing: 12) {
-                    InfoRow_RBIV(
-                        icon: "book.pages",
-                        title: "Complete Books",
-                        description: "Import entire recipe collections with all recipes"
-                    )
-                    
-                    InfoRow_RBIV(
-                        icon: "photo.on.rectangle",
-                        title: "Images Included",
-                        description: "All recipe photos and book covers are preserved"
-                    )
-                    
-                    InfoRow_RBIV(
-                        icon: "arrow.triangle.2.circlepath",
-                        title: "Automatic Updates",
-                        description: "Existing recipes are updated, new ones are added"
-                    )
-                }
-                .padding()
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal)
-                
-                Spacer()
             }
-            .padding(.top, 40)
-            .navigationTitle("Import")
+            .navigationTitle("Import Recipe Book")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -89,120 +43,343 @@ struct RecipeBookImportView: View {
                         dismiss()
                     }
                 }
+                
+                if previewPackage != nil {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Import") {
+                            Task {
+                                await performImport()
+                            }
+                        }
+                        .disabled(isImporting)
+                    }
+                }
             }
             .fileImporter(
-                isPresented: $showingFilePicker,
+                isPresented: $showFileImporter,
                 allowedContentTypes: [UTType(filenameExtension: "recipebook") ?? .data],
                 allowsMultipleSelection: false
             ) { result in
-                handleFileImport(result)
+                handleFileSelection(result)
             }
-            .alert("Import Failed", isPresented: $showingError) {
-                Button("OK") { }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
             } message: {
-                if let error = importError {
-                    Text(error.localizedDescription)
-                }
+                Text(errorMessage ?? "An unknown error occurred")
             }
-            .alert("Import Successful", isPresented: $showingSuccess) {
-                Button("View Book") {
-                    dismiss()
-                    // You might want to pass a callback to navigate to the book
-                }
+            .alert("Import Successful", isPresented: $showSuccessAlert) {
                 Button("Done") {
                     dismiss()
                 }
             } message: {
-                if let book = importedBook {
-                    Text("Successfully imported \"\(book.name)\" with \(book.recipeCount) recipes")
+                if let result = importResult {
+                    Text("Imported '\(result.book.name)'\n\(result.summary)")
                 }
             }
-            .overlay {
-                if isImporting {
-                    ZStack {
-                        Color.black.opacity(0.4)
-                            .ignoresSafeArea()
-                        
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                            Text("Importing Recipe Book...")
-                                .font(.headline)
-                            Text("This may take a moment...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(32)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .onAppear {
+                showFileImporter = true
+            }
+        }
+    }
+    
+    // MARK: - Views
+    
+    private var emptyState: some View {
+        VStack(spacing: 24) {
+            // Icon
+            Image(systemName: "book.closed.circle.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(.blue.gradient)
+            
+            // Title and description
+            VStack(spacing: 8) {
+                Text("Import Recipe Book")
+                    .font(.title)
+                    .fontWeight(.bold)
+                
+                Text("Import a recipe book from a .recipebook file shared from another device")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            // Import button
+            Button {
+                showFileImporter = true
+            } label: {
+                Label("Choose File", systemImage: "folder")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.horizontal)
+            
+            // Info section
+            VStack(alignment: .leading, spacing: 12) {
+                InfoRow_RBIV(
+                    icon: "book.pages",
+                    title: "Complete Books",
+                    description: "Import entire recipe collections with all recipes"
+                )
+                
+                InfoRow_RBIV(
+                    icon: "photo.on.rectangle",
+                    title: "Images Included",
+                    description: "All recipe photos and book covers are preserved"
+                )
+                
+                InfoRow_RBIV(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Smart Merging",
+                    description: "Choose to replace, merge, or keep both books"
+                )
+            }
+            .padding()
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal)
+            
+            Spacer()
+        }
+        .padding(.top, 40)
+    }
+    
+    @ViewBuilder
+    private func previewContent(_ package: RecipeBookExportPackage) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Book info
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Book Information")
+                        .font(.headline)
+                    
+                    InfoRow(label: "Name", value: package.book.name)
+                    
+                    if let description = package.book.bookDescription {
+                        InfoRow(label: "Description", value: description)
                     }
+                    
+                    InfoRow(label: "Recipes", value: "\(package.recipes.count)")
+                    InfoRow(label: "Images", value: "\(package.imageManifest.count)")
+                    InfoRow(label: "Exported", value: package.exportDate.formatted(date: .abbreviated, time: .shortened))
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                
+                // Conflict resolution
+                if existingBook != nil {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("A book with this name already exists", systemImage: "exclamationmark.triangle")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+                        
+                        Text("Choose how to handle this:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Picker("Import Mode", selection: $importMode) {
+                            Text("Keep Both").tag(RecipeBookImportMode.keepBoth)
+                            Text("Replace Existing").tag(RecipeBookImportMode.replace)
+                            Text("Merge Recipes").tag(RecipeBookImportMode.merge)
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Text(importModeDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                    }
+                    .padding()
+                    .background(Color(.systemOrange).opacity(0.1))
+                    .cornerRadius(12)
+                }
+                
+                // Recipe list
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Recipes to Import")
+                        .font(.headline)
+                    
+                    ForEach(package.recipes) { recipe in
+                        HStack {
+                            Image(systemName: recipe.imageName != nil ? "photo" : "doc.text")
+                                .foregroundStyle(.secondary)
+                            
+                            VStack(alignment: .leading) {
+                                Text(recipe.title)
+                                    .font(.body)
+                                
+                                if let headerNotes = recipe.headerNotes {
+                                    Text(headerNotes)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                        
+                        if recipe.id != package.recipes.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+            .padding()
+        }
+        .overlay {
+            if isImporting {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        
+                        Text("Importing Recipe Book...")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        
+                        Text("This may take a moment...")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .padding(32)
+                    .background(.regularMaterial)
+                    .cornerRadius(16)
                 }
             }
         }
     }
     
-    // MARK: - Import Handler
+    // MARK: - Helper Views
     
-    private func handleFileImport(_ result: Result<[URL], Error>) {
+    private struct InfoRow: View {
+        let label: String
+        let value: String
+        
+        var body: some View {
+            HStack {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(value)
+                    .fontWeight(.medium)
+            }
+            .font(.subheadline)
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var importModeDescription: String {
+        switch importMode {
+        case .keepBoth:
+            return "Creates a new book with '(Imported)' appended to the name"
+        case .replace:
+            return "Deletes the existing book and replaces it with the imported version"
+        case .merge:
+            return "Adds recipes from the import to the existing book"
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func handleFileSelection(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
             
-            Task {
-                await importBook(from: url)
+            // Start accessing security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                errorMessage = "Unable to access the selected file"
+                showError = true
+                return
+            }
+            
+            defer {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
+            // Copy to temp location since we need to access it later
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString).recipebook")
+            
+            do {
+                if FileManager.default.fileExists(atPath: tempURL.path) {
+                    try FileManager.default.removeItem(at: tempURL)
+                }
+                try FileManager.default.copyItem(at: url, to: tempURL)
+                importURL = tempURL
+                
+                // Preview the file
+                Task {
+                    await loadPreview(from: tempURL)
+                }
+            } catch {
+                errorMessage = "Failed to load file: \(error.localizedDescription)"
+                showError = true
             }
             
         case .failure(let error):
-            importError = error
-            showingError = true
-            logError("File picker error: \(error)", category: "book-import")
+            if (error as NSError).code != NSUserCancelledError {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
         }
     }
     
-    private func importBook(from url: URL) async {
-        isImporting = true
-        importError = nil
-        
+    private func loadPreview(from url: URL) async {
         do {
-            // Start accessing security-scoped resource
-            guard url.startAccessingSecurityScopedResource() else {
-                throw ImportError.accessDenied
-            }
-            defer { url.stopAccessingSecurityScopedResource() }
+            let package = try await RecipeBookImportService.shared.previewBook(from: url)
+            previewPackage = package
             
-            // Copy to temporary location
-            let tempURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent(url.lastPathComponent)
-            
-            if FileManager.default.fileExists(atPath: tempURL.path) {
-                try FileManager.default.removeItem(at: tempURL)
-            }
-            
-            try FileManager.default.copyItem(at: url, to: tempURL)
-            
-            // Import the book
-            let book = try await RecipeBookExportService.importBook(
-                from: tempURL,
-                modelContext: modelContext,
-                replaceExisting: false
+            // Check for existing book
+            existingBook = try RecipeBookImportService.shared.checkForExistingBook(
+                bookID: package.book.id,
+                modelContext: modelContext
             )
             
-            await MainActor.run {
-                importedBook = book
-                isImporting = false
-                showingSuccess = true
-            }
+        } catch {
+            errorMessage = (error as? RecipeBookImportError)?.errorDescription ?? error.localizedDescription
+            showError = true
+            dismiss()
+        }
+    }
+    
+    private func performImport() async {
+        guard let url = importURL else { return }
+        
+        isImporting = true
+        
+        do {
+            let result = try await RecipeBookImportService.shared.importBook(
+                from: url,
+                modelContext: modelContext,
+                importMode: importMode
+            )
             
-            logInfo("Successfully imported book: \(book.name)", category: "book-import")
+            importResult = result
             
             // Clean up temp file
-            try? FileManager.default.removeItem(at: tempURL)
+            try? FileManager.default.removeItem(at: url)
+            
+            isImporting = false
+            showSuccessAlert = true
+            
+            logInfo("Successfully imported book: \(result.book.name)", category: "book-import")
             
         } catch {
-            await MainActor.run {
-                importError = error
-                isImporting = false
-                showingError = true
-            }
+            isImporting = false
+            errorMessage = (error as? RecipeBookImportError)?.errorDescription ?? error.localizedDescription
+            showError = true
             logError("Import failed: \(error)", category: "book-import")
         }
     }
@@ -235,26 +412,7 @@ private struct InfoRow_RBIV: View {
     }
 }
 
-// MARK: - Import Error
-
-enum ImportError: LocalizedError {
-    case accessDenied
-    case invalidFormat
-    case missingData
-    
-    var errorDescription: String? {
-        switch self {
-        case .accessDenied:
-            return "Unable to access the selected file"
-        case .invalidFormat:
-            return "The selected file is not a valid recipe book"
-        case .missingData:
-            return "The recipe book file is missing required data"
-        }
-    }
-}
-
 #Preview {
     RecipeBookImportView()
-        .modelContainer(for: RecipeBook.self, inMemory: true)
+        .modelContainer(for: [Recipe.self, RecipeBook.self], inMemory: true)
 }

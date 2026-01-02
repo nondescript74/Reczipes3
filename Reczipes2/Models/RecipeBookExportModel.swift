@@ -24,6 +24,14 @@ struct RecipeBookExportPackage: Codable {
         self.recipes = recipes
         self.imageManifest = imageManifest
     }
+    
+    /// Summary information about the package
+    var summary: String {
+        let imageCount = imageManifest.count
+        let recipeText = recipes.count == 1 ? "recipe" : "recipes"
+        let imageText = imageCount == 1 ? "image" : "images"
+        return "\(recipes.count) \(recipeText), \(imageCount) \(imageText)"
+    }
 }
 
 /// Exportable version of RecipeBook (without SwiftData decorators)
@@ -90,3 +98,50 @@ struct ImageManifestEntry: Codable, Identifiable {
         self.associatedID = associatedID
     }
 }
+// MARK: - Import Result
+
+/// Result information from importing a recipe book
+struct RecipeBookImportResult {
+    let book: RecipeBook
+    let recipesImported: Int
+    let recipesUpdated: Int
+    let imagesImported: Int
+    let wasReplaced: Bool
+    
+    var summary: String {
+        var parts: [String] = []
+        
+        if recipesImported > 0 {
+            parts.append("\(recipesImported) new recipe\(recipesImported == 1 ? "" : "s")")
+        }
+        
+        if recipesUpdated > 0 {
+            parts.append("\(recipesUpdated) updated recipe\(recipesUpdated == 1 ? "" : "s")")
+        }
+        
+        if imagesImported > 0 {
+            parts.append("\(imagesImported) image\(imagesImported == 1 ? "" : "s")")
+        }
+        
+        return parts.isEmpty ? "No changes" : parts.joined(separator: ", ")
+    }
+}
+
+/// Import mode for handling conflicts
+enum RecipeBookImportMode {
+    case replace        // Replace existing book with same ID
+    case keepBoth       // Create new book with new ID
+    case merge          // Merge recipes into existing book
+    
+    var description: String {
+        switch self {
+        case .replace:
+            return "Replace existing book"
+        case .keepBoth:
+            return "Keep both books"
+        case .merge:
+            return "Merge into existing book"
+        }
+    }
+}
+

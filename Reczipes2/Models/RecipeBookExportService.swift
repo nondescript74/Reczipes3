@@ -46,7 +46,7 @@ class RecipeBookExportService {
     }
     
     /// Extracts a ZIP archive to a directory using native iOS capabilities
-    private static func extractZipArchive(from sourceURL: URL, to destinationURL: URL) throws {
+    static func extractZipArchive(from sourceURL: URL, to destinationURL: URL) throws {
         // Create destination directory
         try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
         

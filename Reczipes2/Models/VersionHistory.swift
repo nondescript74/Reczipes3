@@ -61,16 +61,9 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "✨ Added: Cooking Mode with step-by-step recipe tracking and completion checkmarks",
-                "⚡️ Added: Dynamic serving size adjustment with automatic ingredient quantity scaling",
-                "🎨 Added: Persistent cooking session state across app launches using SwiftData",
-                "🔧 Fixed: CloudKit sync compatibility for CookingSession model with proper default values",
-                "✅ Added Recipe Book Query",
-                "✅ Enhanced Recipe Row with Book Badges",
-                "✅ Added Add to Book Context Menu",
-                "✅ Added Helper Methods",
-                "✅ Added View Books Toolbar Button",
-                "✅ Created RecipeBookBadge Component"
+                "✨ Added: Recipe Book integration with context menus and visual badges showing book membership",
+                "⚡️ Improved: Background filter processing with caching to prevent UI blocking during allergen and diabetes analysis",
+                "🔧 Enhanced: Recipe deletion now automatically cleans up associated image files and assignments"
 
             ]
         ))
@@ -80,10 +73,12 @@ class VersionHistoryManager {
         
         history.append(VersionHistoryEntry(
             version: "12.4",
-            buildNumber: "55",
+            buildNumber: "56",
             releaseDate: Date(),
             changes: [
-
+                "✨ Added: Recipe Book integration with context menus and visual badges showing book membership",
+                "⚡️ Improved: Background filter processing with caching to prevent UI blocking during allergen and diabetes analysis",
+                "🔧 Enhanced: Recipe deletion now automatically cleans up associated image files and assignments"
             ]
         ))
         
