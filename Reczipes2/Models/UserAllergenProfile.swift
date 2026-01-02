@@ -3,7 +3,8 @@
 //  Reczipes2
 //
 //  Created by Zahirudeen Premji on 12/18/25.
-//  Schema Version: 2.0.0 - Added diabetes status support
+//  Schema Version: 3.0.0 - Added nutritional goals support
+//  Previous: 2.0.0 - Added diabetes status support
 //
 
 import Foundation
@@ -34,40 +35,49 @@ enum DiabetesStatus: String, Codable, CaseIterable {
 }
 
 // MARK: - User Profile (SwiftData Model)
-// Schema Version: 2.0.0
+// Schema Version: 3.0.0
 
 @Model
 final class UserAllergenProfile {
-    var id: UUID = UUID()
-    var name: String = ""
-    var isActive: Bool = false
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var isActive: Bool
     var sensitivitiesData: Data?
     
     // Added in Schema V2.0.0
     // Default value ensures automatic migration works without deleting the app
-    var diabetesStatusRaw: String = DiabetesStatus.none.rawValue
+    var diabetesStatusRaw: String
     
-    var dateCreated: Date = Date()
-    var dateModified: Date = Date()
+    // Added in Schema V3.0.0
+    // Nutritional goals (calories, sodium, fat, etc.)
+    // Stored as encoded Data for CloudKit compatibility
+    var nutritionalGoalsData: Data?
     
-    init(id: UUID = UUID(),
-         name: String,
-         isActive: Bool = false,
-         sensitivitiesData: Data? = nil,
-         diabetesStatus: DiabetesStatus = .none,
-         dateCreated: Date = Date(),
-         dateModified: Date = Date()) {
+    var dateCreated: Date
+    var dateModified: Date
+    
+    init(
+        id: UUID = UUID(),
+        name: String = "",
+        isActive: Bool = false,
+        sensitivitiesData: Data? = nil,
+        diabetesStatus: DiabetesStatus = .none,
+        nutritionalGoals: NutritionalGoals? = nil,
+        dateCreated: Date = Date(),
+        dateModified: Date = Date()
+    ) {
         self.id = id
         self.name = name
         self.isActive = isActive
         self.sensitivitiesData = sensitivitiesData
         self.diabetesStatusRaw = diabetesStatus.rawValue
+        self.nutritionalGoalsData = try? JSONEncoder().encode(nutritionalGoals)
         self.dateCreated = dateCreated
         self.dateModified = dateModified
     }
     
     // Computed property for diabetes status
-    var diabetesStatus: DiabetesStatus {
+    nonisolated var diabetesStatus: DiabetesStatus {
         get {
             DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
         }
@@ -77,13 +87,30 @@ final class UserAllergenProfile {
         }
     }
     
+    // Computed property for nutritional goals
+    nonisolated var nutritionalGoals: NutritionalGoals? {
+        get {
+            guard let data = nutritionalGoalsData else { return nil }
+            return try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+        }
+        set {
+            nutritionalGoalsData = try? JSONEncoder().encode(newValue)
+            dateModified = Date()
+        }
+    }
+    
     // Convenience property to check if diabetes filtering is needed
-    var hasDiabetesConcern: Bool {
+    nonisolated var hasDiabetesConcern: Bool {
         diabetesStatus != .none
     }
     
+    // Convenience property to check if nutritional goals are set
+    nonisolated var hasNutritionalGoals: Bool {
+        nutritionalGoals != nil
+    }
+    
     // Computed property to get sensitivities
-    var sensitivities: [UserSensitivity] {
+    nonisolated var sensitivities: [UserSensitivity] {
         get {
             guard let data = sensitivitiesData else { return [] }
             return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
@@ -95,21 +122,21 @@ final class UserAllergenProfile {
     }
     
     // Add a sensitivity
-    func addSensitivity(_ sensitivity: UserSensitivity) {
+    nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
         var current = sensitivities
         current.append(sensitivity)
         sensitivities = current
     }
     
     // Remove a sensitivity
-    func removeSensitivity(id: UUID) {
+    nonisolated func removeSensitivity(id: UUID) {
         var current = sensitivities
         current.removeAll { $0.id == id }
         sensitivities = current
     }
     
     // Update a sensitivity
-    func updateSensitivity(_ sensitivity: UserSensitivity) {
+    nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
         var current = sensitivities
         if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
             current[index] = sensitivity

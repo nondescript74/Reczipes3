@@ -181,9 +181,14 @@ class RecipeBookExportService {
     
     /// Decompresses DEFLATE compressed data
     private static func decompressDeflate(_ data: Data, uncompressedSize: Int) throws -> Data {
+        // ZIP uses raw DEFLATE without zlib wrapper, so we need to add the zlib header
+        // Zlib header: 0x78, 0x9C for default compression
+        var zlibData = Data([0x78, 0x9C])
+        zlibData.append(data)
+        
         var decompressed = Data(count: uncompressedSize)
         
-        let result = data.withUnsafeBytes { (compressedBuffer: UnsafeRawBufferPointer) -> Int in
+        let result = zlibData.withUnsafeBytes { (compressedBuffer: UnsafeRawBufferPointer) -> Int in
             decompressed.withUnsafeMutableBytes { (decompressedBuffer: UnsafeMutableRawBufferPointer) -> Int in
                 guard let compressedPtr = compressedBuffer.baseAddress,
                       let decompressedPtr = decompressedBuffer.baseAddress else {
@@ -194,7 +199,7 @@ class RecipeBookExportService {
                     decompressedPtr.assumingMemoryBound(to: UInt8.self),
                     uncompressedSize,
                     compressedPtr.assumingMemoryBound(to: UInt8.self),
-                    data.count,
+                    zlibData.count,
                     nil,
                     COMPRESSION_ZLIB
                 )
@@ -203,7 +208,7 @@ class RecipeBookExportService {
         
         guard result > 0 else {
             throw NSError(domain: "RecipeBookExport", code: -4, userInfo: [
-                NSLocalizedDescriptionKey: "Failed to decompress data"
+                NSLocalizedDescriptionKey: "Could not decompress the file. The archive may be corrupted or use an unsupported compression format."
             ])
         }
         

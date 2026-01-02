@@ -61,25 +61,24 @@ struct Reczipes2App: App {
         )
 
         // Try CloudKit configuration first
-        // Note: Lightweight migration (adding diabetesStatusRaw field) is automatic
+        // Using SchemaMigrationPlan for automatic schema versioning and migration
         do {
-            let schema = Schema([
-                Recipe.self,
+            let container = try ModelContainer(
+                for: Recipe.self,
                 RecipeImageAssignment.self,
                 UserAllergenProfile.self,
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
                 RecipeBook.self,
                 CookingSession.self,
-            ])
-            
-            let container = try ModelContainer(
-                for: schema,
-                configurations: [cloudKitConfiguration]
+                migrationPlan: Reczipes2MigrationPlan.self,
+                configurations: cloudKitConfiguration
             )
             print("✅ ModelContainer created successfully with CloudKit sync enabled")
             print("   Container: iCloud.com.headydiscy.reczipes")
-            print("   Automatic lightweight migration enabled for schema changes")
+            print("   Migration Plan: Reczipes2MigrationPlan")
+            print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
+            print("   Automatic schema migration enabled")
             return container
         } catch {
             // CloudKit failed, try local-only as fallback
@@ -87,21 +86,21 @@ struct Reczipes2App: App {
             print("   Attempting fallback to local-only container...")
             
             do {
-                let schema = Schema([
-                    Recipe.self,
+                let container = try ModelContainer(
+                    for: Recipe.self,
                     RecipeImageAssignment.self,
                     UserAllergenProfile.self,
                     CachedDiabeticAnalysis.self,
                     SavedLink.self,
                     RecipeBook.self,
-                ])
-                
-                let container = try ModelContainer(
-                    for: schema,
-                    configurations: [localConfiguration]
+                    CookingSession.self,
+                    migrationPlan: Reczipes2MigrationPlan.self,
+                    configurations: localConfiguration
                 )
                 print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
-                print("   Automatic lightweight migration enabled for schema changes")
+                print("   Migration Plan: Reczipes2MigrationPlan")
+                print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
+                print("   Automatic schema migration enabled")
                 print("   Note: CloudKit was enabled but failed. Check your iCloud settings and container identifier.")
                 print("   See CLOUDKIT_SETUP_GUIDE.md for troubleshooting steps.")
                 return container

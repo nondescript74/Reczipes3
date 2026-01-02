@@ -46,9 +46,9 @@ enum SchemaV1: VersionedSchema {
     }
 }
 
-// MARK: - Schema Version 2 (Current - with Diabetes Status)
+// MARK: - Schema Version 2 (with Diabetes Status)
 
-/// Current schema with diabetes status added to profiles
+/// Schema V2 with diabetes status added to profiles
 enum SchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
     
@@ -85,7 +85,7 @@ enum SchemaV2: VersionedSchema {
         }
         
         // Computed property for diabetes status
-        var diabetesStatus: DiabetesStatus {
+        nonisolated var diabetesStatus: DiabetesStatus {
             get {
                 DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
             }
@@ -96,12 +96,12 @@ enum SchemaV2: VersionedSchema {
         }
         
         // Convenience property
-        var hasDiabetesConcern: Bool {
+        nonisolated var hasDiabetesConcern: Bool {
             diabetesStatus != .none
         }
         
         // Sensitivities management
-        var sensitivities: [UserSensitivity] {
+        nonisolated var sensitivities: [UserSensitivity] {
             get {
                 guard let data = sensitivitiesData else { return [] }
                 return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
@@ -112,19 +112,128 @@ enum SchemaV2: VersionedSchema {
             }
         }
         
-        func addSensitivity(_ sensitivity: UserSensitivity) {
+        nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
             var current = sensitivities
             current.append(sensitivity)
             sensitivities = current
         }
         
-        func removeSensitivity(id: UUID) {
+        nonisolated func removeSensitivity(id: UUID) {
             var current = sensitivities
             current.removeAll { $0.id == id }
             sensitivities = current
         }
         
-        func updateSensitivity(_ sensitivity: UserSensitivity) {
+        nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
+            var current = sensitivities
+            if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
+                current[index] = sensitivity
+                sensitivities = current
+            }
+        }
+    }
+}
+
+// MARK: - Schema Version 3 (Current - with Nutritional Goals)
+
+/// Current schema with nutritional goals added to profiles
+enum SchemaV3: VersionedSchema {
+    static var versionIdentifier = Schema.Version(3, 0, 0)
+    
+    static var models: [any PersistentModel.Type] {
+        [
+            UserAllergenProfile.self,
+        ]
+    }
+    
+    @Model
+    final class UserAllergenProfile {
+        @Attribute(.unique) var id: UUID
+        var name: String
+        var isActive: Bool
+        var sensitivitiesData: Data?
+        var diabetesStatusRaw: String
+        var nutritionalGoalsData: Data?  // NEW: Added in V3
+        var dateCreated: Date
+        var dateModified: Date
+        
+        init(
+            id: UUID = UUID(),
+            name: String = "",
+            isActive: Bool = false,
+            sensitivitiesData: Data? = nil,
+            diabetesStatus: DiabetesStatus = .none,
+            nutritionalGoals: NutritionalGoals? = nil,
+            dateCreated: Date = Date(),
+            dateModified: Date = Date()
+        ) {
+            self.id = id
+            self.name = name
+            self.isActive = isActive
+            self.sensitivitiesData = sensitivitiesData
+            self.diabetesStatusRaw = diabetesStatus.rawValue
+            self.nutritionalGoalsData = try? JSONEncoder().encode(nutritionalGoals)
+            self.dateCreated = dateCreated
+            self.dateModified = dateModified
+        }
+        
+        // Computed property for diabetes status
+        nonisolated var diabetesStatus: DiabetesStatus {
+            get {
+                DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
+            }
+            set {
+                diabetesStatusRaw = newValue.rawValue
+                dateModified = Date()
+            }
+        }
+        
+        // Computed property for nutritional goals
+        nonisolated var nutritionalGoals: NutritionalGoals? {
+            get {
+                guard let data = nutritionalGoalsData else { return nil }
+                return try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+            }
+            set {
+                nutritionalGoalsData = try? JSONEncoder().encode(newValue)
+                dateModified = Date()
+            }
+        }
+        
+        // Convenience properties
+        nonisolated var hasDiabetesConcern: Bool {
+            diabetesStatus != .none
+        }
+        
+        nonisolated var hasNutritionalGoals: Bool {
+            nutritionalGoals != nil
+        }
+        
+        // Sensitivities management
+        nonisolated var sensitivities: [UserSensitivity] {
+            get {
+                guard let data = sensitivitiesData else { return [] }
+                return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
+            }
+            set {
+                sensitivitiesData = try? JSONEncoder().encode(newValue)
+                dateModified = Date()
+            }
+        }
+        
+        nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
+            var current = sensitivities
+            current.append(sensitivity)
+            sensitivities = current
+        }
+        
+        nonisolated func removeSensitivity(id: UUID) {
+            var current = sensitivities
+            current.removeAll { $0.id == id }
+            sensitivities = current
+        }
+        
+        nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
             var current = sensitivities
             if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
                 current[index] = sensitivity
@@ -141,6 +250,7 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
         [
             SchemaV1.self,
             SchemaV2.self,
+            SchemaV3.self,
         ]
     }
     
@@ -148,6 +258,8 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
         [
             // Migration from V1 to V2: Add diabetes status with default value
             migrateV1toV2,
+            // Migration from V2 to V3: Add nutritional goals
+            migrateV2toV3,
         ]
     }
     
@@ -186,6 +298,36 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             print("   All existing profiles now have diabetes status = 'None'")
         }
     )
+    
+    /// Migration from V2 to V3: Adds nutritionalGoalsData field (optional)
+    static let migrateV2toV3 = MigrationStage.custom(
+        fromVersion: SchemaV2.self,
+        toVersion: SchemaV3.self,
+        willMigrate: { context in
+            // Log migration start
+            print("🔄 Starting migration from Schema V2 to V3")
+            print("   Adding nutritional goals support to user profiles...")
+            
+            // Fetch all existing profiles
+            let profiles = try context.fetch(FetchDescriptor<SchemaV2.UserAllergenProfile>())
+            print("   Found \(profiles.count) profile(s) to migrate")
+        },
+        didMigrate: { context in
+            // After automatic migration, nutritionalGoalsData will be nil by default
+            let profiles = try context.fetch(FetchDescriptor<SchemaV3.UserAllergenProfile>())
+            
+            // No action needed - nutritionalGoalsData is optional
+            // Users can set their goals through the UI
+            
+            // Save changes
+            try context.save()
+            
+            print("✅ Migration to Schema V3 complete")
+            print("   Total profiles: \(profiles.count)")
+            print("   All profiles can now set nutritional goals")
+            print("   Note: Nutritional goals are optional and can be configured by users")
+        }
+    )
 }
 
 // MARK: - Schema Versioning Helper
@@ -194,7 +336,7 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
 struct SchemaVersionManager {
     
     /// Current schema version
-    static let currentVersion = SchemaV2.versionIdentifier
+    static let currentVersion = SchemaV3.versionIdentifier
     
     /// Check if migration is needed
     static func needsMigration(currentStoredVersion: Schema.Version?) -> Bool {
@@ -230,15 +372,22 @@ struct SchemaVersionManager {
  
  ### Version 1.0.0 (Initial)
  - Original schema
- - UserAllergenProfile without diabetes status
- - All other models in initial state
+ - UserAllergenProfile without diabetes status or nutritional goals
+ - Basic profile with sensitivities only
  
- ### Version 2.0.0 (Current)
+ ### Version 2.0.0
  - Added `diabetesStatusRaw` to UserAllergenProfile
  - Default value: "None"
  - Supports: None, Prediabetic, Diabetic
  - Migration: Automatic with default value assignment
  - Backward compatible: Old profiles get "None" status
+ 
+ ### Version 3.0.0 (Current)
+ - Added `nutritionalGoalsData` to UserAllergenProfile
+ - Stores encoded NutritionalGoals struct as Data
+ - Optional field (nil by default)
+ - Supports tracking of daily nutritional targets
+ - Migration: Automatic, no data transformation needed
  
  ## Future Versions
  
@@ -248,14 +397,15 @@ struct SchemaVersionManager {
  2. Update version identifier: Schema.Version(X, 0, 0)
  3. Add any new properties or models
  4. Add migration stage to Reczipes2MigrationPlan.stages
- 5. Test migration thoroughly
- 6. Update this documentation
+ 5. Update SchemaVersionManager.currentVersion
+ 6. Test migration thoroughly
+ 7. Update this documentation
  
- Example for V3:
+ Example for V4:
  
  ```swift
- enum SchemaV3: VersionedSchema {
-     static var versionIdentifier = Schema.Version(3, 0, 0)
+ enum SchemaV4: VersionedSchema {
+     static var versionIdentifier = Schema.Version(4, 0, 0)
      
      static var models: [any PersistentModel.Type] {
          [/* updated models */]
@@ -265,9 +415,9 @@ struct SchemaVersionManager {
  }
  
  // Add to MigrationPlan:
- static let migrateV2toV3 = MigrationStage.custom(
-     fromVersion: SchemaV2.self,
-     toVersion: SchemaV3.self,
+ static let migrateV3toV4 = MigrationStage.custom(
+     fromVersion: SchemaV3.self,
+     toVersion: SchemaV4.self,
      willMigrate: { context in
          // Pre-migration logic
      },

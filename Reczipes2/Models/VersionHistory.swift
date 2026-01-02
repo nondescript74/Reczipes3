@@ -61,15 +61,31 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "✨ Added: Recipe Book integration with context menus and visual badges showing book membership",
-                "⚡️ Improved: Background filter processing with caching to prevent UI blocking during allergen and diabetes analysis",
-                "🔧 Enhanced: Recipe deletion now automatically cleans up associated image files and assignments"
-
+                "🐛 Fixed: Recipe Book import decompression error when importing .recipebook files",
+                "🔧 Enhanced: ZIP file extraction now properly handles raw DEFLATE compression with zlib wrapper",
+                "⚡️ Improved: More descriptive error messages when archive decompression fails",
+                "📚 Fixed: Recipe Books exported from the app can now be successfully imported on other devices",
+                "✨ Added: Nutritional Goals system with daily targets for calories, sodium, fat, sugar, fiber, and more",
+                "⚠️ Added: Personalized nutritional goal profiles (Weight Loss, Diabetes Management, Heart Health, General Health, Athletic Performance)",
+                "🏥 Added: Medical guidelines integration from American Heart Association, American Diabetes Association, and CDC",
+                "📊 Added: Recipe nutritional analysis showing how recipes fit within daily goals",
+                "⚡️ Added: Smart nutrition alerts for high sodium, saturated fat, sugar, and positive fiber content",
+                "🎯 Added: Recipe compatibility scoring (0-100) based on nutritional goals",
+                "💾 Added: Schema V3.0.0 for UserAllergenProfile with nutritional goals data storage"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.5",
+            buildNumber: "57",
+            releaseDate: Date(),
+            changes: [
+
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "12.4",
