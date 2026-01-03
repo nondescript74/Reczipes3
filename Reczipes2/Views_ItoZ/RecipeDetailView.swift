@@ -34,6 +34,7 @@ struct RecipeDetailView: View {
     @State private var newTipText = ""
     @State private var pendingTips: [RecipeNote] = [] // Tips to be saved with the recipe
     @State private var showingCookingMode = false
+    @State private var currentServings: Int = 1
     
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
@@ -212,6 +213,19 @@ struct RecipeDetailView: View {
                                 .padding(.vertical, 6)
                                 .background(Color.blue.opacity(0.1))
                                 .clipShape(Capsule())
+                            
+                            // Serving size stepper for nutritional analysis
+                            if activeProfile?.nutritionalGoals != nil {
+                                Divider()
+                                    .frame(height: 20)
+                                
+                                Stepper("Servings: \(currentServings)", value: $currentServings, in: 1...20)
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.green.opacity(0.1))
+                                    .clipShape(Capsule())
+                            }
                         }
                     }
                 }
@@ -360,6 +374,20 @@ struct RecipeDetailView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                         }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                }
+                
+                // Nutritional Analysis Section
+                if activeProfile?.nutritionalGoals != nil || activeProfile != nil {
+                    VStack(alignment: .leading, spacing: 12) {
+                        RecipeNutritionalSection(
+                            recipe: recipe,
+                            profile: activeProfile,
+                            servings: currentServings
+                        )
                     }
                     .padding(.vertical, 8)
                     

@@ -61,15 +61,28 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "🐛 Fixed: Startup crash caused by SchemaV3 initialization with nil nutritional goals",
-                "🔧 Fixed: Main actor isolation warnings in UserAllergenProfile schema definitions",
-                "⚡️ Improved: Enhanced ModelContainer initialization logging for better debugging",
-                "🔍 Added: Detailed error logging during container creation to diagnose CloudKit issues"
+                "🔧 Fixed: Swift 6 concurrency warnings in UserAllergenProfile and SchemaMigration files",
+                "📝 Improved: JSON encoding/decoding patterns for nutritional goals and sensitivities",
+                "💾 Enhanced: Schema V3 compatibility with CloudKit sync for nutritional data",
+                "✅ Verified: All SwiftData models properly configured for main actor isolation"
+
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.7",
+            buildNumber: "59",
+            releaseDate: Date(),
+            changes: [
+                "🔧 Fixed: Swift 6 concurrency warnings in UserAllergenProfile and SchemaMigration files",
+                "📝 Improved: JSON encoding/decoding patterns for nutritional goals and sensitivities",
+                "💾 Enhanced: Schema V3 compatibility with CloudKit sync for nutritional data",
+                "✅ Verified: All SwiftData models properly configured for main actor isolation"
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "12.6",

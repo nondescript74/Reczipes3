@@ -141,6 +141,8 @@ struct CombinedRecipeBadge: View {
             return "exclamationmark.triangle.fill"
         case .diabetes:
             return "heart.text.square.fill"
+        case .nutrition:
+            return "pencil.and.outline.square"
         case .all:
             return "shield.lefthalf.filled"
         }
@@ -154,6 +156,8 @@ struct CombinedRecipeBadge: View {
             return "Allergen & FODMAP Analysis"
         case .diabetes:
             return "Diabetes Analysis"
+        case .nutrition:
+            return "Nutrition Analysis"
         case .all:
             return "Complete Health Analysis"
         }
@@ -195,6 +199,7 @@ struct CombinedRecipeBadge: View {
                     severityLevel: nil
                 ),
                 diabetesScore: nil,
+                nutritionalScore: nil,
                 filterMode: .allergenFODMAP
             ),
             compact: true
@@ -214,6 +219,7 @@ struct CombinedRecipeBadge: View {
                     beneficialIngredients: [],
                     isDiabeticFriendly: false
                 ),
+                nutritionalScore: nil,
                 filterMode: .diabetes
             ),
             compact: false

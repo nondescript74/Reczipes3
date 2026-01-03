@@ -33,6 +33,7 @@ struct ContentView: View {
     @State private var cachedAllergenScores: [UUID: RecipeAllergenScore] = [:]
     @State private var cachedDiabetesScores: [UUID: DiabetesScore] = [:]
     @State private var cachedCombinedScores: [UUID: CombinedRecipeScore] = [:]
+    @State private var cachedNutritionalScores: [UUID: NutritionalScore] = [:]
     
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
@@ -112,6 +113,7 @@ struct ContentView: View {
             var allergenScores: [UUID: RecipeAllergenScore] = [:]
             var diabetesScores: [UUID: DiabetesScore] = [:]
             var combinedScores: [UUID: CombinedRecipeScore] = [:]
+            var nutritionalScores: [UUID: NutritionalScore] = [:]
             
             // Analyze for allergens if needed
             if await currentMode.includesAllergenFilter, let profile = currentProfile {
@@ -121,6 +123,15 @@ struct ContentView: View {
             // Analyze for diabetes if needed
             if await currentMode.includesDiabetesFilter {
                 diabetesScores = await DiabetesAnalyzer.shared.analyzeRecipes(recipesToProcess)
+            }
+            
+            if await currentMode.includesNutritionalFilter,
+               let profile = currentProfile,
+               let goals = profile.nutritionalGoals {
+                nutritionalScores = await NutritionalAnalyzer.shared.analyzeRecipes(
+                    recipesToProcess,
+                    goals: goals
+                )
             }
             
             // Create combined scores and pre-compute safety values
@@ -133,6 +144,7 @@ struct ContentView: View {
                     recipeID: recipe.id,
                     allergenScore: allergenScores[recipe.id],
                     diabetesScore: diabetesScores[recipe.id],
+                    nutritionalScore: nutritionalScores[recipe.id],
                     filterMode: currentMode
                 )
                 combinedScores[recipe.id] = score
@@ -162,11 +174,12 @@ struct ContentView: View {
             
             // Update UI on main thread
             // Explicitly capture values in capture list to satisfy Swift 6 concurrency
-            await MainActor.run { [filteredRecipes, allergenScores, diabetesScores, combinedScores] in
+            await MainActor.run { [filteredRecipes, allergenScores, diabetesScores, combinedScores, nutritionalScores] in
                 cachedFilteredRecipes = filteredRecipes
                 cachedAllergenScores = allergenScores
                 cachedDiabetesScores = diabetesScores
                 cachedCombinedScores = combinedScores
+                cachedNutritionalScores = nutritionalScores
                 isProcessingFilter = false
             }
         }
@@ -547,6 +560,10 @@ struct ContentView: View {
             // Combined badge (shows allergen, diabetes, or both based on filter mode)
             if filterMode != .none, let score = combinedScores[recipe.id] {
                 CombinedRecipeBadge(score: score, compact: true)
+            }
+            if (filterMode == .nutrition || filterMode == .all),
+               let score = cachedNutritionalScores[recipe.id] {
+                NutritionalBadge(score: score, compact: true)
             }
         }
     }

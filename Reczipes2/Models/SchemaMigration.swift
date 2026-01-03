@@ -97,7 +97,7 @@ enum SchemaV2: VersionedSchema {
         }
         
         // Computed property for diabetes status
-        nonisolated var diabetesStatus: DiabetesStatus {
+        var diabetesStatus: DiabetesStatus {
             get {
                 DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
             }
@@ -108,12 +108,12 @@ enum SchemaV2: VersionedSchema {
         }
         
         // Convenience property
-        nonisolated var hasDiabetesConcern: Bool {
+        var hasDiabetesConcern: Bool {
             diabetesStatus != .none
         }
         
         // Sensitivities management
-        nonisolated var sensitivities: [UserSensitivity] {
+        var sensitivities: [UserSensitivity] {
             get {
                 guard let data = sensitivitiesData else { return [] }
                 return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
@@ -124,19 +124,19 @@ enum SchemaV2: VersionedSchema {
             }
         }
         
-        nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
+        func addSensitivity(_ sensitivity: UserSensitivity) {
             var current = sensitivities
             current.append(sensitivity)
             sensitivities = current
         }
         
-        nonisolated func removeSensitivity(id: UUID) {
+        func removeSensitivity(id: UUID) {
             var current = sensitivities
             current.removeAll { $0.id == id }
             sensitivities = current
         }
         
-        nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
+        func updateSensitivity(_ sensitivity: UserSensitivity) {
             var current = sensitivities
             if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
                 current[index] = sensitivity
@@ -202,7 +202,7 @@ enum SchemaV3: VersionedSchema {
         }
         
         // Computed property for diabetes status
-        nonisolated var diabetesStatus: DiabetesStatus {
+        var diabetesStatus: DiabetesStatus {
             get {
                 DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
             }
@@ -213,7 +213,7 @@ enum SchemaV3: VersionedSchema {
         }
         
         // Computed property for nutritional goals
-        nonisolated var nutritionalGoals: NutritionalGoals? {
+        var nutritionalGoals: NutritionalGoals? {
             get {
                 guard let data = nutritionalGoalsData else { return nil }
                 return try? JSONDecoder().decode(NutritionalGoals.self, from: data)
@@ -225,16 +225,16 @@ enum SchemaV3: VersionedSchema {
         }
         
         // Convenience properties
-        nonisolated var hasDiabetesConcern: Bool {
+        var hasDiabetesConcern: Bool {
             diabetesStatus != .none
         }
         
-        nonisolated var hasNutritionalGoals: Bool {
+        var hasNutritionalGoals: Bool {
             nutritionalGoals != nil
         }
         
         // Sensitivities management
-        nonisolated var sensitivities: [UserSensitivity] {
+        var sensitivities: [UserSensitivity] {
             get {
                 guard let data = sensitivitiesData else { return [] }
                 return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
@@ -245,19 +245,19 @@ enum SchemaV3: VersionedSchema {
             }
         }
         
-        nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
+        func addSensitivity(_ sensitivity: UserSensitivity) {
             var current = sensitivities
             current.append(sensitivity)
             sensitivities = current
         }
         
-        nonisolated func removeSensitivity(id: UUID) {
+        func removeSensitivity(id: UUID) {
             var current = sensitivities
             current.removeAll { $0.id == id }
             sensitivities = current
         }
         
-        nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
+        func updateSensitivity(_ sensitivity: UserSensitivity) {
             var current = sensitivities
             if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
                 current[index] = sensitivity

@@ -4,6 +4,11 @@
 //
 //  Created for Claude-powered recipe extraction
 //
+//  Note: Uses global logging functions (logInfo, logDebug, etc.) 
+//  defined in DiagnosticLogger.swift
+//
+
+import Foundation
 
 #if os(iOS)
 import UIKit

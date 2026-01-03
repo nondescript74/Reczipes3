@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 
+
 struct AllergenProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -254,6 +255,27 @@ struct ProfileEditorView: View {
             } footer: {
                 if profile.sensitivities.isEmpty {
                     Text("Add food allergens or intolerances to track.")
+                }
+            }
+            
+            Section("Daily Targets") {
+                NavigationLink {
+                    NutritionalGoalsView(profile: Binding(
+                        get: { profile },
+                        set: { newValue in
+                            // The profile is already managed by SwiftData
+                            // Changes will be automatically persisted
+                        }
+                    ))
+                } label: {
+                    HStack {
+                        Label("Nutritional Goals", systemImage: "heart.text.square.fill")
+                        Spacer()
+                        if profile.hasNutritionalGoals {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                    }
                 }
             }
         }

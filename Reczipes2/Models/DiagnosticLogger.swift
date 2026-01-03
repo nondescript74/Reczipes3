@@ -32,7 +32,8 @@ final class DiagnosticLogger: @unchecked Sendable {
         "network": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "network"),
         "storage": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "storage"),
         "ui": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "ui"),
-        "extraction": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "extraction")
+        "extraction": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "extraction"),
+        "image": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "image")
     ]
     
     // MARK: - Initialization

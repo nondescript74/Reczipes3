@@ -372,6 +372,7 @@ final class Recipe {
             reference: recipeModel.reference,
             dateAdded: Date(),
             imageName: recipeModel.imageName,
+            additionalImageNames: recipeModel.additionalImageNames,
             ingredientSectionsData: ingredientsData,
             instructionSectionsData: instructionsData,
             notesData: notesData,

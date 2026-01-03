@@ -12,7 +12,8 @@ enum RecipeFilterMode: String, CaseIterable, Identifiable {
     case none = "None"
     case allergenFODMAP = "Allergen + FODMAP"
     case diabetes = "Diabetes"
-    case all = "Allergen + FODMAP + Diabetes"
+    case all = "Allergen + FODMAP + Diabetes + Nutrition"
+    case nutrition = "Nutrition"
     
     var id: String { rawValue }
     
@@ -24,6 +25,8 @@ enum RecipeFilterMode: String, CaseIterable, Identifiable {
         switch self {
         case .none:
             return "line.3.horizontal.decrease.circle"
+        case .nutrition:
+            return "leaf.fill"
         case .allergenFODMAP:
             return "exclamationmark.triangle.fill"
         case .diabetes:
@@ -37,6 +40,8 @@ enum RecipeFilterMode: String, CaseIterable, Identifiable {
         switch self {
         case .none:
             return "Show all recipes without filtering"
+        case .nutrition:
+            return "Filter based on nutritional information"
         case .allergenFODMAP:
             return "Filter based on allergens and FODMAP sensitivities"
         case .diabetes:
@@ -49,17 +54,20 @@ enum RecipeFilterMode: String, CaseIterable, Identifiable {
     /// Whether this mode includes allergen/FODMAP filtering
     var includesAllergenFilter: Bool {
         switch self {
-        case .none, .diabetes:
+        case .none, .diabetes, .nutrition:
             return false
         case .allergenFODMAP, .all:
             return true
         }
     }
+    var includesNutritionalFilter: Bool {
+        self == .nutrition || self == .all
+    }
     
     /// Whether this mode includes diabetes filtering
     var includesDiabetesFilter: Bool {
         switch self {
-        case .none, .allergenFODMAP:
+        case .none, .allergenFODMAP, .nutrition:
             return false
         case .diabetes, .all:
             return true

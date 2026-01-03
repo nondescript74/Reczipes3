@@ -15,20 +15,18 @@ struct RecipeFilterBar: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // Filter Mode Picker
-            Picker("Filter Mode", selection: $filterMode) {
+            // Filter Mode Picker - Compact badges
+            HStack(spacing: 8) {
                 ForEach(RecipeFilterMode.allCases) { mode in
-                    Label(mode.displayName, systemImage: mode.icon)
-                        .tag(mode)
+                    filterBadge(for: mode)
                 }
             }
-            .pickerStyle(.segmented)
             .padding(.horizontal)
             .padding(.top, 8)
             
             // Filter Details Section (only show when a filter is active)
             if filterMode != .none {
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     // Show active profile info for allergen filters
                     if filterMode.includesAllergenFilter {
                         allergenProfileSection
@@ -39,16 +37,22 @@ struct RecipeFilterBar: View {
                         diabetesStatusSection
                     }
                     
+                    // Show nutrition status for nutrition filters
+                    if filterMode.includesNutritionalFilter {
+                        nutritionStatusSection
+                    }
+                    
                     Spacer()
                     
                     // Show only safe toggle
                     Toggle(isOn: $showOnlySafe) {
-                        Text("Only Safe")
+                        Image(systemName: "checkmark.shield.fill")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(showOnlySafe ? .green : .secondary)
                     }
-                    .toggleStyle(.switch)
-                    .fixedSize()
+                    .toggleStyle(.button)
+                    .buttonStyle(.borderless)
+                    .help("Show only safe recipes")
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 8)
@@ -57,80 +61,133 @@ struct RecipeFilterBar: View {
         .background(Color(.systemGray6))
     }
     
+    // MARK: - Filter Badge
+    
+    @ViewBuilder
+    private func filterBadge(for mode: RecipeFilterMode) -> some View {
+        Button {
+            filterMode = mode
+        } label: {
+            Image(systemName: mode.icon)
+                .font(.caption)
+                .foregroundStyle(filterMode == mode ? .white : badgeColor(for: mode))
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(filterMode == mode ? badgeColor(for: mode) : Color(.systemBackground))
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(badgeColor(for: mode).opacity(0.3), lineWidth: filterMode == mode ? 0 : 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(mode.description)
+    }
+    
+    private func badgeColor(for mode: RecipeFilterMode) -> Color {
+        switch mode {
+        case .none:
+            return .gray
+        case .allergenFODMAP:
+            return .orange
+        case .diabetes:
+            return .red
+        case .nutrition:
+            return .green
+        case .all:
+            return .purple
+        }
+    }
+    
     // MARK: - Allergen Profile Section
     
     private var allergenProfileSection: some View {
         Button(action: onProfileTap) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: "person.crop.circle.fill")
-                    .foregroundStyle(activeProfile != nil ? .blue : .secondary)
+                    .font(.caption)
+                    .foregroundStyle(activeProfile != nil ? .orange : .secondary)
                 
                 if let profile = activeProfile {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(profile.name)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
-                        
-                        Text("\(profile.sensitivities.count) sensitivit\(profile.sensitivities.count == 1 ? "y" : "ies")")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text("\(profile.sensitivities.count)")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
                 } else {
-                    Text("No Profile")
-                        .font(.caption)
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                Capsule()
                     .fill(Color(.systemBackground))
             )
         }
         .buttonStyle(.plain)
+        .help(activeProfile != nil ? "Profile: \(activeProfile!.name) (\(activeProfile!.sensitivities.count) sensitivities)" : "No profile selected - tap to choose")
     }
     
     // MARK: - Diabetes Status Section
     
     private var diabetesStatusSection: some View {
         Button(action: onProfileTap) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: "heart.text.square.fill")
+                    .font(.caption)
                     .foregroundStyle(activeProfile?.hasDiabetesConcern == true ? .red : .secondary)
                 
                 if let profile = activeProfile, profile.hasDiabetesConcern {
-                    HStack(spacing: 4) {
-                        Text(profile.diabetesStatus.icon)
-                            .font(.caption)
-                        Text(profile.diabetesStatus.rawValue)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
-                    }
-                } else {
-                    Text("No Diabetes Status")
+                    Text(profile.diabetesStatus.icon)
                         .font(.caption)
+                } else {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                Capsule()
                     .fill(Color(.systemBackground))
             )
         }
         .buttonStyle(.plain)
+        .help(activeProfile?.hasDiabetesConcern == true ? "Diabetes: \(activeProfile!.diabetesStatus.rawValue)" : "No diabetes status - tap to set")
+    }
+    
+    // MARK: - Nutrition Status Section
+    
+    private var nutritionStatusSection: some View {
+        Button(action: onProfileTap) {
+            HStack(spacing: 4) {
+                Image(systemName: "leaf.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                
+                if let profile = activeProfile, profile.hasNutritionalGoals {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                } else {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(Color(.systemBackground))
+            )
+        }
+        .buttonStyle(.plain)
+        .help(activeProfile?.hasNutritionalGoals == true ? "Nutritional goals configured" : "No nutritional goals - tap to set")
     }
 }
 
@@ -175,6 +232,12 @@ struct RecipeFilterStatusHeader: View {
             } else {
                 return "Sorted by Diabetes Suitability"
             }
+        case .nutrition:
+            if showOnlySafe {
+                return "Nutrient-Rich Recipes"
+            } else {
+                return "Sorted by Nutritional Value"
+            }
         case .all:
             if showOnlySafe {
                 return "Safe for All Conditions"
@@ -192,6 +255,8 @@ struct RecipeFilterStatusHeader: View {
             return .orange
         case .diabetes:
             return .blue
+        case .nutrition:
+            return .green
         case .all:
             return .purple
         }

@@ -7,12 +7,13 @@
 
 import Foundation
 
-/// Combined score that includes allergen, FODMAP, and diabetes analysis
+/// Combined score that includes allergen, FODMAP, diabetes, and nutritional analysis
 struct CombinedRecipeScore: Identifiable, Sendable {
     let id = UUID()
     let recipeID: UUID
     let allergenScore: RecipeAllergenScore?
     let diabetesScore: DiabetesScore?
+    let nutritionalScore: NutritionalScore?
     let filterMode: RecipeFilterMode
     
     /// Overall safety score considering active filters
@@ -32,6 +33,15 @@ struct CombinedRecipeScore: Identifiable, Sendable {
             components += 1
         }
         
+        // Add nutritional score if relevant
+        if filterMode.includesNutritionalFilter, let nutrition = nutritionalScore {
+            // Convert compatibility score (0-100) to risk score (0-15) by inverting
+            // Higher compatibility = lower risk
+            let nutritionalRisk = 15.0 - (nutrition.compatibilityScore / 100.0 * 15.0)
+            total += nutritionalRisk
+            components += 1
+        }
+        
         // Return average if we have components, otherwise 0
         return components > 0 ? total / Double(components) : 0
     }
@@ -45,10 +55,13 @@ struct CombinedRecipeScore: Identifiable, Sendable {
             return allergenScore?.isSafe ?? true
         case .diabetes:
             return diabetesScore?.isDiabeticFriendly ?? true
+        case .nutrition:
+            return nutritionalScore?.isCompatible ?? true
         case .all:
             let allergenSafe = allergenScore?.isSafe ?? true
             let diabetesSafe = diabetesScore?.isDiabeticFriendly ?? true
-            return allergenSafe && diabetesSafe
+            let nutritionSafe = nutritionalScore?.isCompatible ?? true
+            return allergenSafe && diabetesSafe && nutritionSafe
         }
     }
     
@@ -65,12 +78,20 @@ struct CombinedRecipeScore: Identifiable, Sendable {
             return allergenScore?.scoreLabel ?? ""
         case .diabetes:
             return diabetesScore?.suitability.displayName ?? ""
+        case .nutrition:
+            if let nutrition = nutritionalScore {
+                return nutrition.overallSeverity == .high ? "High Risk" : "Moderate"
+            }
+            return ""
         case .all:
             if let allergen = allergenScore, !allergen.isSafe {
                 return allergen.scoreLabel
             }
             if let diabetes = diabetesScore, !diabetes.isDiabeticFriendly {
                 return diabetes.suitability.displayName
+            }
+            if let nutrition = nutritionalScore, !nutrition.isCompatible {
+                return nutrition.overallSeverity == .high ? "High Risk" : "Moderate"
             }
             return "Safe"
         }
@@ -92,11 +113,20 @@ struct CombinedRecipeScore: Identifiable, Sendable {
             return "gray"
         case .diabetes:
             return diabetesScore?.suitability.color ?? "gray"
+        case .nutrition:
+            if let nutrition = nutritionalScore {
+                return nutrition.overallSeverity.color
+            }
+            return "gray"
         case .all:
-            // Use the worse of the two
+            // Use the worse of the three
             let allergenRisk = allergenScore?.score ?? 0
             let diabetesRisk = diabetesScore?.riskScore ?? 0
-            let maxRisk = max(allergenRisk, diabetesRisk)
+            
+            // Convert nutritional compatibility to risk (inverted scale)
+            let nutritionRisk = nutritionalScore.map { 15.0 - ($0.compatibilityScore / 100.0 * 15.0) } ?? 0
+            
+            let maxRisk = max(allergenRisk, diabetesRisk, nutritionRisk)
             
             if maxRisk < 5 {
                 return "yellow"
