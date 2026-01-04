@@ -61,7 +61,10 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-
+                "✨ Added: Rerun Analysis button for diabetic-friendly recipe analysis",
+                "🔗 Added: Clickable recipe reference URLs that open in Safari Reader mode",
+                "🔒 Enhanced: Reference URLs open in secure SFSafariViewController with restricted navigation",
+                "🎨 Improved: Recipe references now display as interactive buttons with Safari icon for valid URLs"
             ]
         ))
         
@@ -70,10 +73,13 @@ class VersionHistoryManager {
         
         history.append(VersionHistoryEntry(
             version: "12.8",
-            buildNumber: "60",
+            buildNumber: "61",
             releaseDate: Date(),
             changes: [
-
+                "✨ Added: Rerun Analysis button for diabetic-friendly recipe analysis",
+                "🔗 Added: Clickable recipe reference URLs that open in Safari Reader mode",
+                "🔒 Enhanced: Reference URLs open in secure SFSafariViewController with restricted navigation",
+                "🎨 Improved: Recipe references now display as interactive buttons with Safari icon for valid URLs"
             ]
         ))
         

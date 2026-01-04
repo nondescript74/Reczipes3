@@ -35,6 +35,8 @@ struct RecipeDetailView: View {
     @State private var pendingTips: [RecipeNote] = [] // Tips to be saved with the recipe
     @State private var showingCookingMode = false
     @State private var currentServings: Int = 1
+    @State private var showingSafariView = false
+    @State private var safariURL: URL?
     
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
@@ -344,6 +346,25 @@ struct RecipeDetailView: View {
                         
                         if let info = diabeticInfo {
                             DiabeticInfoView(info: info)
+                            
+                            // Rerun analysis button
+                            Button {
+                                Task {
+                                    await rerunDiabeticAnalysis()
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Rerun Analysis")
+                                }
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.red.opacity(0.1))
+                                .foregroundStyle(.red)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .disabled(isLoadingDiabeticInfo)
                         } else if isLoadingDiabeticInfo {
                             VStack(spacing: 12) {
                                 ProgressView("Analyzing recipe...", value: analysisProgress)
@@ -593,10 +614,39 @@ struct RecipeDetailView: View {
                         Label("Reference", systemImage: "link")
                             .font(.headline)
                         
-                        Text(reference)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .italic()
+                        // Check if reference is a valid URL
+                        if let url = URL(string: reference), 
+                           url.scheme == "http" || url.scheme == "https" {
+                            // Clickable link button
+                            Button {
+                                safariURL = url
+                                showingSafariView = true
+                            } label: {
+                                HStack {
+                                    Text(reference)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.blue)
+                                        .underline()
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "safari")
+                                        .foregroundStyle(.blue)
+                                }
+                                .padding()
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            // Plain text for non-URL references
+                            Text(reference)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .italic()
+                        }
                     }
                 }
             }
@@ -692,6 +742,12 @@ struct RecipeDetailView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingSafariView) {
+            if let url = safariURL {
+                SafariView(url: url, entersReaderIfAvailable: true)
+                    .ignoresSafeArea()
+            }
         }
         .alert("Reminders", isPresented: $showingRemindersAlert) {
             Button("OK", role: .cancel) { }
@@ -803,6 +859,16 @@ struct RecipeDetailView: View {
             remindersAlertMessage = "Failed to analyze recipe: \(error.localizedDescription)"
             showingRemindersAlert = true
         }
+    }
+    
+    private func rerunDiabeticAnalysis() async {
+        // Clear existing analysis
+        diabeticInfo = nil
+        
+        logInfo("Rerunning diabetic analysis for recipe: \(recipe.title)", category: "diabetic")
+        
+        // Rerun the analysis
+        await loadDiabeticInfo()
     }
     
     // MARK: - Task Restoration
@@ -998,6 +1064,30 @@ struct RecipeDetailView: View {
         case .timing: return .purple
         case .general: return .gray
         }
+    }
+}
+
+// MARK: - SafariView Wrapper
+
+import SafariServices
+
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+    let entersReaderIfAvailable: Bool
+    
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let configuration = SFSafariViewController.Configuration()
+        configuration.entersReaderIfAvailable = entersReaderIfAvailable
+        configuration.barCollapsingEnabled = true
+        
+        let safariVC = SFSafariViewController(url: url, configuration: configuration)
+        safariVC.dismissButtonStyle = .done
+        
+        return safariVC
+    }
+    
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
+        // No updates needed
     }
 }
 
