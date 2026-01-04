@@ -53,9 +53,10 @@ struct DiabeticCacheIntegrationTests {
             }
             
             // Generate mock analysis based on recipe ID
-            return createMockAnalysis(recipeId: recipeId)
+            return await createMockAnalysis(recipeId: recipeId)
         }
         
+        @MainActor
         private func createMockAnalysis(recipeId: UUID) -> DiabeticInfo {
             DiabeticInfo(
                 id: UUID(),
@@ -284,7 +285,7 @@ struct DiabeticCacheIntegrationTests {
         
         // Modify one recipe
         logger.info("🔧 Modifying recipe 2...")
-        let newIngredients = [
+        let newIngredients = await [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "5", unit: "cups", name: "modified ingredient")
             ])

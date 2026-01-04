@@ -14,10 +14,10 @@
             filePath = "Reczipes2/Models/VersionHistory.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "242"
-            endingLineNumber = "242"
-            landmarkName = "VersionHistoryManager"
-            landmarkType = "3">
+            startingLineNumber = "247"
+            endingLineNumber = "247"
+            landmarkName = "versionHistory"
+            landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

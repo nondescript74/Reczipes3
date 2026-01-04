@@ -61,16 +61,21 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "🔧 Fixed: Swift 6 concurrency warnings in UserAllergenProfile and SchemaMigration files",
-                "📝 Improved: JSON encoding/decoding patterns for nutritional goals and sensitivities",
-                "💾 Enhanced: Schema V3 compatibility with CloudKit sync for nutritional data",
-                "✅ Verified: All SwiftData models properly configured for main actor isolation"
 
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.8",
+            buildNumber: "60",
+            releaseDate: Date(),
+            changes: [
+
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "12.7",
