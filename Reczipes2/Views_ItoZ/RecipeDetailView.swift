@@ -15,6 +15,7 @@ struct RecipeDetailView: View {
     let previewImage: UIImage? // Optional image for unsaved recipes being previewed
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppStateManager
     
     @Query private var savedRecipes: [Recipe]
@@ -77,50 +78,513 @@ struct RecipeDetailView: View {
         return AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
     }
     
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Recipe Image (if available)
-                // For unsaved recipes in preview, show the previewImage
-                // For saved recipes, use the imageName from the recipe model
-                if let previewImage = previewImage {
-                    // Show the temporary preview image (for extracted recipes not yet saved)
-                    Image(uiImage: previewImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                        .frame(maxHeight: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        .padding(.horizontal)
-                } else if let imageName = recipe.imageName {
-                    // Get all image names (main + additional + imageURLs)
-                    let allImageNames = getAllImageNames(for: recipe)
+    // MARK: - View Components
+    
+    @ViewBuilder
+    private var allergenSection: some View {
+        // Allergen Information Section (if profile is active)
+        if let score = allergenScore, let profile = activeProfile {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Allergen Analysis", systemImage: "allergens")
+                        .font(.title2)
+                        .fontWeight(.bold)
                     
-                    if allImageNames.count > 1 {
-                        // Show scrollable gallery for multiple images
-                        TabView {
-                            ForEach(allImageNames, id: \.self) { imageNameItem in
-                                RecipeImageView(
-                                    imageName: imageNameItem,
-                                    size: nil,
-                                    aspectRatio: .fit,
-                                    cornerRadius: 16
-                                )
-                                .frame(maxWidth: .infinity)
-                                .frame(maxHeight: 200)
-                                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                                .padding(.horizontal)
-                            }
+                    Spacer()
+                    
+                    RecipeAllergenBadge(score: score)
+                }
+                
+                Text("Based on \(profile.name)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                if !score.isSafe {
+                    Button {
+                        showingAllergenDetail = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "info.circle.fill")
+                            Text("View Detailed Analysis")
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .always))
-                        .frame(height: 220) // Slightly taller to accommodate page indicator
-                        .indexViewStyle(.page(backgroundDisplayMode: .always))
-                    } else {
-                        // Show single image (saved recipes)
+                        .font(.subheadline)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.1))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+            
+            Divider()
+        }
+    }
+    
+    @ViewBuilder
+    private var fodmapSection: some View {
+        // FODMAP Substitutions Section (if there are any high FODMAP ingredients)
+        if fodmapSettings.isFODMAPEnabled && fodmapAnalysis.hasSubstitutions {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("FODMAP Friendly Options", systemImage: "leaf.circle.fill")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.orange)
+                    
+                    Spacer()
+                    
+                    Button {
+                        withAnimation {
+                            showingFODMAPSubstitutions.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(showingFODMAPSubstitutions ? "Hide" : "Show")
+                                .font(.subheadline)
+                            Image(systemName: showingFODMAPSubstitutions ? "chevron.up" : "chevron.down")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.blue)
+                    }
+                }
+                
+                if showingFODMAPSubstitutions {
+                    FODMAPSubstitutionSection(analysis: fodmapAnalysis)
+                }
+            }
+            .padding(.vertical, 8)
+            
+            Divider()
+        }
+    }
+    
+    @ViewBuilder
+    private var diabeticSection: some View {
+        // Diabetic-Friendly Analysis Section
+        // Show if diabetic mode is enabled OR if active profile has diabetes concern
+        if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
+            VStack(alignment: .leading, spacing: 12) {
+                diabeticHeaderView
+                
+                diabeticContentView
+            }
+            .padding(.vertical, 8)
+            
+            Divider()
+        }
+    }
+    
+    @ViewBuilder
+    private var diabeticHeaderView: some View {
+        HStack {
+            Label("Diabetic-Friendly Analysis", systemImage: "heart.text.square")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(.red)
+            
+            Spacer()
+            
+            // Show diabetes status badge if from profile
+            if let profile = activeProfile, profile.hasDiabetesConcern {
+                HStack(spacing: 4) {
+                    Text(profile.diabetesStatus.icon)
+                    Text(profile.diabetesStatus.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.red.opacity(0.1))
+                .foregroundStyle(.red)
+                .clipShape(Capsule())
+            }
+        }
+        
+        // Show profile note if analysis is triggered by profile diabetes status
+        if let profile = activeProfile, profile.hasDiabetesConcern {
+            Text("Analysis based on \(profile.name) - \(profile.diabetesStatus.description)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var diabeticContentView: some View {
+        if let info = diabeticInfo {
+            DiabeticInfoView(info: info)
+            
+            // Rerun analysis button
+            Button {
+                Task {
+                    await rerunDiabeticAnalysis()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Rerun Analysis")
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.red.opacity(0.1))
+                .foregroundStyle(.red)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .disabled(isLoadingDiabeticInfo)
+        } else if isLoadingDiabeticInfo {
+            VStack(spacing: 12) {
+                ProgressView("Analyzing recipe...", value: analysisProgress)
+                    .progressViewStyle(.linear)
+                    .tint(.red)
+                
+                Text("\(Int(analysisProgress * 100))% complete")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+        } else {
+            Button {
+                Task {
+                    await loadDiabeticInfo()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "waveform.path.ecg")
+                    Text("Analyze for Diabetic-Friendly Info")
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red.opacity(0.1))
+                .foregroundStyle(.red)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var nutritionalSection: some View {
+        // Nutritional Analysis Section
+        if activeProfile?.nutritionalGoals != nil || activeProfile != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                RecipeNutritionalSection(
+                    recipe: recipe,
+                    profile: activeProfile,
+                    servings: currentServings
+                )
+            }
+            .padding(.vertical, 8)
+            
+            Divider()
+        }
+    }
+    
+    @ViewBuilder
+    private var ingredientsSection: some View {
+        // Ingredients Section
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Ingredients", systemImage: "list.bullet")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            ForEach(recipe.ingredientSections) { section in
+                ingredientSectionView(section)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func ingredientSectionView(_ section: IngredientSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let title = section.title {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.blue)
+                    .padding(.top, 8)
+            }
+            
+            ForEach(section.ingredients) { ingredient in
+                ingredientRowView(ingredient)
+            }
+            
+            if let transitionNote = section.transitionNote {
+                Text(transitionNote)
+                    .font(.subheadline)
+                    .italic()
+                    .foregroundStyle(.orange)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func ingredientRowView(_ ingredient: Ingredient) -> some View {
+        // Check if this ingredient has a FODMAP substitution
+        let substitution = fodmapSettings.isFODMAPEnabled && fodmapSettings.showInlineIndicators
+            ? FODMAPSubstitutionDatabase.shared.getSubstitutions(for: ingredient.name)
+            : nil
+        
+        IngredientRowWithFODMAP(
+            ingredient: ingredient,
+            substitution: substitution
+        )
+    }
+    
+    @ViewBuilder
+    private var instructionsSection: some View {
+        // Instructions Section
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Instructions", systemImage: "list.number")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            ForEach(recipe.instructionSections) { section in
+                instructionSectionView(section)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func instructionSectionView(_ section: InstructionSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let title = section.title {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.green)
+                    .padding(.top, 8)
+            }
+            
+            ForEach(section.steps) { step in
+                instructionStepView(step)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func instructionStepView(_ step: InstructionStep) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            if let stepNum = step.stepNumber {
+                Text("\(stepNum)")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Color.green)
+                    .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 6)
+            }
+            
+            Text(step.text)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.bottom, 4)
+    }
+    
+    @ViewBuilder
+    private var notesSection: some View {
+        // Notes Section - Always show to allow adding tips
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Notes", systemImage: "note.text")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            notesListView
+            
+            addTipButtonView
+        }
+    }
+    
+    @ViewBuilder
+    private var notesListView: some View {
+        // Show existing notes
+        ForEach(recipe.notes) { note in
+            noteView(note, isPending: false)
+        }
+        
+        // Show pending tips (not yet saved)
+        ForEach(pendingTips) { note in
+            noteView(note, isPending: true)
+        }
+        
+        // Show helpful message if no notes exist yet
+        if recipe.notes.isEmpty && pendingTips.isEmpty {
+            Text("No notes yet. Add cooking tips, substitutions, or important reminders.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .italic()
+                .padding(.vertical, 8)
+        }
+    }
+    
+    @ViewBuilder
+    private func noteView(_ note: RecipeNote, isPending: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: iconForNoteType(note.type))
+                .font(.title3)
+                .foregroundStyle(colorForNoteType(note.type))
+                .frame(width: 32)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                if isPending {
+                    HStack {
+                        Text(note.type.rawValue.capitalized)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(colorForNoteType(note.type))
+                        
+                        Spacer()
+                        
+                        Text("Pending")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.2))
+                            .foregroundStyle(.orange)
+                            .clipShape(Capsule())
+                    }
+                } else {
+                    Text(note.type.rawValue.capitalized)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(colorForNoteType(note.type))
+                }
+                
+                Text(note.text)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+            }
+            
+            if isPending {
+                Button {
+                    removePendingTip(note)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(12)
+        .background(colorForNoteType(note.type).opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            Group {
+                if isPending {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, dash: [5]))
+                }
+            }
+        )
+    }
+    
+    @ViewBuilder
+    private var addTipButtonView: some View {
+        // Add Tip Button - Always visible
+        Button {
+            showingAddTip = true
+        } label: {
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                Text("Add a Tip")
+            }
+            .font(.subheadline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.blue.opacity(0.1))
+            .foregroundStyle(.blue)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    @ViewBuilder
+    private var referenceSection: some View {
+        // Reference
+        if let reference = recipe.reference {
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Reference", systemImage: "link")
+                    .font(.headline)
+                
+                referenceContentView(reference)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func referenceContentView(_ reference: String) -> some View {
+        // Check if reference is a valid URL
+        if let url = URL(string: reference),
+           url.scheme == "http" || url.scheme == "https" {
+            // Clickable link button
+            Button {
+                safariURL = url
+                showingSafariView = true
+            } label: {
+                HStack {
+                    Text(reference)
+                        .font(.subheadline)
+                        .foregroundStyle(.blue)
+                        .underline()
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "safari")
+                        .foregroundStyle(.blue)
+                }
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Plain text for non-URL references
+            Text(reference)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .italic()
+        }
+    }
+    
+    @ViewBuilder
+    private var recipeImageSection: some View {
+        // Recipe Image (if available)
+        // For unsaved recipes in preview, show the previewImage
+        // For saved recipes, use the imageName from the recipe model
+        if let previewImage = previewImage {
+            // Show the temporary preview image (for extracted recipes not yet saved)
+            Image(uiImage: previewImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                .padding(.horizontal)
+        } else if let imageName = recipe.imageName {
+            // Get all image names (main + additional + imageURLs)
+            let allImageNames = getAllImageNames(for: recipe)
+            
+            if allImageNames.count > 1 {
+                // Show scrollable gallery for multiple images
+                TabView {
+                    ForEach(allImageNames, id: \.self) { imageNameItem in
                         RecipeImageView(
-                            imageName: imageName,
-                            size: nil,  // No fixed size - let it adapt
+                            imageName: imageNameItem,
+                            size: nil,
                             aspectRatio: .fit,
                             cornerRadius: 16
                         )
@@ -130,525 +594,160 @@ struct RecipeDetailView: View {
                         .padding(.horizontal)
                     }
                 }
-                
-                // Header Section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(recipe.title)
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                            
-                            if let headerNotes = recipe.headerNotes {
-                                Text(headerNotes)
-                                    .font(.body)
-                                    .foregroundStyle(.secondary)
-                                    .italic()
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(spacing: 8) {
-                            // Show Save/Update button based on state
-                            if !isSaved {
-                                // Unsaved recipe - show Save button
-                                Button(action: { 
-                                    saveRecipeWithTips()
-                                }) {
-                                    Label("Save Recipe", systemImage: "plus.circle.fill")
-                                        .font(.headline)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.blue)
-                            } else if !pendingTips.isEmpty {
-                                // Saved recipe with pending tips - show Update button
-                                Button(action: { 
-                                    savePendingTipsToExistingRecipe()
-                                }) {
-                                    Label("Save Tips", systemImage: "arrow.down.circle.fill")
-                                        .font(.headline)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.blue)
-                            } else {
-                                // Saved recipe with no pending tips - show Saved badge
-                                Label("Saved", systemImage: "checkmark.circle.fill")
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(Color.green)
-                                    .clipShape(Capsule())
-                            }
-                            
-                            // Show badge if there are pending tips
-                            if !pendingTips.isEmpty {
-                                Text("\(pendingTips.count) tip\(pendingTips.count == 1 ? "" : "s") to save")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            // Show diabetic badge if diabetic mode is enabled or profile has diabetes concern
-                            if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
-                                RecipeDiabeticBadge.full(
-                                    info: diabeticInfo,
-                                    isLoading: isLoadingDiabeticInfo,
-                                    progress: analysisProgress
-                                )
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
-                                .background(Color(.systemBackground))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
-                    
-                    if let yield = recipe.yield {
-                        HStack {
-                            Label(yield, systemImage: "chart.bar.doc.horizontal")
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.blue.opacity(0.1))
-                                .clipShape(Capsule())
-                            
-                            // Serving size stepper for nutritional analysis
-                            if activeProfile?.nutritionalGoals != nil {
-                                Divider()
-                                    .frame(height: 20)
-                                
-                                Stepper("Servings: \(currentServings)", value: $currentServings, in: 1...20)
-                                    .font(.subheadline)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Color.green.opacity(0.1))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                }
-                .padding(.bottom, 8)
-                
-                Divider()
-                
-                // Allergen Information Section (if profile is active)
-                if let score = allergenScore, let profile = activeProfile {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("Allergen Analysis", systemImage: "allergens")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            
-                            Spacer()
-                            
-                            RecipeAllergenBadge(score: score)
-                        }
-                        
-                        Text("Based on \(profile.name)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        if !score.isSafe {
-                            Button {
-                                showingAllergenDetail = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "info.circle.fill")
-                                    Text("View Detailed Analysis")
-                                }
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.orange.opacity(0.1))
-                                .foregroundStyle(.orange)
-                                .clipShape(Capsule())
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    Divider()
-                }
-                
-                // FODMAP Substitutions Section (if there are any high FODMAP ingredients)
-                if fodmapSettings.isFODMAPEnabled && fodmapAnalysis.hasSubstitutions {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("FODMAP Friendly Options", systemImage: "leaf.circle.fill")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.orange)
-                            
-                            Spacer()
-                            
-                            Button {
-                                withAnimation {
-                                    showingFODMAPSubstitutions.toggle()
-                                }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(showingFODMAPSubstitutions ? "Hide" : "Show")
-                                        .font(.subheadline)
-                                    Image(systemName: showingFODMAPSubstitutions ? "chevron.up" : "chevron.down")
-                                        .font(.caption)
-                                }
-                                .foregroundStyle(.blue)
-                            }
-                        }
-                        
-                        if showingFODMAPSubstitutions {
-                            FODMAPSubstitutionSection(analysis: fodmapAnalysis)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    Divider()
-                }
-                
-                // Diabetic-Friendly Analysis Section
-                // Show if diabetic mode is enabled OR if active profile has diabetes concern
-                if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("Diabetic-Friendly Analysis", systemImage: "heart.text.square")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.red)
-                            
-                            Spacer()
-                            
-                            // Show diabetes status badge if from profile
-                            if let profile = activeProfile, profile.hasDiabetesConcern {
-                                HStack(spacing: 4) {
-                                    Text(profile.diabetesStatus.icon)
-                                    Text(profile.diabetesStatus.rawValue)
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.red.opacity(0.1))
-                                .foregroundStyle(.red)
-                                .clipShape(Capsule())
-                            }
-                        }
-                        
-                        // Show profile note if analysis is triggered by profile diabetes status
-                        if let profile = activeProfile, profile.hasDiabetesConcern {
-                            Text("Analysis based on \(profile.name) - \(profile.diabetesStatus.description)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        if let info = diabeticInfo {
-                            DiabeticInfoView(info: info)
-                            
-                            // Rerun analysis button
-                            Button {
-                                Task {
-                                    await rerunDiabeticAnalysis()
-                                }
-                            } label: {
-                                HStack {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Rerun Analysis")
-                                }
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Color.red.opacity(0.1))
-                                .foregroundStyle(.red)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                            .disabled(isLoadingDiabeticInfo)
-                        } else if isLoadingDiabeticInfo {
-                            VStack(spacing: 12) {
-                                ProgressView("Analyzing recipe...", value: analysisProgress)
-                                    .progressViewStyle(.linear)
-                                    .tint(.red)
-                                
-                                Text("\(Int(analysisProgress * 100))% complete")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 24)
-                        } else {
-                            Button {
-                                Task {
-                                    await loadDiabeticInfo()
-                                }
-                            } label: {
-                                HStack {
-                                    Image(systemName: "waveform.path.ecg")
-                                    Text("Analyze for Diabetic-Friendly Info")
-                                }
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red.opacity(0.1))
-                                .foregroundStyle(.red)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    Divider()
-                }
-                
-                // Nutritional Analysis Section
-                if activeProfile?.nutritionalGoals != nil || activeProfile != nil {
-                    VStack(alignment: .leading, spacing: 12) {
-                        RecipeNutritionalSection(
-                            recipe: recipe,
-                            profile: activeProfile,
-                            servings: currentServings
-                        )
-                    }
-                    .padding(.vertical, 8)
-                    
-                    Divider()
-                }
-                
-                // Ingredients Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Label("Ingredients", systemImage: "list.bullet")
-                        .font(.title2)
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .frame(height: 220)
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+            } else {
+                // Show single image (saved recipes)
+                RecipeImageView(
+                    imageName: imageName,
+                    size: nil,
+                    aspectRatio: .fit,
+                    cornerRadius: 16
+                )
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 200)
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                .padding(.horizontal)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(recipe.title)
+                        .font(.largeTitle)
                         .fontWeight(.bold)
                     
-                    ForEach(recipe.ingredientSections) { section in
-                        VStack(alignment: .leading, spacing: 12) {
-                            if let title = section.title {
-                                Text(title)
-                                    .font(.headline)
-                                    .foregroundStyle(.blue)
-                                    .padding(.top, 8)
-                            }
-                            
-                            ForEach(section.ingredients) { ingredient in
-                                // Check if this ingredient has a FODMAP substitution
-                                let substitution = fodmapSettings.isFODMAPEnabled && fodmapSettings.showInlineIndicators
-                                    ? FODMAPSubstitutionDatabase.shared.getSubstitutions(for: ingredient.name)
-                                    : nil
-                                
-                                IngredientRowWithFODMAP(
-                                    ingredient: ingredient,
-                                    substitution: substitution
-                                )
-                            }
-                            
-                            if let transitionNote = section.transitionNote {
-                                Text(transitionNote)
-                                    .font(.subheadline)
-                                    .italic()
-                                    .foregroundStyle(.orange)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 12)
-                                    .background(Color.orange.opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
-                    }
-                }
-                
-                Divider()
-                
-                // Instructions Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Label("Instructions", systemImage: "list.number")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    ForEach(recipe.instructionSections) { section in
-                        VStack(alignment: .leading, spacing: 12) {
-                            if let title = section.title {
-                                Text(title)
-                                    .font(.headline)
-                                    .foregroundStyle(.green)
-                                    .padding(.top, 8)
-                            }
-                            
-                            ForEach(section.steps) { step in
-                                HStack(alignment: .top, spacing: 12) {
-                                    if let stepNum = step.stepNumber {
-                                        Text("\(stepNum)")
-                                            .font(.title3)
-                                            .fontWeight(.bold)
-                                            .foregroundStyle(.white)
-                                            .frame(width: 32, height: 32)
-                                            .background(Color.green)
-                                            .clipShape(Circle())
-                                    } else {
-                                        Circle()
-                                            .fill(Color.green)
-                                            .frame(width: 8, height: 8)
-                                            .padding(.top, 6)
-                                    }
-                                    
-                                    Text(step.text)
-                                        .font(.body)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .padding(.bottom, 4)
-                            }
-                        }
-                    }
-                }
-                
-                // Notes Section - Always show to allow adding tips
-                Divider()
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Notes", systemImage: "note.text")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    // Show existing notes
-                    ForEach(recipe.notes) { note in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: iconForNoteType(note.type))
-                                .font(.title3)
-                                .foregroundStyle(colorForNoteType(note.type))
-                                .frame(width: 32)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(note.type.rawValue.capitalized)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(colorForNoteType(note.type))
-                                
-                                Text(note.text)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                            }
-                        }
-                        .padding(12)
-                        .background(colorForNoteType(note.type).opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    
-                    // Show pending tips (not yet saved)
-                    ForEach(pendingTips) { note in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: iconForNoteType(note.type))
-                                .font(.title3)
-                                .foregroundStyle(colorForNoteType(note.type))
-                                .frame(width: 32)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(note.type.rawValue.capitalized)
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(colorForNoteType(note.type))
-                                    
-                                    Spacer()
-                                    
-                                    Text("Pending")
-                                        .font(.caption2)
-                                        .fontWeight(.semibold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.orange.opacity(0.2))
-                                        .foregroundStyle(.orange)
-                                        .clipShape(Capsule())
-                                }
-                                
-                                Text(note.text)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                            }
-                            
-                            Button {
-                                removePendingTip(note)
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(12)
-                        .background(colorForNoteType(note.type).opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, dash: [5]))
-                        )
-                    }
-                    
-                    // Show helpful message if no notes exist yet
-                    if recipe.notes.isEmpty && pendingTips.isEmpty {
-                        Text("No notes yet. Add cooking tips, substitutions, or important reminders.")
-                            .font(.subheadline)
+                    if let headerNotes = recipe.headerNotes {
+                        Text(headerNotes)
+                            .font(.body)
                             .foregroundStyle(.secondary)
                             .italic()
-                            .padding(.vertical, 8)
-                    }
-                    
-                    // Add Tip Button - Always visible
-                    Button {
-                        showingAddTip = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                            Text("Add a Tip")
-                        }
-                        .font(.subheadline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundStyle(.blue)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 
-                // Reference
-                if let reference = recipe.reference {
-                    Divider()
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Reference", systemImage: "link")
-                            .font(.headline)
-                        
-                        // Check if reference is a valid URL
-                        if let url = URL(string: reference), 
-                           url.scheme == "http" || url.scheme == "https" {
-                            // Clickable link button
-                            Button {
-                                safariURL = url
-                                showingSafariView = true
-                            } label: {
-                                HStack {
-                                    Text(reference)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.blue)
-                                        .underline()
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "safari")
-                                        .foregroundStyle(.blue)
-                                }
-                                .padding()
-                                .background(Color.blue.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            // Plain text for non-URL references
-                            Text(reference)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .italic()
-                        }
-                    }
+                Spacer()
+                
+                saveButtonSection
+            }
+            
+            yieldSection
+        }
+        .padding(.bottom, 8)
+    }
+    
+    @ViewBuilder
+    private var saveButtonSection: some View {
+        VStack(spacing: 8) {
+            if !isSaved {
+                Button(action: { 
+                    saveRecipeWithTips()
+                }) {
+                    Label("Save Recipe", systemImage: "plus.circle.fill")
+                        .font(.headline)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            } else if !pendingTips.isEmpty {
+                Button(action: { 
+                    savePendingTipsToExistingRecipe()
+                }) {
+                    Label("Save Tips", systemImage: "arrow.down.circle.fill")
+                        .font(.headline)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            } else {
+                Label("Saved", systemImage: "checkmark.circle.fill")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.green)
+                    .clipShape(Capsule())
+            }
+            
+            if !pendingTips.isEmpty {
+                Text("\(pendingTips.count) tip\(pendingTips.count == 1 ? "" : "s") to save")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            
+            if diabeticSettings.isDiabeticEnabled || (activeProfile?.hasDiabetesConcern ?? false) {
+                RecipeDiabeticBadge.full(
+                    info: diabeticInfo,
+                    isLoading: isLoadingDiabeticInfo,
+                    progress: analysisProgress
+                )
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color(.systemBackground))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var yieldSection: some View {
+        if let yield = recipe.yield {
+            HStack {
+                Label(yield, systemImage: "chart.bar.doc.horizontal")
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Capsule())
+                
+                if activeProfile?.nutritionalGoals != nil {
+                    Divider()
+                        .frame(height: 20)
+                    
+                    Stepper("Servings: \(currentServings)", value: $currentServings, in: 1...20)
+                        .font(.subheadline)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+            }
+        }
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                recipeImageSection
+                
+                headerSection
+                
+                Divider()
+                
+                allergenSection
+                
+                fodmapSection
+                
+                diabeticSection
+                
+                nutritionalSection
+                
+                ingredientsSection
+                
+                Divider()
+                
+                instructionsSection
+                
+                Divider()
+                
+                notesSection
+                
+                referenceSection
             }
             .padding()
         }
@@ -1082,12 +1181,25 @@ struct SafariView: UIViewControllerRepresentable {
         
         let safariVC = SFSafariViewController(url: url, configuration: configuration)
         safariVC.dismissButtonStyle = .done
+        safariVC.preferredControlTintColor = .systemBlue
         
         return safariVC
     }
     
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
         // No updates needed
+    }
+}
+
+// Alternative: Use the standard SwiftUI approach
+extension View {
+    func safariView(url: Binding<URL?>, isPresented: Binding<Bool>) -> some View {
+        self.sheet(isPresented: isPresented) {
+            if let url = url.wrappedValue {
+                SafariView(url: url, entersReaderIfAvailable: true)
+                    .ignoresSafeArea()
+            }
+        }
     }
 }
 

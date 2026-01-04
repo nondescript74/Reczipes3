@@ -61,15 +61,28 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "✨ Added: Rerun Analysis button for diabetic-friendly recipe analysis",
-                "🔗 Added: Clickable recipe reference URLs that open in Safari Reader mode",
-                "🔒 Enhanced: Reference URLs open in secure SFSafariViewController with restricted navigation",
-                "🎨 Improved: Recipe references now display as interactive buttons with Safari icon for valid URLs"
+                "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
+                "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
+                "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",
+                "⚡️ Fixed: Recipe detail sheets appearing too small on iPad, now uses device-appropriate presentation"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "12.9",
+            buildNumber: "62",
+            releaseDate: Date(),
+            changes: [
+                "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
+                "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
+                "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",
+                "⚡️ Fixed: Recipe detail sheets appearing too small on iPad, now uses device-appropriate presentation"
+
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "12.8",

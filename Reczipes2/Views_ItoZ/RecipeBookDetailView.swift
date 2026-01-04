@@ -11,6 +11,7 @@ import SwiftData
 struct RecipeBookDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var savedRecipes: [Recipe]
     
     let book: RecipeBook
@@ -24,6 +25,10 @@ struct RecipeBookDetailView: View {
     @State private var showingShareSheet = false
     @State private var exportError: Error?
     @State private var showingExportError = false
+    
+    private var isPad: Bool {
+        horizontalSizeClass == .regular
+    }
     
     // Get recipes in the book, maintaining order
     private var bookRecipes: [RecipeModel] {
@@ -86,9 +91,17 @@ struct RecipeBookDetailView: View {
             }
             .sheet(isPresented: $showingRecipeSelector) {
                 RecipeBookRecipeSelectorView(book: book)
+#if os(iOS)
+                    .presentationDetents(isPad ? [.large] : [.medium, .large])
+                    .presentationDragIndicator(.visible)
+#endif
             }
             .sheet(isPresented: $showingBookEditor) {
                 RecipeBookEditorView(book: book)
+#if os(iOS)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+#endif
             }
             .confirmationDialog("Export Recipe Book", isPresented: $showingExportOptions) {
                 Button("Export with Images") {
@@ -250,9 +263,15 @@ struct RecipePageView: View {
     let savedRecipes: [Recipe]
     
     @State private var showingFullDetail = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     private var isSaved: Bool {
         savedRecipes.contains { $0.id == recipe.id }
+    }
+    
+    // On iPad (regular width), use fullScreenCover; on iPhone use sheet
+    private var isPad: Bool {
+        horizontalSizeClass == .regular
     }
     
     var body: some View {
@@ -433,13 +452,50 @@ struct RecipePageView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingFullDetail) {
-            NavigationStack {
-                RecipeDetailView(
-                    recipe: recipe,
-                    isSaved: isSaved,
-                    onSave: { }
-                )
+        .if(isPad) { view in
+            view.fullScreenCover(isPresented: $showingFullDetail) {
+                NavigationStack {
+                    RecipeDetailView(
+                        recipe: recipe,
+                        isSaved: isSaved,
+                        onSave: { }
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button {
+                                showingFullDetail = false
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title3)
+                                        .symbolRenderingMode(.hierarchical)
+                                    Text("Close")
+                                        .font(.body)
+                                }
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        } else: { view in
+            view.sheet(isPresented: $showingFullDetail) {
+                NavigationStack {
+                    RecipeDetailView(
+                        recipe: recipe,
+                        isSaved: isSaved,
+                        onSave: { }
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                showingFullDetail = false
+                            }
+                        }
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
         }
     }
@@ -479,6 +535,24 @@ struct ShareSheet_RBDV: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
         // No updates needed
+    }
+}
+
+// MARK: - View Extension for Conditional Modifiers
+
+extension View {
+    /// Applies a transformation to a view if a condition is true, otherwise applies an alternative transformation
+    @ViewBuilder
+    func `if`<TrueContent: View, FalseContent: View>(
+        _ condition: Bool,
+        then trueTransform: (Self) -> TrueContent,
+        else falseTransform: (Self) -> FalseContent
+    ) -> some View {
+        if condition {
+            trueTransform(self)
+        } else {
+            falseTransform(self)
+        }
     }
 }
 
