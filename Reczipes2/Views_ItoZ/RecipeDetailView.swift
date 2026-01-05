@@ -1181,7 +1181,6 @@ struct SafariView: UIViewControllerRepresentable {
         
         let safariVC = SFSafariViewController(url: url, configuration: configuration)
         safariVC.dismissButtonStyle = .done
-        safariVC.preferredControlTintColor = .systemBlue
         
         return safariVC
     }

@@ -13,7 +13,26 @@ import SwiftData
 @Suite("Recipe Export/Import Tests")
 struct RecipeExportImportTests {
     
-    // MARK: - Smoke Test
+    // MARK: - Test Configuration
+    
+    /// Helper to get the Reczipes2 backup directory path
+    func getBackupDirectory() -> URL {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+    }
+    
+    /// Helper to clean up test backup files
+    func cleanupTestBackups() throws {
+        let backupDir = getBackupDirectory()
+        if FileManager.default.fileExists(atPath: backupDir.path) {
+            let contents = try FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: nil)
+            for file in contents where file.lastPathComponent.starts(with: "TEST_") {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+    }
+    
+    // MARK: - Smoke Tests
     
     @Test("Absolute simplest test - should always pass")
     func testBasicAssertion() {
@@ -24,6 +43,14 @@ struct RecipeExportImportTests {
     func testSimpleStruct() {
         let uuid = UUID()
         #expect(uuid.uuidString.count > 0)
+    }
+    
+    @Test("Backup directory path is correct")
+    @MainActor
+    func testBackupDirectoryPath() {
+        let backupDir = getBackupDirectory()
+        #expect(backupDir.lastPathComponent == "Reczipes2", "Backup directory should be named Reczipes2")
+        #expect(backupDir.path.contains("Documents"), "Backup directory should be in Documents folder")
     }
     
     // MARK: - Test Data Factories
@@ -128,6 +155,599 @@ struct RecipeExportImportTests {
                 )
             ]
         )
+    }
+    
+    // MARK: - Backup File Location Tests
+    
+    @Test("Backup directory is created when it doesn't exist")
+    @MainActor
+    func testBackupDirectoryCreation() async throws {
+        let backupDir = getBackupDirectory()
+        
+        // Remove directory if it exists
+        if FileManager.default.fileExists(atPath: backupDir.path) {
+            try? FileManager.default.removeItem(at: backupDir)
+        }
+        
+        // Create a test recipe
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: createMinimalRecipeModel())
+        context.insert(testRecipe)
+        
+        // Create backup - this should create the directory
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        // Verify directory exists
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: backupDir.path, isDirectory: &isDirectory)
+        #expect(exists, "Backup directory should be created if it doesn't exist")
+        #expect(isDirectory.boolValue, "Backup directory path should be a directory")
+        
+        // Verify backup file is in the directory
+        #expect(backupURL.deletingLastPathComponent() == backupDir, "Backup should be saved in Reczipes2 folder")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Backup files are saved to Files/Reczipes2 folder")
+    @MainActor
+    func testBackupSavedToCorrectLocation() async throws {
+        _ = getBackupDirectory()
+        
+        // Create a test recipe
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: createCompleteRecipeModel())
+        context.insert(testRecipe)
+        
+        // Create backup
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        // Verify it's in the correct location
+        #expect(backupURL.path.contains("Documents/Reczipes2"), 
+                "Backup should be in Documents/Reczipes2 folder, but was at: \(backupURL.path)")
+        
+        // Verify file exists
+        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                "Backup file should exist at: \(backupURL.path)")
+        
+        // Verify file extension
+        #expect(backupURL.pathExtension == "reczipes", 
+                "Backup file should have .reczipes extension")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Backup file naming convention is correct")
+    @MainActor
+    func testBackupFileNaming() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: createMinimalRecipeModel())
+        context.insert(testRecipe)
+        
+        // Create backup
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        let fileName = backupURL.lastPathComponent
+        
+        // Should start with "RecipeBackup_"
+        #expect(fileName.hasPrefix("RecipeBackup_"), 
+                "Backup filename should start with 'RecipeBackup_', got: \(fileName)")
+        
+        // Should contain a date in YYYY-MM-DD format
+        let datePattern = #/\d{4}-\d{2}-\d{2}/#
+        #expect(fileName.contains(datePattern), 
+                "Backup filename should contain date in YYYY-MM-DD format")
+        
+        // Should contain a time in HHmmss format
+        let timePattern = #/\d{6}/#
+        #expect(fileName.contains(timePattern), 
+                "Backup filename should contain time in HHmmss format")
+        
+        // Should contain milliseconds (3 digits) for uniqueness
+        let millisPattern = #/_\d{3}\.reczipes/#
+        #expect(fileName.contains(millisPattern), 
+                "Backup filename should contain milliseconds for uniqueness")
+        
+        // Should end with .reczipes
+        #expect(fileName.hasSuffix(".reczipes"), 
+                "Backup filename should end with .reczipes")
+        
+        // Example: RecipeBackup_2026-01-05_143022_123.reczipes
+        print("✓ Created backup with valid filename: \(fileName)")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("listAvailableBackups finds backups in Reczipes2 folder")
+    @MainActor
+    func testListAvailableBackups() async throws {
+        // Create test backup files
+        let backupDir = getBackupDirectory()
+        try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
+        
+        // Create a test recipe
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: createMinimalRecipeModel())
+        context.insert(testRecipe)
+        
+        // Create multiple backups
+        let backup1URL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        // Wait a moment to ensure different timestamps
+        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        
+        let backup2URL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        // List available backups
+        let availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        
+        // Should find both backups
+        #expect(availableBackups.count >= 2, 
+                "Should find at least 2 backups, found: \(availableBackups.count)")
+        
+        // Backups should be sorted by modification date (most recent first)
+        if availableBackups.count >= 2 {
+            let firstDate = availableBackups[0].modificationDate
+            let secondDate = availableBackups[1].modificationDate
+            #expect(firstDate >= secondDate, 
+                    "Backups should be sorted by modification date (newest first)")
+        }
+        
+        // Verify backup info is populated
+        for backup in availableBackups.prefix(2) {
+            #expect(backup.fileSize > 0, "Backup file size should be greater than 0")
+            #expect(!backup.fileName.isEmpty, "Backup filename should not be empty")
+            #expect(!backup.displayName.isEmpty, "Backup display name should not be empty")
+            #expect(!backup.fileSizeFormatted.isEmpty, "Backup formatted file size should not be empty")
+            
+            print("✓ Found backup: \(backup.displayName) - \(backup.fileSizeFormatted)")
+        }
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backup1URL)
+        try? FileManager.default.removeItem(at: backup2URL)
+    }
+    
+    @Test("listAvailableBackups returns empty array when no backups exist")
+    @MainActor
+    func testListAvailableBackupsEmpty() throws {
+        let backupDir = getBackupDirectory()
+        
+        // Remove all .reczipes files
+        if FileManager.default.fileExists(atPath: backupDir.path) {
+            let contents = try FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: nil)
+            for file in contents where file.pathExtension == "reczipes" {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+        
+        let availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        
+        #expect(availableBackups.isEmpty, "Should return empty array when no backups exist")
+        print("✓ Correctly returns empty array when no backups found")
+    }
+    
+    @Test("listAvailableBackups handles missing directory gracefully")
+    @MainActor
+    func testListAvailableBackupsMissingDirectory() throws {
+        let backupDir = getBackupDirectory()
+        
+        // Remove directory if it exists
+        if FileManager.default.fileExists(atPath: backupDir.path) {
+            try? FileManager.default.removeItem(at: backupDir)
+        }
+        
+        // Should not throw, should return empty array
+        let availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        
+        #expect(availableBackups.isEmpty, 
+                "Should return empty array when directory doesn't exist")
+        print("✓ Gracefully handles missing directory")
+    }
+    
+    @Test("BackupFileInfo display name removes prefix and extension")
+    @MainActor
+    func testBackupFileInfoDisplayName() {
+        // Test with new format (with milliseconds)
+        let url1 = getBackupDirectory().appendingPathComponent("RecipeBackup_2026-01-05_143022_123.reczipes")
+        let backupInfo1 = BackupFileInfo(
+            url: url1,
+            fileName: "RecipeBackup_2026-01-05_143022_123.reczipes",
+            fileSize: 12345,
+            creationDate: Date(),
+            modificationDate: Date()
+        )
+        
+        #expect(backupInfo1.displayName == "2026-01-05_143022", 
+                "Display name should remove 'RecipeBackup_' prefix, milliseconds, and '.reczipes' extension, got: \(backupInfo1.displayName)")
+        
+        // Test with old format (without milliseconds) for backward compatibility
+        let url2 = getBackupDirectory().appendingPathComponent("RecipeBackup_2026-01-05_143022.reczipes")
+        let backupInfo2 = BackupFileInfo(
+            url: url2,
+            fileName: "RecipeBackup_2026-01-05_143022.reczipes",
+            fileSize: 12345,
+            creationDate: Date(),
+            modificationDate: Date()
+        )
+        
+        #expect(backupInfo2.displayName == "2026-01-05_143022", 
+                "Display name should work with old format too")
+        
+        #expect(backupInfo1.fileSizeFormatted.contains("KB") || backupInfo1.fileSizeFormatted.contains("bytes"), 
+                "File size should be formatted with units")
+        
+        print("✓ Display name (new format): \(backupInfo1.displayName)")
+        print("✓ Display name (old format): \(backupInfo2.displayName)")
+        print("✓ Formatted size: \(backupInfo1.fileSizeFormatted)")
+    }
+    
+    // MARK: - Backup Export Success Tests
+    
+    @Test("Creating backup with no recipes throws error")
+    @MainActor
+    func testCreateBackupNoRecipes() async {
+        do {
+            _ = try await RecipeBackupManager.shared.createBackup(from: [])
+            #expect(Bool(false), "Should throw RecipeBackupError.noRecipesToBackup")
+        } catch RecipeBackupError.noRecipesToBackup {
+            print("✓ Correctly throws noRecipesToBackup error when recipe array is empty")
+        } catch {
+            #expect(Bool(false), "Should throw RecipeBackupError.noRecipesToBackup, but threw: \(error)")
+        }
+    }
+    
+    @Test("Creating backup with single recipe succeeds")
+    @MainActor
+    func testCreateBackupSingleRecipe() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: createCompleteRecipeModel())
+        context.insert(testRecipe)
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                "Backup file should exist after creation")
+        
+        // Verify file size is reasonable
+        let attributes = try FileManager.default.attributesOfItem(atPath: backupURL.path)
+        let fileSize = attributes[.size] as? Int ?? 0
+        #expect(fileSize > 0, "Backup file should have content")
+        #expect(fileSize < 10_000_000, "Single recipe backup should be under 10MB")
+        
+        print("✓ Successfully created backup for single recipe: \(fileSize) bytes")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Creating backup with multiple recipes succeeds")
+    @MainActor
+    func testCreateBackupMultipleRecipes() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let recipes = [
+            Recipe(from: createCompleteRecipeModel()),
+            Recipe(from: createMinimalRecipeModel()),
+            Recipe(from: createCompleteRecipeModel())
+        ]
+        
+        for recipe in recipes {
+            context.insert(recipe)
+        }
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: recipes)
+        
+        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                "Backup file should exist after creation")
+        
+        // Verify backup can be read and contains correct number of recipes
+        let data = try Data(contentsOf: backupURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let package = try decoder.decode(RecipeBackupPackage.self, from: data)
+        
+        #expect(package.recipeCount == 3, 
+                "Backup should contain 3 recipes, found: \(package.recipeCount)")
+        
+        print("✓ Successfully created backup for \(package.recipeCount) recipes")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Backup file is valid JSON and can be decoded")
+    @MainActor
+    func testBackupFileIsValidJSON() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: createCompleteRecipeModel())
+        context.insert(testRecipe)
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        
+        // Read and decode
+        let data = try Data(contentsOf: backupURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        let package = try decoder.decode(RecipeBackupPackage.self, from: data)
+        
+        #expect(!package.recipes.isEmpty, "Backup package should contain recipes")
+        #expect(!package.version.isEmpty, "Backup package should have version")
+        #expect(!package.exportDate.description.isEmpty, "Backup package should have export date")
+        
+        print("✓ Backup file is valid JSON")
+        print("✓ Package version: \(package.version)")
+        print("✓ Export date: \(package.exportDate)")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    // MARK: - Backup Import Success Tests
+    
+    @Test("Importing backup from Reczipes2 folder succeeds")
+    @MainActor
+    func testImportBackupFromReczipes2Folder() async throws {
+        // Create export
+        let exportSchema = Schema([Recipe.self, RecipeBook.self])
+        let exportConfig = ModelConfiguration(schema: exportSchema, isStoredInMemoryOnly: true)
+        let exportContainer = try ModelContainer(for: exportSchema, configurations: [exportConfig])
+        let exportContext = exportContainer.mainContext
+        
+        let originalRecipe = Recipe(from: createCompleteRecipeModel())
+        exportContext.insert(originalRecipe)
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
+        
+        // Create new context for import
+        let importSchema = Schema([Recipe.self, RecipeBook.self])
+        let importConfig = ModelConfiguration(schema: importSchema, isStoredInMemoryOnly: true)
+        let importContainer = try ModelContainer(for: importSchema, configurations: [importConfig])
+        let importContext = importContainer.mainContext
+        
+        // Import backup
+        let result = try await RecipeBackupManager.shared.importBackup(
+            from: backupURL,
+            into: importContext,
+            existingRecipes: [],
+            overwriteMode: .keepBoth
+        )
+        
+        #expect(result.newRecipes == 1, 
+                "Should import 1 new recipe, got: \(result.newRecipes)")
+        #expect(result.totalRecipes == 1, 
+                "Total recipes should be 1, got: \(result.totalRecipes)")
+        
+        print("✓ Successfully imported backup: \(result.summary)")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Import with keepBoth mode preserves existing recipes")
+    @MainActor
+    func testImportKeepBothMode() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        // Create and export a recipe
+        let recipeModel = createCompleteRecipeModel()
+        let originalRecipe = Recipe(from: recipeModel)
+        context.insert(originalRecipe)
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
+        
+        // Import with keepBoth mode (recipe already exists)
+        let result = try await RecipeBackupManager.shared.importBackup(
+            from: backupURL,
+            into: context,
+            existingRecipes: [originalRecipe],
+            overwriteMode: .keepBoth
+        )
+        
+        #expect(result.newRecipes == 1, 
+                "keepBoth mode should create new recipe even if one exists")
+        #expect(result.updatedRecipes == 0, 
+                "keepBoth mode should not update existing recipes")
+        
+        print("✓ keepBoth mode correctly creates duplicate with new ID")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Import with skip mode skips existing recipes")
+    @MainActor
+    func testImportSkipMode() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        // Create and export a recipe
+        let recipeModel = createCompleteRecipeModel()
+        let originalRecipe = Recipe(from: recipeModel)
+        context.insert(originalRecipe)
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
+        
+        // Import with skip mode (recipe already exists)
+        let result = try await RecipeBackupManager.shared.importBackup(
+            from: backupURL,
+            into: context,
+            existingRecipes: [originalRecipe],
+            overwriteMode: .skip
+        )
+        
+        #expect(result.skippedRecipes == 1, 
+                "skip mode should skip existing recipe")
+        #expect(result.newRecipes == 0, 
+                "skip mode should not create new recipes when they exist")
+        
+        print("✓ skip mode correctly skips existing recipes")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Import with overwrite mode replaces existing recipes")
+    @MainActor
+    func testImportOverwriteMode() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        // Create and export a recipe
+        let recipeModel = createCompleteRecipeModel()
+        let originalRecipe = Recipe(from: recipeModel)
+        context.insert(originalRecipe)
+        
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
+        
+        // Import with overwrite mode (recipe already exists)
+        let result = try await RecipeBackupManager.shared.importBackup(
+            from: backupURL,
+            into: context,
+            existingRecipes: [originalRecipe],
+            overwriteMode: .overwrite
+        )
+        
+        #expect(result.updatedRecipes == 1, 
+                "overwrite mode should update existing recipe")
+        #expect(result.newRecipes == 0, 
+                "overwrite mode should not create new recipes when they exist")
+        
+        print("✓ overwrite mode correctly replaces existing recipes")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    // MARK: - Backup Import Failure Tests
+    
+    @Test("Importing from non-existent file throws error")
+    @MainActor
+    func testImportNonExistentFile() async {
+        let nonExistentURL = getBackupDirectory().appendingPathComponent("DoesNotExist.reczipes")
+        
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        do {
+            _ = try await RecipeBackupManager.shared.importBackup(
+                from: nonExistentURL,
+                into: context,
+                existingRecipes: [],
+                overwriteMode: .keepBoth
+            )
+            #expect(Bool(false), "Should throw error for non-existent file")
+        } catch RecipeBackupError.invalidBackupFile {
+            print("✓ Correctly throws invalidBackupFile error for non-existent file")
+        } catch {
+            print("✓ Throws error for non-existent file: \(error.localizedDescription)")
+        }
+    }
+    
+    @Test("Importing corrupted backup file throws decoding error")
+    @MainActor
+    func testImportCorruptedBackupFile() async throws {
+        // Create a corrupted backup file
+        let backupDir = getBackupDirectory()
+        try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
+        
+        let corruptedURL = backupDir.appendingPathComponent("TEST_Corrupted.reczipes")
+        let corruptedData = "This is not valid JSON {{{".data(using: .utf8)!
+        try corruptedData.write(to: corruptedURL)
+        
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        do {
+            _ = try await RecipeBackupManager.shared.importBackup(
+                from: corruptedURL,
+                into: context,
+                existingRecipes: [],
+                overwriteMode: .keepBoth
+            )
+            #expect(Bool(false), "Should throw decoding error for corrupted file")
+        } catch RecipeBackupError.decodingFailed(let underlyingError) {
+            print("✓ Correctly throws decodingFailed error for corrupted file")
+            print("  Underlying error: \(underlyingError.localizedDescription)")
+        } catch {
+            print("✓ Throws error for corrupted file: \(error.localizedDescription)")
+        }
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: corruptedURL)
+    }
+    
+    @Test("Importing empty backup file throws error")
+    @MainActor
+    func testImportEmptyBackupFile() async throws {
+        let backupDir = getBackupDirectory()
+        try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
+        
+        let emptyURL = backupDir.appendingPathComponent("TEST_Empty.reczipes")
+        let emptyData = Data()
+        try emptyData.write(to: emptyURL)
+        
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        do {
+            _ = try await RecipeBackupManager.shared.importBackup(
+                from: emptyURL,
+                into: context,
+                existingRecipes: [],
+                overwriteMode: .keepBoth
+            )
+            #expect(Bool(false), "Should throw error for empty file")
+        } catch {
+            print("✓ Correctly throws error for empty backup file: \(error.localizedDescription)")
+        }
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: emptyURL)
     }
     
     // MARK: - RecipeModel Encoding/Decoding Tests
@@ -656,9 +1276,15 @@ struct RecipeExportImportTests {
 @Suite("Recipe Export/Import Integration Tests")
 struct RecipeExportImportIntegrationTests {
     
+    /// Helper to get the Reczipes2 backup directory path
+    func getBackupDirectory() -> URL {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+    }
+    
     @Test("Full export/import cycle preserves all data")
     @MainActor
-    func testFullExportImportCycle() throws {
+    func testFullExportImportCycle() async throws {
         // Create a complete recipe
         let original = RecipeModel(
             id: UUID(),
@@ -742,6 +1368,342 @@ struct RecipeExportImportIntegrationTests {
         #expect(exported.ingredientSections.count == original.ingredientSections.count)
         #expect(exported.instructionSections.count == original.instructionSections.count)
         #expect(exported.notes.count == original.notes.count)
+        
+        print("✓ Full export/import cycle preserved all recipe data")
+    }
+    
+    @Test("Complete backup and restore workflow from Files/Reczipes2")
+    @MainActor
+    func testCompleteBackupRestoreWorkflow() async throws {
+        // Step 1: Create original recipes
+        let exportSchema = Schema([Recipe.self, RecipeBook.self])
+        let exportConfig = ModelConfiguration(schema: exportSchema, isStoredInMemoryOnly: true)
+        let exportContainer = try ModelContainer(for: exportSchema, configurations: [exportConfig])
+        let exportContext = exportContainer.mainContext
+        
+        let recipe1 = Recipe(from: RecipeModel(
+            id: UUID(),
+            title: "Workflow Test Recipe 1",
+            ingredientSections: [
+                IngredientSection(ingredients: [Ingredient(name: "ingredient 1")])
+            ],
+            instructionSections: [
+                InstructionSection(steps: [InstructionStep(text: "step 1")])
+            ]
+        ))
+        
+        let recipe2 = Recipe(from: RecipeModel(
+            id: UUID(),
+            title: "Workflow Test Recipe 2",
+            ingredientSections: [
+                IngredientSection(ingredients: [Ingredient(name: "ingredient 2")])
+            ],
+            instructionSections: [
+                InstructionSection(steps: [InstructionStep(text: "step 2")])
+            ]
+        ))
+        
+        exportContext.insert(recipe1)
+        exportContext.insert(recipe2)
+        
+        print("Step 1: Created 2 original recipes")
+        
+        // Step 2: Create backup to Files/Reczipes2
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [recipe1, recipe2])
+        
+        #expect(backupURL.path.contains("Reczipes2"), 
+                "Backup should be in Reczipes2 folder")
+        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                "Backup file should exist")
+        
+        print("Step 2: Created backup at: \(backupURL.lastPathComponent)")
+        
+        // Step 3: Verify backup is listed in available backups
+        let availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        let ourBackup = availableBackups.first { $0.url == backupURL }
+        
+        #expect(ourBackup != nil, 
+                "Backup should be listed in available backups")
+        
+        print("Step 3: Verified backup appears in available backups list")
+        
+        // Step 4: Create new context (simulating app reinstall or new device)
+        let importSchema = Schema([Recipe.self, RecipeBook.self])
+        let importConfig = ModelConfiguration(schema: importSchema, isStoredInMemoryOnly: true)
+        let importContainer = try ModelContainer(for: importSchema, configurations: [importConfig])
+        let importContext = importContainer.mainContext
+        
+        print("Step 4: Created fresh database context (simulating new device)")
+        
+        // Step 5: Import from backup
+        let importResult = try await RecipeBackupManager.shared.importBackup(
+            from: backupURL,
+            into: importContext,
+            existingRecipes: [],
+            overwriteMode: .keepBoth
+        )
+        
+        #expect(importResult.newRecipes == 2, 
+                "Should import 2 new recipes")
+        #expect(importResult.totalRecipes == 2, 
+                "Total should be 2 recipes")
+        
+        print("Step 5: Successfully imported backup: \(importResult.summary)")
+        
+        // Step 6: Verify imported recipes match originals
+        try importContext.save()
+        
+        let importedRecipes = try importContext.fetch(FetchDescriptor<Recipe>())
+        #expect(importedRecipes.count == 2, 
+                "Should have 2 recipes in new context")
+        
+        let titles = Set(importedRecipes.map { $0.title })
+        #expect(titles.contains("Workflow Test Recipe 1"), 
+                "Should contain Recipe 1")
+        #expect(titles.contains("Workflow Test Recipe 2"), 
+                "Should contain Recipe 2")
+        
+        print("Step 6: Verified all recipes restored correctly")
+        print("✅ Complete backup/restore workflow succeeded!")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Backup persists across app sessions")
+    @MainActor
+    func testBackupPersistence() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: RecipeModel(
+            title: "Persistence Test Recipe",
+            ingredientSections: [
+                IngredientSection(ingredients: [Ingredient(name: "test")])
+            ],
+            instructionSections: [
+                InstructionSection(steps: [InstructionStep(text: "test")])
+            ]
+        ))
+        context.insert(testRecipe)
+        
+        // Create backup
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        let fileName = backupURL.lastPathComponent
+        
+        print("Created backup: \(fileName)")
+        
+        // Verify file exists immediately
+        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                "Backup should exist immediately after creation")
+        
+        // Verify it appears in the list immediately
+        var availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        var foundBackup = availableBackups.first { $0.fileName == fileName }
+        
+        #expect(foundBackup != nil, 
+                "Backup should be in available backups list immediately")
+        
+        // Wait a moment (simulating app closing/reopening)
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Verify file still exists after waiting
+        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                "Backup should still exist after waiting")
+        
+        // Verify it's still in the list after waiting
+        availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        foundBackup = availableBackups.first { $0.fileName == fileName }
+        
+        #expect(foundBackup != nil, 
+                "Backup should still be in available backups list after waiting")
+        
+        print("✓ Backup persists across simulated app sessions")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+    
+    @Test("Multiple sequential backups all persist")
+    @MainActor
+    func testMultipleSequentialBackups() async throws {
+        let schema = Schema([Recipe.self, RecipeBook.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        
+        let testRecipe = Recipe(from: RecipeModel(
+            title: "Sequential Backup Test",
+            ingredientSections: [
+                IngredientSection(ingredients: [Ingredient(name: "test")])
+            ],
+            instructionSections: [
+                InstructionSection(steps: [InstructionStep(text: "test")])
+            ]
+        ))
+        context.insert(testRecipe)
+        
+        var backupURLs: [URL] = []
+        var backupFileNames: [String] = []
+        
+        // Create 3 backups sequentially
+        for i in 1...3 {
+            let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+            backupURLs.append(backupURL)
+            backupFileNames.append(backupURL.lastPathComponent)
+            
+            // Verify file exists immediately after creation
+            #expect(FileManager.default.fileExists(atPath: backupURL.path), 
+                    "Backup \(i) should exist immediately after creation at: \(backupURL.path)")
+            
+            print("Created backup \(i): \(backupURL.lastPathComponent) - exists: \(FileManager.default.fileExists(atPath: backupURL.path))")
+            
+            // Small delay to ensure different timestamps
+            if i < 3 {  // Don't wait after the last one
+                try await Task.sleep(nanoseconds: 1_100_000_000) // 1.1 seconds
+            }
+        }
+        
+        // Wait a moment before final verification to ensure all files are settled
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Verify all backups still exist
+        print("Verifying all backups still exist...")
+        for (i, url) in backupURLs.enumerated() {
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            print("  Backup \(i + 1) (\(url.lastPathComponent)): exists = \(exists)")
+            #expect(exists, "Backup \(i + 1) should still exist at: \(url.path)")
+        }
+        
+        // Verify all appear in available backups by checking their filenames
+        let availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        let availableFileNames = Set(availableBackups.map { $0.fileName })
+        
+        print("Available backups: \(availableFileNames.sorted())")
+        print("Expected backups: \(backupFileNames.sorted())")
+        
+        for (i, fileName) in backupFileNames.enumerated() {
+            #expect(availableFileNames.contains(fileName), 
+                    "Backup \(i + 1) (\(fileName)) should be in available backups list")
+        }
+        
+        print("✓ All \(backupURLs.count) sequential backups persisted successfully")
+        
+        // Cleanup - remove only the backups we created in this test
+        for url in backupURLs {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+    
+    @Test("Backup and restore preserves recipe relationships")
+    @MainActor
+    func testBackupRestoreWithRelationships() async throws {
+        // Create recipes with complex data
+        let exportSchema = Schema([Recipe.self, RecipeBook.self])
+        let exportConfig = ModelConfiguration(schema: exportSchema, isStoredInMemoryOnly: true)
+        let exportContainer = try ModelContainer(for: exportSchema, configurations: [exportConfig])
+        let exportContext = exportContainer.mainContext
+        
+        let complexRecipe = Recipe(from: RecipeModel(
+            id: UUID(),
+            title: "Complex Recipe with All Features",
+            headerNotes: "Header notes with émojis 🍕",
+            yield: "Serves 4-6",
+            ingredientSections: [
+                IngredientSection(
+                    title: "Section 1",
+                    ingredients: [
+                        Ingredient(quantity: "2", unit: "cups", name: "flour"),
+                        Ingredient(quantity: "1", unit: "tsp", name: "salt")
+                    ],
+                    transitionNote: "Mix dry ingredients"
+                ),
+                IngredientSection(
+                    title: "Section 2",
+                    ingredients: [
+                        Ingredient(quantity: "2", unit: "cups", name: "water")
+                    ]
+                )
+            ],
+            instructionSections: [
+                InstructionSection(
+                    title: "Preparation",
+                    steps: [
+                        InstructionStep(stepNumber: 1, text: "Prepare ingredients"),
+                        InstructionStep(stepNumber: 2, text: "Mix together")
+                    ]
+                ),
+                InstructionSection(
+                    title: "Cooking",
+                    steps: [
+                        InstructionStep(stepNumber: 3, text: "Cook at 350°F")
+                    ]
+                )
+            ],
+            notes: [
+                RecipeNote(type: .tip, text: "Use fresh ingredients"),
+                RecipeNote(type: .warning, text: "Don't overmix"),
+                RecipeNote(type: .timing, text: "Takes 45 minutes")
+            ],
+            reference: "Test Cookbook, Page 42"
+        ))
+        
+        exportContext.insert(complexRecipe)
+        
+        // Create backup
+        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [complexRecipe])
+        
+        // Import to new context
+        let importSchema = Schema([Recipe.self, RecipeBook.self])
+        let importConfig = ModelConfiguration(schema: importSchema, isStoredInMemoryOnly: true)
+        let importContainer = try ModelContainer(for: importSchema, configurations: [importConfig])
+        let importContext = importContainer.mainContext
+        
+        let result = try await RecipeBackupManager.shared.importBackup(
+            from: backupURL,
+            into: importContext,
+            existingRecipes: [],
+            overwriteMode: .keepBoth
+        )
+        
+        #expect(result.newRecipes == 1)
+        
+        // Verify imported recipe
+        let importedRecipes = try importContext.fetch(FetchDescriptor<Recipe>())
+        #expect(importedRecipes.count == 1)
+        
+        let imported = importedRecipes[0]
+        #expect(imported.title == "Complex Recipe with All Features")
+        #expect(imported.headerNotes == "Header notes with émojis 🍕")
+        #expect(imported.recipeYield == "Serves 4-6")
+        #expect(imported.reference == "Test Cookbook, Page 42")
+        
+        // Verify sections were preserved
+        let decoder = JSONDecoder()
+        let ingredientSections = try decoder.decode([IngredientSection].self, from: imported.ingredientSectionsData!)
+        let instructionSections = try decoder.decode([InstructionSection].self, from: imported.instructionSectionsData!)
+        let notes = try decoder.decode([RecipeNote].self, from: imported.notesData!)
+        
+        #expect(ingredientSections.count == 2)
+        #expect(ingredientSections[0].title == "Section 1")
+        #expect(ingredientSections[0].ingredients.count == 2)
+        #expect(ingredientSections[0].transitionNote == "Mix dry ingredients")
+        
+        #expect(instructionSections.count == 2)
+        #expect(instructionSections[0].title == "Preparation")
+        #expect(instructionSections[0].steps.count == 2)
+        
+        #expect(notes.count == 3)
+        #expect(notes[0].type == .tip)
+        #expect(notes[1].type == .warning)
+        #expect(notes[2].type == .timing)
+        
+        print("✅ Complex recipe with all relationships preserved perfectly!")
+        
+        // Cleanup
+        try? FileManager.default.removeItem(at: backupURL)
     }
 }
 // MARK: - Export Package Validation Tests

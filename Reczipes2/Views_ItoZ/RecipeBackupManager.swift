@@ -58,6 +58,50 @@ struct RecipeImportResult {
     }
 }
 
+struct BackupFileInfo: Identifiable {
+    let id: String
+    let url: URL
+    let fileName: String
+    let fileSize: Int
+    let creationDate: Date
+    let modificationDate: Date
+    
+    init(url: URL, fileName: String, fileSize: Int, creationDate: Date, modificationDate: Date) {
+        self.url = url
+        self.fileName = fileName
+        self.fileSize = fileSize
+        self.creationDate = creationDate
+        self.modificationDate = modificationDate
+        self.id = url.path // Use the file path as the unique identifier
+    }
+    
+    var displayName: String {
+        // Remove "RecipeBackup_" prefix and ".reczipes" extension
+        var name = fileName
+        if name.hasPrefix("RecipeBackup_") {
+            name = String(name.dropFirst("RecipeBackup_".count))
+        }
+        if name.hasSuffix(".reczipes") {
+            name = String(name.dropLast(".reczipes".count))
+        }
+        
+        // Optionally clean up the milliseconds suffix (e.g., "_123") for cleaner display
+        // Pattern: ends with underscore and 3 digits
+        if let range = name.ranges(of: #/_\d{3}$/#).first {
+            name.removeSubrange(range)
+        }
+        
+        return name
+    }
+    
+    var fileSizeFormatted: String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useAll]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(fileSize))
+    }
+}
+
 @MainActor
 class RecipeBackupManager {
     static let shared = RecipeBackupManager()
@@ -138,22 +182,88 @@ class RecipeBackupManager {
             throw RecipeBackupError.encodingFailed(error)
         }
         
-        // Create temporary file
-        let tempDirectory = FileManager.default.temporaryDirectory
+        // Create Reczipes2 folder in Documents if it doesn't exist
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        
+        do {
+            try FileManager.default.createDirectory(at: reczipesDirectory, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            logError("Failed to create Reczipes2 directory: \(error)", category: "backup")
+            throw RecipeBackupError.fileCreationFailed
+        }
+        
+        // Create backup file in Reczipes2 folder
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let dateString = dateFormatter.string(from: Date())
-        let fileName = "RecipeBackup_\(dateString).reczipes"
-        let fileURL = tempDirectory.appendingPathComponent(fileName)
+        let currentDate = Date()
+        let dateString = dateFormatter.string(from: currentDate)
+        
+        // Add milliseconds to ensure uniqueness when creating multiple backups quickly
+        let milliseconds = Int((currentDate.timeIntervalSince1970.truncatingRemainder(dividingBy: 1)) * 1000)
+        let fileName = "RecipeBackup_\(dateString)_\(String(format: "%03d", milliseconds)).reczipes"
+        let fileURL = reczipesDirectory.appendingPathComponent(fileName)
         
         do {
             try jsonData.write(to: fileURL)
-            logInfo("Backup created successfully: \(fileName) (\(jsonData.count) bytes)", category: "backup")
+            logInfo("Backup created successfully: \(fileName) (\(jsonData.count) bytes) at \(fileURL.path)", category: "backup")
             return fileURL
         } catch {
             logError("Failed to write backup file: \(error)", category: "backup")
             throw RecipeBackupError.fileCreationFailed
         }
+    }
+    
+    // MARK: - List Backups
+    
+    /// Lists all available backup files in the Reczipes2 folder
+    func listAvailableBackups() throws -> [BackupFileInfo] {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        
+        // Check if directory exists
+        guard FileManager.default.fileExists(atPath: reczipesDirectory.path) else {
+            return []
+        }
+        
+        // Get all .reczipes files
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: reczipesDirectory,
+            includingPropertiesForKeys: [.fileSizeKey, .creationDateKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )
+        
+        let backupFiles = contents.filter { $0.pathExtension == "reczipes" }
+        
+        // Create BackupFileInfo for each file
+        var backupInfos: [BackupFileInfo] = []
+        
+        for fileURL in backupFiles {
+            do {
+                let resourceValues = try fileURL.resourceValues(forKeys: [.fileSizeKey, .creationDateKey, .contentModificationDateKey])
+                
+                let fileSize = resourceValues.fileSize ?? 0
+                let creationDate = resourceValues.creationDate ?? Date()
+                let modificationDate = resourceValues.contentModificationDate ?? Date()
+                
+                let info = BackupFileInfo(
+                    url: fileURL,
+                    fileName: fileURL.lastPathComponent,
+                    fileSize: fileSize,
+                    creationDate: creationDate,
+                    modificationDate: modificationDate
+                )
+                
+                backupInfos.append(info)
+            } catch {
+                logWarning("Could not read attributes for backup file: \(fileURL.lastPathComponent)", category: "backup")
+            }
+        }
+        
+        // Sort by modification date (most recent first)
+        backupInfos.sort { $0.modificationDate > $1.modificationDate }
+        
+        return backupInfos
     }
     
     // MARK: - Import

@@ -232,7 +232,15 @@ final class Recipe {
     
     // Computed property for safe version access
     var currentVersion: Int {
-        return version ?? 1
+        guard let version = version else { return 1 }
+        
+        // Protect against corrupted data with extremely large values
+        // If version is close to Int.max, reset to prevent overflow
+        if version >= Int.max - 100 {
+            return 1
+        }
+        
+        return version
     }
     
     // Computed property for safe lastModified access
@@ -413,7 +421,17 @@ final class Recipe {
     func updateIngredients(_ ingredientsData: Data) {
         self.ingredientSectionsData = ingredientsData
         self.ingredientsHash = Self.calculateIngredientsHash(from: ingredientsData)
-        self.version = currentVersion + 1 // Use computed property for safe access
+        
+        // Safely increment version with overflow protection
+        let newVersion = currentVersion.addingReportingOverflow(1)
+        if newVersion.overflow {
+            // If overflow occurs, reset to 1
+            self.version = 1
+            print("Warning: Recipe version overflow detected for '\(title)', resetting to 1")
+        } else {
+            self.version = newVersion.partialValue
+        }
+        
         self.lastModified = Date()
     }
     
@@ -421,6 +439,23 @@ final class Recipe {
     func hasIngredientsChanged(comparedTo hash: String?) -> Bool {
         guard let hash = hash else { return true }
         return self.ingredientsHash != hash
+    }
+    
+    // MARK: - Diagnostics
+    
+    /// Check if the recipe has a corrupted or problematic version number
+    var hasVersionIssue: Bool {
+        guard let version = version else { return false }
+        return version >= Int.max - 100 || version < 0
+    }
+    
+    /// Reset version to a safe value if corrupted
+    func resetVersionIfNeeded() {
+        if hasVersionIssue {
+            print("Warning: Resetting corrupted version (\(version ?? 0)) for recipe '\(title)'")
+            self.version = 1
+            self.lastModified = Date()
+        }
     }
     
     // Convert back to RecipeModel for display

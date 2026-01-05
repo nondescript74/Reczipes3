@@ -24,6 +24,8 @@ struct RecipeBackupView: View {
     @State private var errorMessage: String?
     @State private var importResult: RecipeImportResult?
     @State private var selectedImportMode: ImportOverwriteMode = .keepBoth
+    @State private var availableBackups: [BackupFileInfo] = []
+    @State private var selectedBackup: BackupFileInfo?
     
     var body: some View {
         List {
@@ -82,21 +84,71 @@ struct RecipeBackupView: View {
                 }
                 .pickerStyle(.menu)
                 
+                // Show available backups from Reczipes2 folder
+                if !availableBackups.isEmpty {
+                    ForEach(availableBackups) { backup in
+                        Button {
+                            selectedBackup = backup
+                            Task {
+                                await importFromBackup(backup)
+                            }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(backup.displayName)
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+                                    
+                                    HStack {
+                                        Text(backup.modificationDate, style: .date)
+                                        Text("•")
+                                        Text(backup.fileSizeFormatted)
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if isImporting && selectedBackup?.id == backup.id {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "square.and.arrow.down")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                        .disabled(isImporting || isExporting)
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: "tray")
+                            .foregroundColor(.secondary)
+                        Text("No backups found in Reczipes2 folder")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Option to import from other location
                 Button {
                     showImportPicker = true
                 } label: {
-                    if isImporting {
-                        HStack {
-                            ProgressView()
-                            Text("Importing...")
-                        }
-                    } else {
-                        Label("Import Recipes", systemImage: "square.and.arrow.down")
-                    }
+                    Label("Import from Other Location", systemImage: "folder")
                 }
                 .disabled(isExporting || isImporting)
             } header: {
-                Text("Import")
+                HStack {
+                    Text("Import")
+                    Spacer()
+                    Button {
+                        loadAvailableBackups()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Import recipes from a backup file (.reczipes).")
@@ -123,6 +175,9 @@ struct RecipeBackupView: View {
         }
         .navigationTitle("Backup & Restore")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadAvailableBackups()
+        }
         .fileImporter(
             isPresented: $showImportPicker,
             allowedContentTypes: [.reczipesBackup],
@@ -206,6 +261,40 @@ struct RecipeBackupView: View {
     }
     
     // MARK: - Import
+    
+    private func loadAvailableBackups() {
+        do {
+            availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
+        } catch {
+            logError("Failed to load available backups: \(error)", category: "backup")
+            availableBackups = []
+        }
+    }
+    
+    private func importFromBackup(_ backup: BackupFileInfo) async {
+        isImporting = true
+        errorMessage = nil
+        
+        do {
+            let result = try await RecipeBackupManager.shared.importBackup(
+                from: backup.url,
+                into: modelContext,
+                existingRecipes: recipes,
+                overwriteMode: selectedImportMode
+            )
+            
+            importResult = result
+            showImportSuccess = true
+            
+            // Refresh the backup list
+            loadAvailableBackups()
+            
+        } catch {
+            errorMessage = "Import failed: \(error.localizedDescription)"
+        }
+        
+        isImporting = false
+    }
     
     private func handleImport(result: Result<[URL], Error>) async {
         isImporting = true

@@ -61,6 +61,16 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
+                "💾 Enhanced: Recipe backups now save to Files/Reczipes2 folder instead of temporary storage",
+                "✨ Added: Automatic backup discovery - available backups are listed in the import view",
+                "📁 Improved: Backups are now persistent and accessible via iOS/iPadOS Files app",
+                "🔄 Added: Refresh button to reload available backups in import view",
+                "📊 Enhanced: Backup list shows file name, date, and size for each backup",
+                "☁️ Added: Backups in Documents folder can sync via iCloud if enabled",
+                "🔧 Added: Comprehensive test suite for backup/restore with 25+ test cases",
+                "✅ Added: Integration tests for complete backup/restore workflows",
+                "🐛 Added: Failure scenario tests with instructive error messages",
+                "📝 Added: Step-by-step workflow tests simulating real-world usage",
                 "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
                 "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
                 "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",
@@ -76,6 +86,16 @@ class VersionHistoryManager {
             buildNumber: "62",
             releaseDate: Date(),
             changes: [
+                "💾 Enhanced: Recipe backups now save to Files/Reczipes2 folder instead of temporary storage",
+                "✨ Added: Automatic backup discovery - available backups are listed in the import view",
+                "📁 Improved: Backups are now persistent and accessible via iOS/iPadOS Files app",
+                "🔄 Added: Refresh button to reload available backups in import view",
+                "📊 Enhanced: Backup list shows file name, date, and size for each backup",
+                "☁️ Added: Backups in Documents folder can sync via iCloud if enabled",
+                "🔧 Added: Comprehensive test suite for backup/restore with 25+ test cases",
+                "✅ Added: Integration tests for complete backup/restore workflows",
+                "🐛 Added: Failure scenario tests with instructive error messages",
+                "📝 Added: Step-by-step workflow tests simulating real-world usage",
                 "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
                 "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
                 "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",

@@ -20,10 +20,11 @@ struct DiabeticCachePerformanceTests {
     // MARK: - Hash Performance Tests
     
     @Test("Hash calculation performance - small recipe")
-    nonisolated func hashPerformanceSmall() async throws {
+    @MainActor
+    func hashPerformanceSmall() async throws {
         logger.info("🧪 Testing hash performance (small recipe)")
         
-        let ingredients = await [
+        let ingredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "2", unit: "cups", name: "flour"),
                 Ingredient(quantity: "1", unit: "tsp", name: "salt"),
@@ -58,11 +59,12 @@ struct DiabeticCachePerformanceTests {
     }
     
     @Test("Hash calculation performance - large recipe")
-    nonisolated func hashPerformanceLarge() async throws {
+    @MainActor
+    func hashPerformanceLarge() async throws {
         logger.info("🧪 Testing hash performance (large recipe)")
         
         // Create a recipe with 100 ingredients
-        let ingredients = await [
+        let ingredients = [
             IngredientSection(ingredients: (1...100).map { i in
                 Ingredient(
                     quantity: "\(i)",
@@ -101,10 +103,11 @@ struct DiabeticCachePerformanceTests {
     }
     
     @Test("Hash calculation consistency under load")
-    nonisolated func hashConsistencyUnderLoad() async throws {
+    @MainActor
+    func hashConsistencyUnderLoad() async throws {
         logger.info("🧪 Testing hash consistency under concurrent load")
         
-        let ingredients = await [
+        let ingredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "2", unit: "cups", name: "flour")
             ])
@@ -279,7 +282,7 @@ struct DiabeticCachePerformanceTests {
     // MARK: - Memory Tests
     
     @Test("Memory efficiency of hash storage")
-    nonisolated func hashMemoryEfficiency() async throws {
+    func hashMemoryEfficiency() async throws {
         logger.info("🧪 Testing hash memory efficiency")
         
         // Create hashes for various data sizes
@@ -424,7 +427,8 @@ struct DiabeticCachePerformanceTests {
     // MARK: - Stress Tests
     
     @Test("Hash calculation stability under stress")
-    nonisolated func hashStabilityStress() async throws {
+    @MainActor
+    func hashStabilityStress() async throws {
         logger.info("🧪 Testing hash stability under stress")
         
         let encoder = JSONEncoder()
