@@ -61,25 +61,31 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "💾 Enhanced: Recipe backups now save to Files/Reczipes2 folder instead of temporary storage",
-                "✨ Added: Automatic backup discovery - available backups are listed in the import view",
-                "📁 Improved: Backups are now persistent and accessible via iOS/iPadOS Files app",
-                "🔄 Added: Refresh button to reload available backups in import view",
-                "📊 Enhanced: Backup list shows file name, date, and size for each backup",
-                "☁️ Added: Backups in Documents folder can sync via iCloud if enabled",
-                "🔧 Added: Comprehensive test suite for backup/restore with 25+ test cases",
-                "✅ Added: Integration tests for complete backup/restore workflows",
-                "🐛 Added: Failure scenario tests with instructive error messages",
-                "📝 Added: Step-by-step workflow tests simulating real-world usage",
-                "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
-                "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
-                "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",
-                "⚡️ Fixed: Recipe detail sheets appearing too small on iPad, now uses device-appropriate presentation"
+                "🐛 Fixed: Profile activation bug where multiple profiles could be active simultaneously",
+                "⚡️ Improved: Clarified that only ONE profile can be active at a time for dietary filtering",
+                "🔍 Enhanced: Diabetes analysis now properly respects active profile selection",
+                "📝 Documented: Profile activation behavior and filter mode requirements for dietary analysis",
+                "🔧 Refactored: Split 2,864-line RecipeExportImportTests into 5 focused test files for better maintainability",
+                "✅ Organized: Test suites now grouped by functionality (Basic, Backup, Restore, Integration, Edge Cases)",
+                "⚡️ Enhanced: Tests can now run independently, improving development workflow",
+                "🐛 Fixed: Edge case test expectation for nil vs empty string in ingredient encoding"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "13.0",
+            buildNumber: "63",
+            releaseDate: Date(),
+            changes: [
+                "🔧 Refactored: Split 2,864-line RecipeExportImportTests into 5 focused test files for better maintainability",
+                "✅ Organized: Test suites now grouped by functionality (Basic, Backup, Restore, Integration, Edge Cases)",
+                "⚡️ Enhanced: Tests can now run independently, improving development workflow",
+                "🐛 Fixed: Edge case test expectation for nil vs empty string in ingredient encoding"
+            ]
+        ))
         
         history.append(VersionHistoryEntry(
             version: "12.9",

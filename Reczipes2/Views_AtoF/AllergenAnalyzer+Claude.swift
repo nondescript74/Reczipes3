@@ -12,6 +12,7 @@ import Foundation
 
 struct ClaudeAllergenAnalysis: Codable {
     let detectedAllergens: [ClaudeDetectedAllergen]
+    let falsePositivesAvoided: [FalsePositiveInfo]?  // New: documents what wasn't flagged
     let overallSafetyScore: Double  // 0-10 scale
     let recommendation: RecommendationType
     let notes: String?
@@ -22,6 +23,11 @@ struct ClaudeAllergenAnalysis: Codable {
         case caution
         case avoid
     }
+}
+
+struct FalsePositiveInfo: Codable {
+    let ingredient: String
+    let whyNotAnAllergen: String
 }
 
 struct ClaudeFODMAPAnalysisData: Codable {
@@ -50,6 +56,8 @@ struct ClaudeDetectedAllergen: Codable {
     let severity: String  // "mild", "moderate", "severe"
     let hidden: Bool  // true if not obvious from ingredient name
     let substitutions: [String]
+    let confidenceScore: Double?  // Optional: 0.0-1.0 confidence
+    let reasoning: String?  // Optional: explanation of the match
 }
 
 // MARK: - Enhanced Analysis Methods

@@ -110,11 +110,20 @@ struct RecipeFilterBar: View {
                     .foregroundStyle(activeProfile != nil ? .orange : .secondary)
                 
                 if let profile = activeProfile {
-                    Text("\(profile.sensitivities.count)")
+                    Text(profile.name)
                         .font(.caption2)
-                        .fontWeight(.semibold)
+                        .fontWeight(.medium)
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    Text("(\(profile.sensitivities.count))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 } else {
+                    Text("No Profile")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
                     Image(systemName: "exclamationmark.circle")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -128,7 +137,7 @@ struct RecipeFilterBar: View {
             )
         }
         .buttonStyle(.plain)
-        .help(activeProfile != nil ? "Profile: \(activeProfile!.name) (\(activeProfile!.sensitivities.count) sensitivities)" : "No profile selected - tap to choose")
+        .help(activeProfile != nil ? "Active Profile: \(activeProfile!.name) (\(activeProfile!.sensitivities.count) sensitivities)" : "No profile selected - tap to choose")
     }
     
     // MARK: - Diabetes Status Section
@@ -140,10 +149,24 @@ struct RecipeFilterBar: View {
                     .font(.caption)
                     .foregroundStyle(activeProfile?.hasDiabetesConcern == true ? .red : .secondary)
                 
-                if let profile = activeProfile, profile.hasDiabetesConcern {
-                    Text(profile.diabetesStatus.icon)
-                        .font(.caption)
+                if let profile = activeProfile {
+                    if profile.hasDiabetesConcern {
+                        Text(profile.diabetesStatus.icon)
+                            .font(.caption)
+                        Text(profile.name)
+                            .font(.caption2)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    } else {
+                        Text("No Diabetes")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
+                    Text("No Profile")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
                     Image(systemName: "exclamationmark.circle")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -157,7 +180,7 @@ struct RecipeFilterBar: View {
             )
         }
         .buttonStyle(.plain)
-        .help(activeProfile?.hasDiabetesConcern == true ? "Diabetes: \(activeProfile!.diabetesStatus.rawValue)" : "No diabetes status - tap to set")
+        .help(activeProfile?.hasDiabetesConcern == true ? "Active Profile: \(activeProfile!.name) - Diabetes: \(activeProfile!.diabetesStatus.rawValue)" : activeProfile != nil ? "Active Profile: \(activeProfile!.name) - No diabetes status set" : "No profile selected - tap to choose")
     }
     
     // MARK: - Nutrition Status Section
@@ -167,13 +190,27 @@ struct RecipeFilterBar: View {
             HStack(spacing: 4) {
                 Image(systemName: "leaf.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(activeProfile?.hasNutritionalGoals == true ? .green : .secondary)
                 
-                if let profile = activeProfile, profile.hasNutritionalGoals {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.green)
+                if let profile = activeProfile {
+                    if profile.hasNutritionalGoals {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text(profile.name)
+                            .font(.caption2)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    } else {
+                        Text("No Goals")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
+                    Text("No Profile")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
                     Image(systemName: "exclamationmark.circle")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -187,7 +224,7 @@ struct RecipeFilterBar: View {
             )
         }
         .buttonStyle(.plain)
-        .help(activeProfile?.hasNutritionalGoals == true ? "Nutritional goals configured" : "No nutritional goals - tap to set")
+        .help(activeProfile?.hasNutritionalGoals == true ? "Active Profile: \(activeProfile!.name) - Nutritional goals configured" : activeProfile != nil ? "Active Profile: \(activeProfile!.name) - No nutritional goals set" : "No profile selected - tap to choose")
     }
 }
 

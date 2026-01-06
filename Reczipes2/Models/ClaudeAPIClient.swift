@@ -195,6 +195,18 @@ class ClaudeAPIClient {
         - Recipe source or author information
         - Cook time, prep time, and total time information
         
+        **INGREDIENT PARSING PRECISION:**
+        When extracting ingredient names, be extremely precise to avoid false allergen matches:
+        - "cream of tartar" is NOT dairy cream (it's potassium bitartrate, a leavening agent)
+        - "coconut milk" is NOT dairy milk (it's plant-based, dairy-free)
+        - "peanut butter" is NOT dairy butter (contains peanuts but no dairy)
+        - "almond milk", "oat milk", "soy milk" are NOT dairy (they're plant-based alternatives)
+        - "butternut squash" is NOT related to dairy butter
+        - "eggplant" does NOT contain eggs
+        - Record the COMPLETE ingredient phrase including all modifying words
+        - Preserve qualifiers like "lactose-free", "vegan", "dairy-free", "gluten-free"
+        - Include preparation methods: "ghee (clarified butter)" vs "butter"
+        
         Web pages often have extra navigation, ads, and unrelated content. Focus ONLY on the recipe content.
         If JSON-LD structured data is present, use it as your primary source. Otherwise, parse the HTML.
         
@@ -444,6 +456,16 @@ class ClaudeAPIClient {
         - Header notes or descriptions
         - Yield/servings information
         - Reference information (page numbers, source notes)
+        
+        **INGREDIENT PARSING PRECISION:**
+        When extracting ingredient names, be extremely precise:
+        - "cream of tartar" is NOT the same as "cream" (it's potassium bitartrate, a leavening agent)
+        - "coconut milk" is NOT the same as "milk" (it's dairy-free)
+        - "peanut butter" is NOT the same as "butter" (it contains no dairy)
+        - "almond milk" is NOT the same as "milk" (it's dairy-free)
+        - "soy sauce" contains soy but "fish sauce" does not
+        - Record the COMPLETE ingredient name including all modifying words
+        - Include preparation methods that change allergen content (e.g., "lactose-free milk", "vegan cheese")
         
         CRITICAL: Return ONLY valid JSON with no markdown formatting, no preamble, and no explanation.
         """

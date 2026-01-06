@@ -196,6 +196,7 @@ struct NewProfileSheet: View {
 // MARK: - Profile Editor View
 
 struct ProfileEditorView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var profile: UserAllergenProfile
     @State private var showingAddSensitivity = false
     
@@ -204,7 +205,40 @@ struct ProfileEditorView: View {
             Section("Profile Info") {
                 TextField("Name", text: $profile.name)
                 
-                Toggle("Active Profile", isOn: $profile.isActive)
+                Toggle("Active Profile", isOn: Binding(
+                    get: { profile.isActive },
+                    set: { newValue in
+                        if newValue {
+                            // When activating this profile, deactivate all others
+                            let descriptor = FetchDescriptor<UserAllergenProfile>()
+                            if let allProfiles = try? modelContext.fetch(descriptor) {
+                                for p in allProfiles where p.id != profile.id {
+                                    p.isActive = false
+                                }
+                            }
+                        }
+                        profile.isActive = newValue
+                    }
+                ))
+            }
+            Section {
+                if profile.isActive {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("This is your active profile")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.blue)
+                        Text("Set as active to use for recipe filtering")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             
             Section {

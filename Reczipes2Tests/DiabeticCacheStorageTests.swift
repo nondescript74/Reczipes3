@@ -118,7 +118,9 @@ struct DiabeticCacheStorageTests {
         cached.ingredientsHash = recipe.ingredientsHash ?? ""
         cached.recipeLastModified = recipe.modificationDate
         cached.cachedAt = Date()
-        cached.analysisData = try JSONEncoder().encode(analysis2)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        cached.analysisData = try encoder.encode(analysis2)
         
         try context.save()
         logger.info("✅ Cache updated")
@@ -552,6 +554,7 @@ struct DiabeticCacheStorageTests {
         )
         
         let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
         let analysisData = try encoder.encode(largeAnalysis)
         logger.info("📊 Analysis data size: \(analysisData.count) bytes")
         

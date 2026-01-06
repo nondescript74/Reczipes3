@@ -530,14 +530,14 @@ final class Recipe {
 
 // MARK: - String Extension for SHA256 Hashing
 
-//import CryptoKit
-//
-//extension String {
-//    /// Generate SHA256 hash of the string
-//    func sha256Hash() -> String {
-//        let inputData = Data(self.utf8)
-//        let hashed = SHA256.hash(data: inputData)
-//        return hashed.compactMap { String(format: "%02x", $0) }.joined()
-//    }
-//}
+import CryptoKit
+
+extension String {
+    /// Generate SHA256 hash of the string
+    func sha256Hash() -> String {
+        let inputData = Data(self.utf8)
+        let hashed = SHA256.hash(data: inputData)
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
 

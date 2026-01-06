@@ -97,7 +97,7 @@ class AllergenAnalyzer {
         return names
     }
     
-    /// Find ingredients that match sensitivity keywords
+    /// Find ingredients that match sensitivity keywords using intelligent word-boundary matching
     private func findMatchingIngredients(ingredientNames: [String], keywords: [String]) -> [String] {
         var matched: [String] = []
         
@@ -107,8 +107,8 @@ class AllergenAnalyzer {
             for keyword in keywords {
                 let lowercasedKeyword = keyword.lowercased()
                 
-                // Check if the ingredient contains the keyword
-                if lowercasedName.contains(lowercasedKeyword) {
+                // Use intelligent matching that considers word boundaries and context
+                if intelligentMatch(ingredient: lowercasedName, keyword: lowercasedKeyword) {
                     // Avoid duplicates
                     if !matched.contains(ingredientName) {
                         matched.append(ingredientName)
@@ -119,6 +119,76 @@ class AllergenAnalyzer {
         }
         
         return matched
+    }
+    
+    /// Intelligent matching that considers word boundaries and common false positives
+    private func intelligentMatch(ingredient: String, keyword: String) -> Bool {
+        // First check for exact match
+        if ingredient == keyword {
+            return true
+        }
+        
+        // Check if keyword is a complete word within the ingredient
+        // This prevents "cream" from matching "cream of tartar" or "creamer"
+        let wordPattern = "\\b\(NSRegularExpression.escapedPattern(for: keyword))\\b"
+        
+        if let regex = try? NSRegularExpression(pattern: wordPattern, options: .caseInsensitive) {
+            let range = NSRange(ingredient.startIndex..., in: ingredient)
+            if regex.firstMatch(in: ingredient, range: range) != nil {
+                // Found a word boundary match, but check for known exceptions
+                if isKnownException(ingredient: ingredient, keyword: keyword) {
+                    return false
+                }
+                return true
+            }
+        }
+        
+        // For multi-word keywords (e.g., "soy sauce"), check if all words are present
+        let keywordWords = keyword.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        if keywordWords.count > 1 {
+            // All words must be present for multi-word match
+            let allWordsPresent = keywordWords.allSatisfy { word in
+                ingredient.range(of: "\\b\(NSRegularExpression.escapedPattern(for: word))\\b",
+                                options: [.regularExpression, .caseInsensitive]) != nil
+            }
+            
+            if allWordsPresent && !isKnownException(ingredient: ingredient, keyword: keyword) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    /// Check for known exceptions where ingredients shouldn't match despite containing the keyword
+    private func isKnownException(ingredient: String, keyword: String) -> Bool {
+        // Dictionary of exceptions: [keyword: [ingredients that shouldn't match]]
+        let exceptions: [String: [String]] = [
+            "cream": ["cream of tartar", "cream of wheat", "tartar", "creamer", "creamery"],
+            "milk": ["coconut milk", "almond milk", "oat milk", "soy milk", "rice milk", "milkweed"],
+            "butter": ["peanut butter", "almond butter", "sunflower butter", "cocoa butter", "shea butter"],
+            "cheese": ["vegan cheese", "cashew cheese"],
+            "egg": ["eggplant", "nutmeg"],
+            "nut": ["coconut", "butternut", "donut", "doughnut"],
+            "wheat": ["buckwheat", "wheatgrass"],
+            "soy": ["soy-free"],
+            "fish": ["shellfish", "starfish", "fish sauce substitute"],
+            "chocolate": ["white chocolate"],  // May not contain cocoa
+            "corn": ["cornflower", "popcorn kernel", "baby corn"]
+        ]
+        
+        guard let exceptionList = exceptions[keyword] else {
+            return false
+        }
+        
+        // Check if ingredient matches any exception pattern
+        for exception in exceptionList {
+            if ingredient.contains(exception) {
+                return true
+            }
+        }
+        
+        return false
     }
     
     /// Find which keywords caused the matches
@@ -181,7 +251,20 @@ class AllergenAnalyzer {
     /// Generate a prompt for Claude to analyze ingredients more deeply
     func generateClaudeAnalysisPrompt(recipe: RecipeModel, profile: UserAllergenProfile) -> String {
         let sensitivityList = profile.sensitivities.map { "\($0.name) (\($0.severity.rawValue))" }.joined(separator: ", ")
-        let ingredients = recipe.ingredientSections.flatMap { $0.ingredients }.map { $0.name }.joined(separator: ", ")
+        
+        // Build comprehensive ingredient list with full context
+        var ingredientList: [String] = []
+        for section in recipe.ingredientSections {
+            for ingredient in section.ingredients {
+                var fullIngredient = ""
+                if let qty = ingredient.quantity { fullIngredient += qty + " " }
+                if let unit = ingredient.unit { fullIngredient += unit + " " }
+                fullIngredient += ingredient.name
+                if let prep = ingredient.preparation { fullIngredient += ", " + prep }
+                ingredientList.append(fullIngredient.trimmingCharacters(in: .whitespaces))
+            }
+        }
+        let ingredients = ingredientList.joined(separator: "\n- ")
         
         // Check if FODMAP sensitivity is included
         let hasFODMAPSensitivity = profile.sensitivities.contains { sensitivity in
@@ -194,14 +277,35 @@ class AllergenAnalyzer {
         User's sensitivities: \(sensitivityList)
         
         Recipe: \(recipe.title)
-        Ingredients: \(ingredients)
         
-        Please:
-        1. Identify any ingredients that contain or may contain the user's allergens/sensitivities
-        2. Note any hidden allergens (e.g., whey in processed foods, gluten in soy sauce)
-        3. Assess the severity risk for each detected allergen
-        4. Suggest substitutions where possible
-        5. Rate the overall recipe safety from 0-10 (0=safe, 10=extremely risky)
+        Ingredients (with full context):
+        - \(ingredients)
+        
+        **CRITICAL ANALYSIS INSTRUCTIONS:**
+        
+        You MUST consider the COMPLETE ingredient phrase, not just individual words. This is essential for accurate allergen detection.
+        
+        Common mistakes to AVOID:
+        - "cream of tartar" is NOT dairy cream (it's potassium bitartrate, completely dairy-free)
+        - "coconut milk" is NOT dairy milk (it's plant-based and dairy-free)
+        - "almond milk", "oat milk", "soy milk" are NOT dairy (they're dairy alternatives)
+        - "peanut butter" is NOT dairy butter (contains peanuts but NO dairy)
+        - "almond butter", "cashew butter" are NOT dairy (they're nut butters)
+        - "cocoa butter" is NOT dairy butter (it's from cacao beans)
+        - "butternut squash" has NO relation to dairy butter
+        - "eggplant" does NOT contain eggs
+        - "buckwheat" does NOT contain wheat (it's gluten-free)
+        - "nutmeg" is NOT a nut (it's a spice, safe for nut allergies)
+        
+        Analysis requirements:
+        1. **Context-Aware Matching**: Always consider the complete ingredient phrase
+        2. **Hidden Allergens**: Identify ingredients where allergens may be truly present (e.g., "whey" contains dairy, "worcestershire sauce" often contains fish)
+        3. **Qualifiers Matter**: Pay attention to "vegan", "dairy-free", "lactose-free", "gluten-free" modifiers
+        4. **Cross-Contamination**: Note if an ingredient may have been processed in facilities with allergens
+        5. **Severity Assessment**: Rate the actual risk, not just presence of a word
+        6. **Substitutions**: Provide practical alternatives that maintain recipe integrity
+        7. **Overall Safety Score**: 0-10 scale (0=completely safe, 10=extremely dangerous for this user)
+        
         """
         
         // Add FODMAP-specific analysis if needed
@@ -225,6 +329,7 @@ class AllergenAnalyzer {
             - Hard cheeses (cheddar, parmesan) are LOW FODMAP
             - Lactose-free dairy is LOW FODMAP
             - Some foods are low FODMAP in small portions but high in large portions
+            - Context matters: "cream" in "cream of tartar" is NOT a FODMAP issue
             
             Include FODMAP analysis in your response with specific alternatives from Monash University data.
             """
@@ -238,10 +343,18 @@ class AllergenAnalyzer {
             "detectedAllergens": [
                 {
                     "name": "allergen name",
-                    "foundIn": ["ingredient1", "ingredient2"],
+                    "foundIn": ["complete ingredient phrase", "another ingredient"],
                     "severity": "mild|moderate|severe",
                     "hidden": true/false,
-                    "substitutions": ["alternative1", "alternative2"]
+                    "substitutions": ["alternative1", "alternative2"],
+                    "confidenceScore": 0.0-1.0,
+                    "reasoning": "Brief explanation of why this is a match"
+                }
+            ],
+            "falsePositivesAvoided": [
+                {
+                    "ingredient": "complete phrase",
+                    "whyNotAnAllergen": "explanation"
                 }
             ],
             "overallSafetyScore": 0-10,
@@ -262,7 +375,7 @@ class AllergenAnalyzer {
                 },
                 "detectedFODMAPs": [
                     {
-                        "ingredient": "name",
+                        "ingredient": "complete ingredient phrase",
                         "categories": ["oligosaccharides"],
                         "portionMatters": true/false,
                         "lowFODMAPAlternative": "suggestion"
@@ -278,9 +391,14 @@ class AllergenAnalyzer {
         
         }
         
-        Always reference the most current Monash University FODMAP data when analyzing FODMAP sensitivities.
-        Consider cross-contamination and hidden sources of allergens.
-        Be specific about portion sizes for FODMAP foods when relevant.
+        Remember:
+        - Always analyze the COMPLETE ingredient phrase
+        - Consider context and modifiers
+        - Only flag true allergen matches, not word similarities
+        - Reference Monash University FODMAP data for FODMAP sensitivities
+        - Consider cross-contamination risks
+        - Be specific about portion sizes for FODMAP foods when relevant
+        - Include confidence scores to help users understand certainty
         """
         
         return prompt

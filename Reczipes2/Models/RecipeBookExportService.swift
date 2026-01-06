@@ -609,18 +609,3 @@ class RecipeBookExportService {
         return name.components(separatedBy: invalidCharacters).joined(separator: "_")
     }
 }
-
-// MARK: - String Extension for Hashing
-
-import CryptoKit
-
-extension String {
-    /// Generates SHA256 hash of the string
-    func sha256Hash() -> String {
-        let data = Data(self.utf8)
-        let hash = SHA256.hash(data: data)
-        return hash.compactMap { String(format: "%02x", $0) }.joined()
-    }
-}
-
-
