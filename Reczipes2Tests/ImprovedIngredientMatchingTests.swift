@@ -46,16 +46,25 @@ struct ImprovedIngredientMatchingTests {
     }
     
     /// Create a test profile with a specific sensitivity
-    func createTestProfile(sensitivityName: String, keywords: [String]) -> UserAllergenProfile {
+    func createTestProfile(allergen: FoodAllergen) -> UserAllergenProfile {
         let profile = UserAllergenProfile()
         let sensitivity = UserSensitivity(
-            intolerance: .dairy,  // Using dairy as example
+            allergen: allergen,
             severity: .moderate,
-            notes: nil,
-            fodmapCategories: nil
+            notes: nil
         )
-        // Note: In real usage, keywords would come from FoodIntolerance
-        // For testing, we're directly testing the matching logic
+        profile.addSensitivity(sensitivity)
+        return profile
+    }
+    
+    /// Create a test profile with a specific intolerance
+    func createTestProfile(intolerance: FoodIntolerance) -> UserAllergenProfile {
+        let profile = UserAllergenProfile()
+        let sensitivity = UserSensitivity(
+            intolerance: intolerance,
+            severity: .moderate,
+            notes: nil
+        )
         profile.addSensitivity(sensitivity)
         return profile
     }
@@ -63,10 +72,10 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - False Positive Prevention Tests
     
     @Test("Cream of tartar should NOT match dairy 'cream' sensitivity")
-    func creamOfTartarNotDairy() async throws {
+    func creamOfTartarNotDairy() throws {
         // Given: A recipe with cream of tartar (not dairy)
         let recipe = createTestRecipe(ingredients: ["cream of tartar"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["cream", "milk", "butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -77,10 +86,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Coconut milk should NOT match dairy 'milk' sensitivity")
-    func coconutMilkNotDairy() async throws {
+    func coconutMilkNotDairy() throws {
         // Given: A recipe with coconut milk (dairy-free)
         let recipe = createTestRecipe(ingredients: ["coconut milk"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["milk", "cream", "butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -91,10 +100,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Almond milk should NOT match dairy 'milk' sensitivity")
-    func almondMilkNotDairy() async throws {
+    func almondMilkNotDairy() throws {
         // Given: A recipe with almond milk (dairy-free)
         let recipe = createTestRecipe(ingredients: ["almond milk"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["milk"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -104,10 +113,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Peanut butter should NOT match dairy 'butter' sensitivity")
-    func peanutButterNotDairy() async throws {
+    func peanutButterNotDairy() throws {
         // Given: A recipe with peanut butter (no dairy)
         let recipe = createTestRecipe(ingredients: ["peanut butter"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -117,10 +126,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Almond butter should NOT match dairy 'butter' sensitivity")
-    func almondButterNotDairy() async throws {
+    func almondButterNotDairy() throws {
         // Given: A recipe with almond butter (no dairy)
         let recipe = createTestRecipe(ingredients: ["almond butter"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -130,10 +139,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Butternut squash should NOT match dairy 'butter' sensitivity")
-    func butternutSquashNotDairy() async throws {
+    func butternutSquashNotDairy() throws {
         // Given: A recipe with butternut squash (no dairy)
         let recipe = createTestRecipe(ingredients: ["butternut squash"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -143,10 +152,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Eggplant should NOT match 'egg' sensitivity")
-    func eggplantNotEgg() async throws {
+    func eggplantNotEgg() throws {
         // Given: A recipe with eggplant (no eggs)
         let recipe = createTestRecipe(ingredients: ["eggplant"])
-        let profile = createTestProfile(sensitivityName: "Egg", keywords: ["egg"])
+        let profile = createTestProfile(allergen: .eggs)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -156,10 +165,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Buckwheat should NOT match 'wheat' sensitivity")
-    func buckwheatNotWheat() async throws {
+    func buckwheatNotWheat() throws {
         // Given: A recipe with buckwheat (gluten-free, not wheat)
         let recipe = createTestRecipe(ingredients: ["buckwheat flour"])
-        let profile = createTestProfile(sensitivityName: "Wheat", keywords: ["wheat"])
+        let profile = createTestProfile(allergen: .wheat)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -169,10 +178,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Nutmeg should NOT match 'nut' sensitivity")
-    func nutmegNotNut() async throws {
+    func nutmegNotNut() throws {
         // Given: A recipe with nutmeg (a spice, not a nut)
         let recipe = createTestRecipe(ingredients: ["nutmeg"])
-        let profile = createTestProfile(sensitivityName: "Nuts", keywords: ["nut"])
+        let profile = createTestProfile(allergen: .treeNuts)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -184,10 +193,10 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - True Positive Detection Tests
     
     @Test("Heavy cream SHOULD match dairy 'cream' sensitivity")
-    func heavyCreamMatchesDairy() async throws {
+    func heavyCreamMatchesDairy() throws {
         // Given: A recipe with actual heavy cream (dairy)
         let recipe = createTestRecipe(ingredients: ["heavy cream"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["cream"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -198,10 +207,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Whole milk SHOULD match dairy 'milk' sensitivity")
-    func wholeMilkMatchesDairy() async throws {
+    func wholeMilkMatchesDairy() throws {
         // Given: A recipe with whole milk (dairy)
         let recipe = createTestRecipe(ingredients: ["whole milk"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["milk"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -211,10 +220,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Butter SHOULD match dairy 'butter' sensitivity")
-    func butterMatchesDairy() async throws {
+    func butterMatchesDairy() throws {
         // Given: A recipe with butter (dairy)
         let recipe = createTestRecipe(ingredients: ["unsalted butter"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -224,10 +233,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Eggs SHOULD match 'egg' sensitivity")
-    func eggsMatchEgg() async throws {
+    func eggsMatchEgg() throws {
         // Given: A recipe with eggs
         let recipe = createTestRecipe(ingredients: ["large eggs"])
-        let profile = createTestProfile(sensitivityName: "Egg", keywords: ["egg"])
+        let profile = createTestProfile(allergen: .eggs)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -239,14 +248,14 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - Complex Multi-Ingredient Tests
     
     @Test("Recipe with both cream of tartar and heavy cream")
-    func mixedCreamIngredients() async throws {
+    func mixedCreamIngredients() throws {
         // Given: A recipe with both cream of tartar (not dairy) and heavy cream (dairy)
         let recipe = createTestRecipe(ingredients: [
             "cream of tartar",
             "heavy cream",
             "sugar"
         ])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["cream"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -261,7 +270,7 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Recipe with multiple plant-based milks")
-    func multipleNonDairyMilks() async throws {
+    func multipleNonDairyMilks() throws {
         // Given: A recipe with various non-dairy milks
         let recipe = createTestRecipe(ingredients: [
             "almond milk",
@@ -269,7 +278,7 @@ struct ImprovedIngredientMatchingTests {
             "oat milk",
             "soy milk"
         ])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["milk"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -280,14 +289,14 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Recipe with nut butters but no dairy butter")
-    func nutButtersNoDairyButter() async throws {
+    func nutButtersNoDairyButter() throws {
         // Given: A recipe with various nut butters
         let recipe = createTestRecipe(ingredients: [
             "peanut butter",
             "almond butter",
             "cashew butter"
         ])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -299,10 +308,10 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - Word Boundary Tests
     
     @Test("'Creamer' should NOT match 'cream' as a word boundary")
-    func creamerNotCream() async throws {
+    func creamerNotCream() throws {
         // Given: A recipe with "creamer" (could be non-dairy)
         let recipe = createTestRecipe(ingredients: ["non-dairy creamer"])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["cream"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -312,10 +321,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("'Soy-free' should NOT match 'soy' sensitivity")
-    func soyFreeNotSoy() async throws {
+    func soyFreeNotSoy() throws {
         // Given: A recipe labeled as soy-free
         let recipe = createTestRecipe(ingredients: ["soy-free sauce"])
-        let profile = createTestProfile(sensitivityName: "Soy", keywords: ["soy"])
+        let profile = createTestProfile(allergen: .soy)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -327,10 +336,10 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - Edge Cases
     
     @Test("Empty ingredient list")
-    func emptyIngredients() async throws {
+    func emptyIngredients() throws {
         // Given: A recipe with no ingredients
         let recipe = createTestRecipe(ingredients: [])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["milk"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -340,14 +349,14 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Case insensitive matching")
-    func caseInsensitiveMatching() async throws {
+    func caseInsensitiveMatching() throws {
         // Given: Ingredients with various cases
         let recipe = createTestRecipe(ingredients: [
             "HEAVY CREAM",
             "Whole Milk",
             "unsalted BUTTER"
         ])
-        let profile = createTestProfile(sensitivityName: "Dairy", keywords: ["cream", "milk", "butter"])
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -358,10 +367,10 @@ struct ImprovedIngredientMatchingTests {
     }
     
     @Test("Multi-word sensitivity matching")
-    func multiWordSensitivity() async throws {
+    func multiWordSensitivity() throws {
         // Given: A recipe with "soy sauce"
         let recipe = createTestRecipe(ingredients: ["soy sauce", "tamari"])
-        let profile = createTestProfile(sensitivityName: "Soy", keywords: ["soy sauce", "soy"])
+        let profile = createTestProfile(allergen: .soy)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -373,7 +382,7 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - Integration Tests with Full Recipe
     
     @Test("Complex recipe with mixed ingredients")
-    func complexRecipeAnalysis() async throws {
+    func complexRecipeAnalysis() throws {
         // Given: A complex recipe with various ingredients
         let ingredients = [
             "all-purpose flour",
@@ -388,10 +397,7 @@ struct ImprovedIngredientMatchingTests {
             "nutmeg"
         ]
         let recipe = createTestRecipe(ingredients: ingredients)
-        let profile = createTestProfile(
-            sensitivityName: "Dairy",
-            keywords: ["cream", "milk", "butter"]
-        )
+        let profile = createTestProfile(allergen: .milk)
         
         // When: Analyzing the recipe
         let score = AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
@@ -419,7 +425,7 @@ struct ImprovedIngredientMatchingTests {
 struct ClaudePromptTests {
     
     @Test("Prompt includes full ingredient context")
-    func promptIncludesFullContext() async throws {
+    func promptIncludesFullContext() throws {
         // Given: A recipe with detailed ingredients
         let ingredients = [
             Ingredient(
@@ -453,10 +459,9 @@ struct ClaudePromptTests {
         
         let profile = UserAllergenProfile()
         let sensitivity = UserSensitivity(
-            intolerance: .dairy,
+            allergen: .milk,
             severity: .moderate,
-            notes: nil,
-            fodmapCategories: nil
+            notes: nil
         )
         profile.addSensitivity(sensitivity)
         
@@ -478,7 +483,7 @@ struct ClaudePromptTests {
     }
     
     @Test("Prompt includes false positive prevention examples")
-    func promptIncludesFalsePositivePrevention() async throws {
+    func promptIncludesFalsePositivePrevention() throws {
         // Given: A basic recipe and profile
         let recipe = RecipeModel(
             title: "Test",
@@ -492,10 +497,9 @@ struct ClaudePromptTests {
         
         let profile = UserAllergenProfile()
         let sensitivity = UserSensitivity(
-            intolerance: .dairy,
+            allergen: .milk,
             severity: .moderate,
-            notes: nil,
-            fodmapCategories: nil
+            notes: nil
         )
         profile.addSensitivity(sensitivity)
         
@@ -523,7 +527,7 @@ struct ClaudePromptTests {
     }
     
     @Test("Prompt requests confidence scores")
-    func promptRequestsConfidenceScores() async throws {
+    func promptRequestsConfidenceScores() throws {
         // Given: A basic recipe and profile
         let recipe = RecipeModel(
             title: "Test",
@@ -537,10 +541,9 @@ struct ClaudePromptTests {
         
         let profile = UserAllergenProfile()
         let sensitivity = UserSensitivity(
-            intolerance: .dairy,
+            allergen: .milk,
             severity: .moderate,
-            notes: nil,
-            fodmapCategories: nil
+            notes: nil
         )
         profile.addSensitivity(sensitivity)
         

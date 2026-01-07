@@ -20,6 +20,8 @@ struct CloudKitSyncStatusMonitorView: View {
     @State private var userRecordID: String = "Checking..."
     @State private var isRefreshing: Bool = false
     @State private var lastRefreshTime: Date?
+    @State private var accountChangedTask: Task<Void, Never>?
+    @State private var remoteChangeTask: Task<Void, Never>?
     
     var body: some View {
         List {
@@ -125,7 +127,9 @@ struct CloudKitSyncStatusMonitorView: View {
                 .disabled(isRefreshing)
                 
                 Button {
-                    copyAllInfoToClipboard()
+                    Task {
+                        await copyAllInfoToClipboard()
+                    }
                 } label: {
                     Label("Copy Status to Clipboard", systemImage: "doc.on.doc")
                 }
@@ -151,10 +155,20 @@ struct CloudKitSyncStatusMonitorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await initialSetup()
-            startMonitoring()
+        }
+        .task {
+            await monitorAccountChanges()
+        }
+        .task {
+            await monitorRemoteChanges()
         }
         .refreshable {
             await refreshStatus()
+        }
+        .onDisappear {
+            // Clean up tasks
+            accountChangedTask?.cancel()
+            remoteChangeTask?.cancel()
         }
     }
     
@@ -214,49 +228,41 @@ struct CloudKitSyncStatusMonitorView: View {
         lastRefreshTime = Date()
     }
     
-    private func startMonitoring() {
-        // Monitor for iCloud account changes
-        NotificationCenter.default.addObserver(
-            forName: .CKAccountChanged,
-            object: nil,
-            queue: .main
-        ) { _ in
-            syncLogger.addEvent("iCloud account changed", type: .warning)
-            Task {
-                await refreshStatus()
-            }
-        }
+    private func monitorAccountChanges() async {
+        let notifications = NotificationCenter.default.notifications(named: .CKAccountChanged)
         
-        // Monitor for persistent store remote change notifications
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("NSPersistentStoreRemoteChangeNotification"),
-            object: nil,
-            queue: .main
-        ) { notification in
+        for await _ in notifications {
+            syncLogger.addEvent("iCloud account changed", type: .warning)
+            await refreshStatus()
+        }
+    }
+    
+    private func monitorRemoteChanges() async {
+        let notificationName = Notification.Name("NSPersistentStoreRemoteChangeNotification")
+        let notifications = NotificationCenter.default.notifications(named: notificationName)
+        
+        for await _ in notifications {
             syncLogger.addEvent("Remote data change detected", type: .sync)
-            Task {
-                await MainActor.run {
-                    // Refresh recipe count
-                    let descriptor = FetchDescriptor<Recipe>()
-                    if let recipes = try? modelContext.fetch(descriptor) {
-                        let oldCount = recipeCount
-                        recipeCount = recipes.count
-                        
-                        if recipeCount != oldCount {
-                            let diff = recipeCount - oldCount
-                            if diff > 0 {
-                                syncLogger.addEvent("Downloaded \(diff) new recipe(s)", type: .success)
-                            } else {
-                                syncLogger.addEvent("Removed \(abs(diff)) recipe(s)", type: .info)
-                            }
-                        }
+            
+            // Refresh recipe count
+            let descriptor = FetchDescriptor<Recipe>()
+            if let recipes = try? modelContext.fetch(descriptor) {
+                let oldCount = recipeCount
+                recipeCount = recipes.count
+                
+                if recipeCount != oldCount {
+                    let diff = recipeCount - oldCount
+                    if diff > 0 {
+                        syncLogger.addEvent("Downloaded \(diff) new recipe(s)", type: .success)
+                    } else {
+                        syncLogger.addEvent("Removed \(abs(diff)) recipe(s)", type: .info)
                     }
                 }
             }
         }
     }
     
-    private func copyAllInfoToClipboard() {
+    private func copyAllInfoToClipboard() async {
         var text = "=== CloudKit Sync Status ===\n\n"
         text += "Date: \(Date())\n"
         text += "Sync Status: \(monitor.isSyncEnabled ? "Active" : "Inactive")\n"
@@ -347,6 +353,7 @@ struct SyncTipRow: View {
 
 // MARK: - Sync Status Logger
 
+@MainActor
 class SyncStatusLogger: ObservableObject {
     @Published var events: [SyncEvent] = []
     private let maxEvents = 50
@@ -354,13 +361,11 @@ class SyncStatusLogger: ObservableObject {
     func addEvent(_ message: String, type: SyncEventType = .info) {
         let event = SyncEvent(message: message, type: type)
         
-        DispatchQueue.main.async {
-            self.events.append(event)
-            
-            // Keep only recent events
-            if self.events.count > self.maxEvents {
-                self.events.removeFirst(self.events.count - self.maxEvents)
-            }
+        events.append(event)
+        
+        // Keep only recent events
+        if events.count > maxEvents {
+            events.removeFirst(events.count - maxEvents)
         }
         
         // Also log to console for Xcode debugging

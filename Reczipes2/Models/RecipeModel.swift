@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct RecipeModel: Codable, Identifiable, Hashable {
+struct RecipeModel: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let title: String
     let headerNotes: String?
@@ -64,7 +64,7 @@ struct RecipeModel: Codable, Identifiable, Hashable {
     }
 }
 
-struct IngredientSection: Codable, Identifiable, Hashable {
+struct IngredientSection: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let title: String?
     let ingredients: [Ingredient]
@@ -81,7 +81,7 @@ struct IngredientSection: Codable, Identifiable, Hashable {
     }
 }
 
-struct Ingredient: Codable, Identifiable, Hashable {
+struct Ingredient: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let quantity: String?
     let unit: String?
@@ -107,7 +107,7 @@ struct Ingredient: Codable, Identifiable, Hashable {
     }
 }
 
-struct InstructionSection: Codable, Identifiable, Hashable {
+struct InstructionSection: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let title: String?
     let steps: [InstructionStep]
@@ -121,7 +121,7 @@ struct InstructionSection: Codable, Identifiable, Hashable {
     }
 }
 
-struct InstructionStep: Codable, Identifiable, Hashable {
+struct InstructionStep: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let stepNumber: Int?
     let text: String
@@ -135,7 +135,7 @@ struct InstructionStep: Codable, Identifiable, Hashable {
     }
 }
 
-struct RecipeNote: Codable, Identifiable, Hashable {
+struct RecipeNote: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let type: NoteType
     let text: String
@@ -148,7 +148,7 @@ struct RecipeNote: Codable, Identifiable, Hashable {
         self.text = text
     }
     
-    enum NoteType: String, Codable {
+    enum NoteType: String, Codable, Sendable {
         case tip
         case substitution
         case warning

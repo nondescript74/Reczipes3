@@ -103,42 +103,39 @@ struct ContentView: View {
         // Show loading state
         isProcessingFilter = true
         
-        // Capture values to use in detached task
+        // Capture values to use in task
         let recipesToProcess = availableRecipesBeforeFilter
         let shouldShowOnlySafe = showOnlySafe
         let currentMode = filterMode
         let currentProfile = activeProfile
         
-        Task.detached(priority: .userInitiated) {
+        // Use regular Task instead of Task.detached to avoid sendability issues
+        Task(priority: .userInitiated) {
             var allergenScores: [UUID: RecipeAllergenScore] = [:]
             var diabetesScores: [UUID: DiabetesScore] = [:]
             var combinedScores: [UUID: CombinedRecipeScore] = [:]
             var nutritionalScores: [UUID: NutritionalScore] = [:]
             
             // Analyze for allergens if needed
-            if await currentMode.includesAllergenFilter, let profile = currentProfile {
-                allergenScores = await AllergenAnalyzer.shared.analyzeRecipes(recipesToProcess, profile: profile)
+            if currentMode.includesAllergenFilter, let profile = currentProfile {
+                allergenScores = AllergenAnalyzer.shared.analyzeRecipes(recipesToProcess, profile: profile)
             }
             
             // Analyze for diabetes if needed
-            if await currentMode.includesDiabetesFilter {
-                diabetesScores = await DiabetesAnalyzer.shared.analyzeRecipes(recipesToProcess)
+            if currentMode.includesDiabetesFilter {
+                diabetesScores = DiabetesAnalyzer.shared.analyzeRecipes(recipesToProcess)
             }
             
-            if await currentMode.includesNutritionalFilter,
+            if currentMode.includesNutritionalFilter,
                let profile = currentProfile,
                let goals = profile.nutritionalGoals {
-                nutritionalScores = await NutritionalAnalyzer.shared.analyzeRecipes(
+                nutritionalScores = NutritionalAnalyzer.shared.analyzeRecipes(
                     recipesToProcess,
                     goals: goals
                 )
             }
             
-            // Create combined scores and pre-compute safety values
-            // We create a tuple with precomputed values to avoid accessing computed properties
-            // in nonisolated context
-            var safetyInfo: [UUID: (isSafe: Bool, overallScore: Double)] = [:]
-            
+            // Create combined scores
             for recipe in recipesToProcess {
                 let score = CombinedRecipeScore(
                     recipeID: recipe.id,
@@ -148,33 +145,27 @@ struct ContentView: View {
                     filterMode: currentMode
                 )
                 combinedScores[recipe.id] = score
-                
-                // Pre-compute the computed properties while we're still in a safe context
-                safetyInfo[recipe.id] = await (isSafe: score.isSafe, overallScore: score.overallScore)
             }
             
-            // Filter or sort based on settings using pre-computed values
-            let recipesWithScores = recipesToProcess.map { recipe -> (RecipeModel, Bool, Double) in
-                let safety = safetyInfo[recipe.id] ?? (isSafe: true, overallScore: 0)
-                return (recipe, safety.isSafe, safety.overallScore)
-            }
-            
+            // Filter or sort based on settings
             let filteredRecipes: [RecipeModel]
             if shouldShowOnlySafe {
                 // Show only safe recipes
-                filteredRecipes = recipesWithScores
-                    .filter { $0.1 } // Filter by isSafe boolean
-                    .map { $0.0 }    // Extract recipe
+                filteredRecipes = recipesToProcess.filter { recipe in
+                    guard let score = combinedScores[recipe.id] else { return true }
+                    return score.isSafe
+                }
             } else {
                 // Sort by safety score (safest first)
-                filteredRecipes = recipesWithScores
-                    .sorted { $0.2 < $1.2 } // Sort by overallScore
-                    .map { $0.0 }           // Extract recipe
+                filteredRecipes = recipesToProcess.sorted { recipe1, recipe2 in
+                    let score1 = combinedScores[recipe1.id]?.overallScore ?? 0
+                    let score2 = combinedScores[recipe2.id]?.overallScore ?? 0
+                    return score1 < score2
+                }
             }
             
             // Update UI on main thread
-            // Explicitly capture values in capture list to satisfy Swift 6 concurrency
-            await MainActor.run { [filteredRecipes, allergenScores, diabetesScores, combinedScores, nutritionalScores] in
+            await MainActor.run {
                 cachedFilteredRecipes = filteredRecipes
                 cachedAllergenScores = allergenScores
                 cachedDiabetesScores = diabetesScores

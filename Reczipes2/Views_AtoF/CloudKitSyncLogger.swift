@@ -9,13 +9,13 @@ import Foundation
 import SwiftData
 
 /// Logger specifically for CloudKit sync debugging
-class CloudKitSyncLogger {
+final class CloudKitSyncLogger: Sendable {
     static let shared = CloudKitSyncLogger()
     
     private init() {}
     
     /// Log when a recipe is created
-    func logRecipeCreated(_ recipe: Recipe) {
+    nonisolated func logRecipeCreated(_ recipe: Recipe) {
         print("🔵 [CloudKit Sync] Recipe created:")
         print("   ID: \(recipe.id.uuidString)")
         print("   Title: \(recipe.title)")
@@ -24,7 +24,7 @@ class CloudKitSyncLogger {
     }
     
     /// Log when a recipe is updated
-    func logRecipeUpdated(_ recipe: Recipe) {
+    nonisolated func logRecipeUpdated(_ recipe: Recipe) {
         print("🟡 [CloudKit Sync] Recipe updated:")
         print("   ID: \(recipe.id.uuidString)")
         print("   Title: \(recipe.title)")
@@ -34,7 +34,7 @@ class CloudKitSyncLogger {
     }
     
     /// Log when a recipe is deleted
-    func logRecipeDeleted(id: UUID, title: String) {
+    nonisolated func logRecipeDeleted(id: UUID, title: String) {
         print("🔴 [CloudKit Sync] Recipe deleted:")
         print("   ID: \(id.uuidString)")
         print("   Title: \(title)")
@@ -42,14 +42,14 @@ class CloudKitSyncLogger {
     }
     
     /// Log when context is saved
-    func logContextSaved(itemCount: Int) {
+    nonisolated func logContextSaved(itemCount: Int) {
         print("💾 [CloudKit Sync] ModelContext saved")
         print("   Changes will be synced to CloudKit")
         print("   Affected items: ~\(itemCount)")
     }
     
     /// Log sync status check
-    func logSyncStatus(enabled: Bool, accountStatus: String) {
+    nonisolated func logSyncStatus(enabled: Bool, accountStatus: String) {
         print("📊 [CloudKit Sync] Status check:")
         print("   Sync enabled: \(enabled)")
         print("   Account status: \(accountStatus)")
@@ -60,12 +60,12 @@ class CloudKitSyncLogger {
 
 extension Recipe {
     /// Log this recipe's creation
-    func logCreation() {
+    @MainActor func logCreation() {
         CloudKitSyncLogger.shared.logRecipeCreated(self)
     }
     
     /// Log this recipe's update
-    func logUpdate() {
+    @MainActor func logUpdate() {
         CloudKitSyncLogger.shared.logRecipeUpdated(self)
     }
 }

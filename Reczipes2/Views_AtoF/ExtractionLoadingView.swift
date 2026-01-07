@@ -14,6 +14,7 @@ struct ExtractionLoadingView: View {
     @State private var scale: CGFloat = 1.0
     @State private var currentMessageIndex = 0
     @State private var showSubMessage = false
+    @State private var dotAnimationPhase: CGFloat = 0
     
     enum ExtractionType {
         case image
@@ -134,12 +135,6 @@ struct ExtractionLoadingView: View {
                         .fill(extractionType.primaryColor.opacity(0.7))
                         .frame(width: 8, height: 8)
                         .scaleEffect(scale(for: index))
-                        .animation(
-                            .easeInOut(duration: 0.6)
-                                .repeatForever()
-                                .delay(Double(index) * 0.2),
-                            value: scale
-                        )
                 }
             }
         }
@@ -151,12 +146,28 @@ struct ExtractionLoadingView: View {
                 .shadow(color: extractionType.primaryColor.opacity(0.1), radius: 10)
         )
         .onAppear {
-            startMessageRotation()
+            rotation = 360
+            scale = 1.15
+            
+            // Start dot animation
+            withAnimation(.linear(duration: 1.8).repeatForever(autoreverses: false)) {
+                dotAnimationPhase = 3
+            }
             
             // Show sub-message after a brief delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task {
+                try? await Task.sleep(for: .milliseconds(500))
                 withAnimation {
                     showSubMessage = true
+                }
+            }
+        }
+        .task {
+            // Rotate through messages every 3 seconds
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    currentMessageIndex = (currentMessageIndex + 1) % extractionType.messages.count
                 }
             }
         }
@@ -168,21 +179,19 @@ struct ExtractionLoadingView: View {
         let baseScale: CGFloat = 1.0
         let maxScale: CGFloat = 1.5
         
-        // Calculate which dot should be scaled based on current animation cycle
-        let cycleLength = 0.6
-        let elapsed = Date().timeIntervalSince1970.truncatingRemainder(dividingBy: cycleLength * 3)
-        let activeIndex = Int(elapsed / cycleLength)
+        // Calculate which dot should be scaled based on animation phase
+        let cyclePosition = dotAnimationPhase.truncatingRemainder(dividingBy: 3)
+        let activeIndex = Int(cyclePosition)
         
-        return activeIndex == index ? maxScale : baseScale
-    }
-    
-    private func startMessageRotation() {
-        // Rotate through messages every 3 seconds
-        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.5)) {
-                currentMessageIndex = (currentMessageIndex + 1) % extractionType.messages.count
-            }
+        // Add smooth transition between dots
+        let progress = cyclePosition - CGFloat(activeIndex)
+        if activeIndex == index {
+            return baseScale + (maxScale - baseScale) * (1 - progress)
+        } else if (activeIndex + 1) % 3 == index {
+            return baseScale + (maxScale - baseScale) * progress
         }
+        
+        return baseScale
     }
 }
 

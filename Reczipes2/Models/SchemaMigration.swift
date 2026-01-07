@@ -13,7 +13,7 @@ import SwiftData
 
 /// Original schema before diabetes status was added
 enum SchemaV1: VersionedSchema {
-    static var versionIdentifier = Schema.Version(1, 0, 0)
+    static nonisolated(unsafe) var versionIdentifier = Schema.Version(1, 0, 0)
     
     static var models: [any PersistentModel.Type] {
         [
@@ -56,7 +56,7 @@ enum SchemaV1: VersionedSchema {
 
 /// Schema V2 with diabetes status added to profiles
 enum SchemaV2: VersionedSchema {
-    static var versionIdentifier = Schema.Version(2, 0, 0)
+    static nonisolated(unsafe) var versionIdentifier = Schema.Version(2, 0, 0)
     
     static var models: [any PersistentModel.Type] {
         [
@@ -97,13 +97,12 @@ enum SchemaV2: VersionedSchema {
         }
         
         // Computed property for diabetes status
-        var diabetesStatus: DiabetesStatus {
+        nonisolated var diabetesStatus: DiabetesStatus {
             get {
                 DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
             }
             set {
                 diabetesStatusRaw = newValue.rawValue
-                dateModified = Date()
             }
         }
         
@@ -116,7 +115,9 @@ enum SchemaV2: VersionedSchema {
         var sensitivities: [UserSensitivity] {
             get {
                 guard let data = sensitivitiesData else { return [] }
-                return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
+                return MainActor.assumeIsolated {
+                    (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
+                }
             }
             set {
                 sensitivitiesData = try? JSONEncoder().encode(newValue)
@@ -150,7 +151,7 @@ enum SchemaV2: VersionedSchema {
 
 /// Current schema with nutritional goals added to profiles
 enum SchemaV3: VersionedSchema {
-    static var versionIdentifier = Schema.Version(3, 0, 0)
+    static nonisolated(unsafe) var versionIdentifier = Schema.Version(3, 0, 0)
     
     static var models: [any PersistentModel.Type] {
         [
@@ -191,11 +192,12 @@ enum SchemaV3: VersionedSchema {
             self.sensitivitiesData = sensitivitiesData
             self.diabetesStatusRaw = diabetesStatus.rawValue
             // Encode nutritional goals data
-            if let goals = nutritionalGoals {
-                let encoder = JSONEncoder()
-                self.nutritionalGoalsData = try? encoder.encode(goals)
-            } else {
-                self.nutritionalGoalsData = nil
+            self.nutritionalGoalsData = MainActor.assumeIsolated {
+                if let goals = nutritionalGoals {
+                    return try? JSONEncoder().encode(goals)
+                } else {
+                    return nil
+                }
             }
             self.dateCreated = dateCreated
             self.dateModified = dateModified
@@ -216,7 +218,9 @@ enum SchemaV3: VersionedSchema {
         var nutritionalGoals: NutritionalGoals? {
             get {
                 guard let data = nutritionalGoalsData else { return nil }
-                return try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+                return MainActor.assumeIsolated {
+                    try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+                }
             }
             set {
                 nutritionalGoalsData = try? JSONEncoder().encode(newValue)
@@ -237,7 +241,9 @@ enum SchemaV3: VersionedSchema {
         var sensitivities: [UserSensitivity] {
             get {
                 guard let data = sensitivitiesData else { return [] }
-                return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
+                return MainActor.assumeIsolated {
+                    (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
+                }
             }
             set {
                 sensitivitiesData = try? JSONEncoder().encode(newValue)

@@ -12,7 +12,7 @@ import SwiftData
 
 // MARK: - Diabetes Status
 
-enum DiabetesStatus: String, Codable, CaseIterable {
+enum DiabetesStatus: String, Codable, CaseIterable, Sendable {
     case none = "None"
     case prediabetic = "Prediabetic"
     case diabetic = "Diabetic"
@@ -56,7 +56,7 @@ final class UserAllergenProfile {
     var dateCreated: Date
     var dateModified: Date
     
-    nonisolated init(
+    init(
         id: UUID = UUID(),
         name: String = "",
         isActive: Bool = false,
@@ -71,13 +71,20 @@ final class UserAllergenProfile {
         self.isActive = isActive
         self.sensitivitiesData = sensitivitiesData
         self.diabetesStatusRaw = diabetesStatus.rawValue
-        self.nutritionalGoalsData = try? JSONEncoder().encode(nutritionalGoals)
+        // Encode nutritional goals data using MainActor.assumeIsolated
+        if let goals = nutritionalGoals {
+            self.nutritionalGoalsData = MainActor.assumeIsolated {
+                try? JSONEncoder().encode(goals)
+            }
+        } else {
+            self.nutritionalGoalsData = nil
+        }
         self.dateCreated = dateCreated
         self.dateModified = dateModified
     }
     
     // Computed property for diabetes status
-    var diabetesStatus: DiabetesStatus {
+    nonisolated var diabetesStatus: DiabetesStatus {
         get {
             DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
         }
@@ -91,26 +98,34 @@ final class UserAllergenProfile {
     var nutritionalGoals: NutritionalGoals? {
         get {
             guard let data = nutritionalGoalsData else { return nil }
-            return try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+            return MainActor.assumeIsolated {
+                try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+            }
         }
         set {
-            nutritionalGoalsData = try? JSONEncoder().encode(newValue)
+            if let goals = newValue {
+                nutritionalGoalsData = MainActor.assumeIsolated {
+                    try? JSONEncoder().encode(goals)
+                }
+            } else {
+                nutritionalGoalsData = nil
+            }
             dateModified = Date()
         }
     }
     
     // Convenience property to check if diabetes filtering is needed
-    var hasDiabetesConcern: Bool {
+    nonisolated var hasDiabetesConcern: Bool {
         diabetesStatus != .none
     }
     
     // Convenience property to check if nutritional goals are set
     var hasNutritionalGoals: Bool {
-        nutritionalGoals != nil
+        nutritionalGoalsData != nil
     }
     
     // Computed property to get sensitivities
-    var sensitivities: [UserSensitivity] {
+    nonisolated var sensitivities: [UserSensitivity] {
         get {
             guard let data = sensitivitiesData else { return [] }
             return (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
@@ -122,21 +137,21 @@ final class UserAllergenProfile {
     }
     
     // Add a sensitivity
-    func addSensitivity(_ sensitivity: UserSensitivity) {
+    nonisolated func addSensitivity(_ sensitivity: UserSensitivity) {
         var current = sensitivities
         current.append(sensitivity)
         sensitivities = current
     }
     
     // Remove a sensitivity
-    func removeSensitivity(id: UUID) {
+    nonisolated func removeSensitivity(id: UUID) {
         var current = sensitivities
         current.removeAll { $0.id == id }
         sensitivities = current
     }
     
     // Update a sensitivity
-    func updateSensitivity(_ sensitivity: UserSensitivity) {
+    nonisolated func updateSensitivity(_ sensitivity: UserSensitivity) {
         var current = sensitivities
         if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
             current[index] = sensitivity

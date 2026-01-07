@@ -10,7 +10,7 @@ import SwiftData
 
 // MARK: - Allergen & Sensitivity Types
 
-enum FoodAllergen: String, Codable, CaseIterable, Identifiable {
+enum FoodAllergen: String, Codable, CaseIterable, Identifiable, Sendable {
     case milk = "Milk"
     case eggs = "Eggs"
     case peanuts = "Peanuts"
@@ -64,7 +64,7 @@ enum FoodAllergen: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum FoodIntolerance: String, Codable, CaseIterable, Identifiable {
+enum FoodIntolerance: String, Codable, CaseIterable, Identifiable, Sendable {
     case gluten = "Gluten"
     case lactose = "Lactose"
     case caffeine = "Caffeine"
@@ -225,7 +225,7 @@ enum FoodIntolerance: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Severity Levels
 
-enum SensitivitySeverity: String, Codable, CaseIterable, Identifiable {
+enum SensitivitySeverity: String, Codable, CaseIterable, Identifiable, Sendable {
     case mild = "Mild"
     case moderate = "Moderate"
     case severe = "Severe"

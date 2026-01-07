@@ -11,7 +11,7 @@ import Foundation
 // MARK: - FODMAP Categories
 
 /// The four FODMAP categories based on Monash University research
-enum FODMAPCategory: String, Codable, CaseIterable {
+enum FODMAPCategory: String, Codable, CaseIterable, Hashable {
     case oligosaccharides = "Oligosaccharides"  // Fructans & GOS
     case disaccharides = "Disaccharides"        // Lactose
     case monosaccharides = "Monosaccharides"    // Excess Fructose

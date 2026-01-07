@@ -164,21 +164,25 @@ class AllergenAnalyzer {
     private func isKnownException(ingredient: String, keyword: String) -> Bool {
         // Dictionary of exceptions: [keyword: [ingredients that shouldn't match]]
         let exceptions: [String: [String]] = [
-            "cream": ["cream of tartar", "cream of wheat", "tartar", "creamer", "creamery"],
-            "milk": ["coconut milk", "almond milk", "oat milk", "soy milk", "rice milk", "milkweed"],
-            "butter": ["peanut butter", "almond butter", "sunflower butter", "cocoa butter", "shea butter"],
-            "cheese": ["vegan cheese", "cashew cheese"],
+            "cream": ["cream of tartar", "cream of wheat", "tartar", "creamer", "creamery", "non-dairy", "dairy-free"],
+            "milk": ["coconut milk", "almond milk", "oat milk", "soy milk", "rice milk", "milkweed", "plant-based milk", "non-dairy", "cashew milk", "hemp milk", "macadamia milk"],
+            "butter": ["peanut butter", "almond butter", "sunflower butter", "cocoa butter", "shea butter", "cashew butter", "tahini butter", "nut butter", "sunbutter"],
+            "cheese": ["vegan cheese", "cashew cheese", "nutritional yeast", "dairy-free"],
             "egg": ["eggplant", "nutmeg"],
             "nut": ["coconut", "butternut", "donut", "doughnut"],
             "wheat": ["buckwheat", "wheatgrass"],
-            "soy": ["soy-free"],
+            "flour": ["buckwheat", "almond flour", "coconut flour", "rice flour", "chickpea flour", "tapioca flour", "cassava flour"],
+            "soy": ["soy-free", "non-soy"],
+            "soy sauce": ["soy-free sauce", "non-soy sauce"],  // Multi-word keyword exception
+            "dairy": ["non-dairy", "dairy-free"],
             "fish": ["shellfish", "starfish", "fish sauce substitute"],
             "chocolate": ["white chocolate"],  // May not contain cocoa
             "corn": ["cornflower", "popcorn kernel", "baby corn"]
         ]
         
         guard let exceptionList = exceptions[keyword] else {
-            return false
+            // If no specific exception list, still check for general negation patterns
+            return checkForNegationPatterns(ingredient: ingredient, keyword: keyword)
         }
         
         // Check if ingredient matches any exception pattern
@@ -188,17 +192,45 @@ class AllergenAnalyzer {
             }
         }
         
+        // Additional check: if ingredient explicitly says it's free of the allergen
+        return checkForNegationPatterns(ingredient: ingredient, keyword: keyword)
+    }
+    
+    /// Check if an ingredient has negation patterns indicating it's free of the allergen
+    private func checkForNegationPatterns(ingredient: String, keyword: String) -> Bool {
+        // For multi-word keywords (e.g., "soy sauce"), check if the first word has a negation
+        let keywordWords = keyword.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        let firstWord = keywordWords.first ?? keyword
+        
+        // Common negation patterns
+        let freePatterns = [
+            "\(firstWord)-free",
+            "non-\(firstWord)",
+            "free of \(firstWord)",
+            "without \(firstWord)",
+            "no \(firstWord)"
+        ]
+        
+        for pattern in freePatterns {
+            if ingredient.contains(pattern) {
+                return true
+            }
+        }
+        
         return false
     }
     
-    /// Find which keywords caused the matches
+    /// Find which keywords caused the matches (using intelligent matching, not simple contains)
     private func findMatchedKeywords(matchedIngredients: [String], keywords: [String]) -> [String] {
         var matchedKeywords: Set<String> = []
         
         for ingredient in matchedIngredients {
             let lowercasedIngredient = ingredient.lowercased()
             for keyword in keywords {
-                if lowercasedIngredient.contains(keyword.lowercased()) {
+                let lowercasedKeyword = keyword.lowercased()
+                
+                // Use the same intelligent matching logic to find which keywords actually matched
+                if intelligentMatch(ingredient: lowercasedIngredient, keyword: lowercasedKeyword) {
                     matchedKeywords.insert(keyword)
                 }
             }

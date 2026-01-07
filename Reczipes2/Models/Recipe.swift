@@ -418,7 +418,7 @@ final class Recipe {
     }
     
     /// Update the recipe with new data and increment version
-    func updateIngredients(_ ingredientsData: Data) {
+    @MainActor func updateIngredients(_ ingredientsData: Data) {
         self.ingredientSectionsData = ingredientsData
         self.ingredientsHash = Self.calculateIngredientsHash(from: ingredientsData)
         
@@ -459,7 +459,7 @@ final class Recipe {
     }
     
     // Convert back to RecipeModel for display
-    func toRecipeModel() -> RecipeModel? {
+    @MainActor func toRecipeModel() -> RecipeModel? {
         let decoder = JSONDecoder()
         
         guard let ingredientsData = ingredientSectionsData,
@@ -487,6 +487,7 @@ final class Recipe {
     
     // MARK: - Preview Helper
     
+    @MainActor
     static var preview: Recipe {
         let sampleIngredients = [
             IngredientSection(
@@ -534,7 +535,7 @@ import CryptoKit
 
 extension String {
     /// Generate SHA256 hash of the string
-    func sha256Hash() -> String {
+    nonisolated func sha256Hash() -> String {
         let inputData = Data(self.utf8)
         let hashed = SHA256.hash(data: inputData)
         return hashed.compactMap { String(format: "%02x", $0) }.joined()

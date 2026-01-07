@@ -146,7 +146,7 @@ struct NutritionalGoals: Codable, Sendable {
 
 // MARK: - Goal Type
 
-enum GoalType: String, Codable, CaseIterable {
+enum GoalType: String, Codable, CaseIterable, Sendable {
     case custom = "Custom"
     case weightLoss = "Weight Loss"
     case diabetesManagement = "Diabetes Management"

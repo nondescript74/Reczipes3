@@ -112,7 +112,8 @@ class BatchExtractionManager: ObservableObject {
         logInfo("Starting batch extraction of \(linksToProcess.count) links", category: "batch-extraction")
         
         // Start extraction task that runs independently
-        extractionTask = Task.detached(priority: .userInitiated) { [weak self] in
+        // Use Task (inherits actor context) instead of Task.detached to avoid data races
+        extractionTask = Task { [weak self] in
             await self?.performBatchExtraction(links: linksToProcess, apiKey: apiKey, modelContext: modelContext)
         }
     }

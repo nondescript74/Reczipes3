@@ -11,22 +11,87 @@ import SwiftData
 
 @ModelActor
 actor DiabeticAnalysisModelActor {
-    /// Fetch cached analysis from SwiftData
-    func fetchCachedAnalysis(recipeId: UUID) throws -> CachedDiabeticAnalysis? {
+    /// Sendable representation of cached data
+    struct CachedData: Sendable {
+        let analysisData: Data
+        let cachedAt: Date
+        let recipeVersion: Int
+        let ingredientsHash: String
+        let recipeLastModified: Date
+        
+        var isStale: Bool {
+            let expirationInterval: TimeInterval = 30 * 24 * 60 * 60 // 30 days
+            return Date().timeIntervalSince(cachedAt) > expirationInterval
+        }
+        
+        func isIngredientsOutdated(recipeVersion: Int, recipeHash: String?, recipeModificationDate: Date) -> Bool {
+            if recipeVersion != self.recipeVersion {
+                return true
+            }
+            if let hash = recipeHash, hash != self.ingredientsHash {
+                return true
+            }
+            if recipeModificationDate > self.recipeLastModified {
+                return true
+            }
+            return false
+        }
+        
+        func isValid(recipeVersion: Int, recipeHash: String?, recipeModificationDate: Date) -> Bool {
+            return !isStale && !isIngredientsOutdated(
+                recipeVersion: recipeVersion,
+                recipeHash: recipeHash,
+                recipeModificationDate: recipeModificationDate
+            )
+        }
+    }
+    
+    /// Fetch cached analysis from SwiftData and return sendable data
+    func fetchCachedAnalysis(recipeId: UUID) throws -> CachedData? {
         let fetchDescriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == recipeId }
         )
-        return try modelContext.fetch(fetchDescriptor).first
+        guard let cached = try modelContext.fetch(fetchDescriptor).first else {
+            return nil
+        }
+        
+        return CachedData(
+            analysisData: cached.analysisData,
+            cachedAt: cached.cachedAt,
+            recipeVersion: cached.recipeVersion,
+            ingredientsHash: cached.ingredientsHash,
+            recipeLastModified: cached.recipeLastModified
+        )
     }
     
     /// Save new analysis to SwiftData
-    func saveCachedAnalysis(_ cached: CachedDiabeticAnalysis) throws {
+    func saveCachedAnalysis(
+        recipeId: UUID,
+        analysisData: Data,
+        recipeVersion: Int,
+        ingredientsHash: String,
+        recipeLastModified: Date
+    ) throws {
+        let cached = CachedDiabeticAnalysis(
+            recipeId: recipeId,
+            analysisData: analysisData,
+            cachedAt: Date(),
+            recipeVersion: recipeVersion,
+            ingredientsHash: ingredientsHash,
+            recipeLastModified: recipeLastModified
+        )
         modelContext.insert(cached)
         try modelContext.save()
     }
     
-    /// Delete a specific cached analysis
-    func deleteCachedAnalysis(_ cached: CachedDiabeticAnalysis) throws {
+    /// Delete cached analysis for a specific recipe
+    func deleteCachedAnalysis(recipeId: UUID) throws {
+        let fetchDescriptor = FetchDescriptor<CachedDiabeticAnalysis>(
+            predicate: #Predicate { $0.recipeId == recipeId }
+        )
+        guard let cached = try modelContext.fetch(fetchDescriptor).first else {
+            return
+        }
         modelContext.delete(cached)
         try modelContext.save()
     }
@@ -64,6 +129,7 @@ actor DiabeticAnalysisService {
     ///   - modelContainer: SwiftData container for cache persistence
     ///   - forceRefresh: Whether to bypass cache and force a fresh analysis
     /// - Returns: Diabetic analysis information
+    @MainActor
     func analyzeDiabeticImpact(
         recipe: Recipe,
         modelContainer: ModelContainer,
@@ -74,20 +140,32 @@ actor DiabeticAnalysisService {
         // Check SwiftData cache first (with ingredient change detection)
         if !forceRefresh {
             let modelActor = DiabeticAnalysisModelActor(modelContainer: modelContainer)
-            if let cached = try await modelActor.fetchCachedAnalysis(recipeId: recipeId) {
+            if let cachedData = try await modelActor.fetchCachedAnalysis(recipeId: recipeId) {
                 // Validate cache against current recipe state
-                if cached.isValid(for: recipe) {
+                if cachedData.isValid(
+                    recipeVersion: recipe.currentVersion,
+                    recipeHash: recipe.ingredientsHash,
+                    recipeModificationDate: recipe.modificationDate
+                ) {
                     print("✅ Using cached diabetic analysis for recipe: \(recipe.title)")
-                    print("   Version: \(cached.recipeVersion), Hash: \(String(cached.ingredientsHash.prefix(8)))...")
-                    return try await cached.decodedAnalysis()
+                    print("   Version: \(cachedData.recipeVersion), Hash: \(String(cachedData.ingredientsHash.prefix(8)))...")
+                    
+                    // Decode the analysis on MainActor
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    return try decoder.decode(DiabeticInfo.self, from: cachedData.analysisData)
                 } else {
                     // Cache is invalid - log why
-                    if cached.isStale {
+                    if cachedData.isStale {
                         print("⚠️ Cache expired (>30 days) for recipe: \(recipe.title)")
-                    } else if cached.isIngredientsOutdated(recipe: recipe) {
+                    } else if cachedData.isIngredientsOutdated(
+                        recipeVersion: recipe.currentVersion,
+                        recipeHash: recipe.ingredientsHash,
+                        recipeModificationDate: recipe.modificationDate
+                    ) {
                         print("⚠️ Ingredients changed for recipe: \(recipe.title)")
-                        print("   Cached version: \(cached.recipeVersion) vs current: \(recipe.currentVersion)")
-                        print("   Cached hash: \(String(cached.ingredientsHash.prefix(8)))... vs current: \(String((recipe.ingredientsHash ?? "").prefix(8)))...")
+                        print("   Cached version: \(cachedData.recipeVersion) vs current: \(recipe.currentVersion)")
+                        print("   Cached hash: \(String(cachedData.ingredientsHash.prefix(8)))... vs current: \(String((recipe.ingredientsHash ?? "").prefix(8)))...")
                     }
                 }
             }
@@ -101,23 +179,34 @@ actor DiabeticAnalysisService {
         }
         
         // Build comprehensive prompt following guidelines
-        let prompt = buildAnalysisPrompt(recipeModel)
+        let prompt = await buildAnalysisPrompt(recipeModel)
         
         // Request Claude analysis using existing extractRecipe method pattern
         let response = try await callClaudeAPI(with: prompt)
         
         // Parse and validate response
-        let diabeticInfo = try await parseAndValidate(response, recipeId: recipeId)
+        let diabeticInfo = try parseAndValidate(response, recipeId: recipeId)
         
         // Cache result in SwiftData with current recipe state
         print("💾 Caching new analysis for recipe: \(recipe.title)")
         print("   Version: \(recipe.currentVersion), Hash: \(String((recipe.ingredientsHash ?? "").prefix(8)))...")
-        let cached = try await CachedDiabeticAnalysis.create(from: diabeticInfo, recipe: recipe)
+        
+        // Encode the diabetic info
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let analysisData = try encoder.encode(diabeticInfo)
+        
         let modelActor = DiabeticAnalysisModelActor(modelContainer: modelContainer)
-        try await modelActor.saveCachedAnalysis(cached)
+        try await modelActor.saveCachedAnalysis(
+            recipeId: recipe.id,
+            analysisData: analysisData,
+            recipeVersion: recipe.currentVersion,
+            ingredientsHash: recipe.ingredientsHash ?? "",
+            recipeLastModified: recipe.modificationDate
+        )
         
         // Also store in in-memory cache for quick access
-        await DiabeticInfoCache.shared.store(diabeticInfo, recipeId: recipeId)
+        DiabeticInfoCache.shared.store(diabeticInfo, recipeId: recipeId)
         
         return diabeticInfo
     }
@@ -136,10 +225,8 @@ actor DiabeticAnalysisService {
     func invalidateCache(for recipeId: UUID, modelContainer: ModelContainer) async throws {
         // Clear persistent cache
         let modelActor = DiabeticAnalysisModelActor(modelContainer: modelContainer)
-        if let cached = try await modelActor.fetchCachedAnalysis(recipeId: recipeId) {
-            try await modelActor.deleteCachedAnalysis(cached)
-            print("🗑️ Deleted persistent diabetic cache for recipe ID: \(recipeId)")
-        }
+        try await modelActor.deleteCachedAnalysis(recipeId: recipeId)
+        print("🗑️ Deleted persistent diabetic cache for recipe ID: \(recipeId)")
         
         // Clear in-memory cache
         await DiabeticInfoCache.shared.clear(recipeId: recipeId)
@@ -153,10 +240,14 @@ actor DiabeticAnalysisService {
     /// - Returns: True if valid cache exists
     func hasCachedAnalysis(for recipe: Recipe, modelContainer: ModelContainer) async throws -> Bool {
         let modelActor = DiabeticAnalysisModelActor(modelContainer: modelContainer)
-        guard let cached = try await modelActor.fetchCachedAnalysis(recipeId: recipe.id) else {
+        guard let cachedData = try await modelActor.fetchCachedAnalysis(recipeId: recipe.id) else {
             return false
         }
-        return cached.isValid(for: recipe)
+        return cachedData.isValid(
+            recipeVersion: recipe.currentVersion,
+            recipeHash: recipe.ingredientsHash,
+            recipeModificationDate: recipe.modificationDate
+        )
     }
     
     // MARK: - Private Methods

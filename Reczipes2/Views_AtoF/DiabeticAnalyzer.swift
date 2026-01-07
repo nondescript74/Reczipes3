@@ -43,6 +43,7 @@ struct DiabeticAnalyzer {
     ///   - modelContainer: SwiftData container for cache
     ///   - forceRefresh: Whether to bypass cache
     /// - Returns: Diabetic analysis information
+    @MainActor
     func analyzeDiabeticInfo(
         for recipe: Recipe,
         modelContainer: ModelContainer,

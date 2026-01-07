@@ -81,8 +81,9 @@ struct RecipeBookEditorView: View {
                         }
                     }
                     
+                    let hasCoverImage = coverImageName != nil
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label(coverImageName == nil ? "Add Cover Image" : "Change Cover Image",
+                        Label(hasCoverImage ? "Change Cover Image" : "Add Cover Image",
                               systemImage: "photo")
                     }
                     .disabled(isProcessingImage)

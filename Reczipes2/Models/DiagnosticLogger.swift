@@ -251,7 +251,7 @@ final class DiagnosticLogger: @unchecked Sendable {
 // MARK: - Data Extension for File Appending
 
 private extension Data {
-    func append(fileOrURL: URL) throws {
+    nonisolated func append(fileOrURL: URL) throws {
         if let fileHandle = FileHandle(forWritingAtPath: fileOrURL.path) {
             defer {
                 fileHandle.closeFile()

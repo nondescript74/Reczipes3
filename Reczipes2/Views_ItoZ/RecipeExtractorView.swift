@@ -118,9 +118,12 @@ struct RecipeExtractorView: View {
                 Button("View in Collection") {
                     // Verify the recipe was saved with image before dismissing
                     if let recipe = viewModel.extractedRecipe {
+                        // Capture the UUID value to avoid Sendable issues
+                        let recipeID = recipe.id
+                        
                         // Query to check if recipe exists in context
                         let descriptor = FetchDescriptor<Recipe>(
-                            predicate: #Predicate { $0.id == recipe.id }
+                            predicate: #Predicate { $0.id == recipeID }
                         )
                         if let savedRecipe = try? modelContext.fetch(descriptor).first {
                             logInfo("Verified recipe in DB: '\(savedRecipe.title)'", category: "storage")
