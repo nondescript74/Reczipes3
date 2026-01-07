@@ -16,6 +16,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Database Tests
     
     @Test("Database has substitutions for common ingredients")
+    @MainActor
     func testDatabaseHasCommonSubstitutions() {
         let db = FODMAPSubstitutionDatabase.shared
         
@@ -30,6 +31,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Database returns nil for low FODMAP ingredients")
+    @MainActor
     func testDatabaseReturnsNilForLowFODMAP() {
         let db = FODMAPSubstitutionDatabase.shared
         
@@ -43,6 +45,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("All substitutions have valid data")
+    @MainActor
     func testAllSubstitutionsHaveValidData() {
         let db = FODMAPSubstitutionDatabase.shared
         let allSubs = db.getAllSubstitutions()
@@ -64,6 +67,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Ingredient lookup is case-insensitive")
+    @MainActor
     func testCaseInsensitiveLookup() {
         let db = FODMAPSubstitutionDatabase.shared
         
@@ -79,6 +83,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Ingredient lookup handles variations")
+    @MainActor
     func testIngredientVariations() {
         let db = FODMAPSubstitutionDatabase.shared
         
@@ -95,6 +100,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Recipe Analysis Tests
     
     @Test("Recipe with no high FODMAP ingredients")
+    @MainActor
     func testLowFODMAPRecipe() {
         let recipe = RecipeModel(
             title: "Low FODMAP Stir Fry",
@@ -120,6 +126,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Recipe with high FODMAP ingredients")
+    @MainActor
     func testHighFODMAPRecipe() {
         let recipe = RecipeModel(
             title: "Pasta with Mushroom Sauce",
@@ -145,6 +152,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Recipe analysis includes all detected ingredients")
+    @MainActor
     func testAnalysisCompleteness() {
         let recipe = RecipeModel(
             title: "Test Recipe",
@@ -184,6 +192,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Substitution Model Tests
     
     @Test("Substitute confidence levels are valid")
+    @MainActor
     func testSubstituteConfidenceLevels() {
         let high = SubstituteOption.SubstituteConfidence.high
         let medium = SubstituteOption.SubstituteConfidence.medium
@@ -199,6 +208,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("FODMAP categories have correct properties")
+    @MainActor
     func testFODMAPCategories() {
         let oligo = FODMAPCategory.oligosaccharides
         let di = FODMAPCategory.disaccharides
@@ -240,6 +250,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Real World Recipe Tests
     
     @Test("Real world recipe: Onion soup")
+    @MainActor
     func testOnionSoup() {
         let recipe = RecipeModel(
             title: "French Onion Soup",
@@ -268,6 +279,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Real world recipe: Mushroom risotto")
+    @MainActor
     func testMushroomRisotto() {
         let recipe = RecipeModel(
             title: "Mushroom Risotto",
@@ -298,6 +310,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Real world recipe: Smoothie with honey and apple")
+    @MainActor
     func testFruitSmoothie() {
         let recipe = RecipeModel(
             title: "Apple Smoothie",
@@ -332,6 +345,7 @@ struct FODMAPSubstitutionTests {
     // MARK: - Edge Case Tests
     
     @Test("Empty recipe")
+    @MainActor
     func testEmptyRecipe() {
         let recipe = RecipeModel(
             title: "Empty",
@@ -347,6 +361,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Recipe with only section titles, no ingredients")
+    @MainActor
     func testRecipeWithEmptySections() {
         let recipe = RecipeModel(
             title: "Test",
@@ -364,6 +379,7 @@ struct FODMAPSubstitutionTests {
     }
     
     @Test("Ingredient with preparation note")
+    @MainActor
     func testIngredientWithPreparation() {
         let recipe = RecipeModel(
             title: "Test",
@@ -459,6 +475,7 @@ struct FODMAPIntegrationTests {
     }
     
     @Test("Category breakdown includes all categories")
+    @MainActor
     func testCategoryBreakdown() {
         let recipe = RecipeModel(
             title: "Multi-FODMAP Recipe",

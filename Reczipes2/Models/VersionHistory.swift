@@ -62,27 +62,21 @@ class VersionHistoryManager {
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
                 // Concurrency & Performance Improvements
-                "Fixed memory leaks in CloudKit sync monitoring by replacing NotificationCenter observers with async notification streams",
-                "Replaced legacy DispatchQueue.main.async calls with modern Swift Concurrency (@MainActor isolation)",
-                "Eliminated Timer memory leaks in ExtractionLoadingView by using SwiftUI's .task modifier with structured concurrency",
-                "Improved notification monitoring with automatic cancellation when views disappear",
 
-                // Swift Concurrency Best Practices
-                "Migrated CloudKitSyncStatusMonitorView to use async/await throughout for better reliability",
-                "Updated SyncStatusLogger to use @MainActor isolation for thread-safe UI updates",
-                "Replaced Date-based animation calculations with state-driven SwiftUI animations",
-
-                // SwiftData & Actor Isolation Fixes
-                "Fixed Sendable compliance errors in DiabeticAnalysisService by introducing CachedData transfer object",
-                "Resolved actor isolation warnings by properly handling SwiftData models within ModelActor boundaries",
-                "Improved cache invalidation to work correctly across actor boundaries with proper data isolation",
-                "⚡️ Enhanced: Intelligent retry logic with exponential backoff for recipe extraction network failures",
-                "🔧 Added: Comprehensive test suite for retry manager covering transient errors, rate limiting, and terminal failures"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        history.append(VersionHistoryEntry(
+            version: "13.2",
+            buildNumber: "66",
+            releaseDate: Date(),
+            changes: [
+
+            ]
+        ))
         
         
         history.append(VersionHistoryEntry(

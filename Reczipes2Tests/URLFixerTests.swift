@@ -15,6 +15,7 @@ struct URLFixerTests {
     // MARK: - Test Individual URL Fixes
     
     @Test("Remove HTML tags from URLs")
+    @MainActor
     func testHTMLTagRemoval() throws {
         let testCases: [(input: String, expected: String)] = [
             (
@@ -44,6 +45,7 @@ struct URLFixerTests {
     }
     
     @Test("Trim whitespace from URLs")
+    @MainActor
     func testWhitespaceTrimming() throws {
         let testCases: [(input: String, expected: String)] = [
             (
@@ -69,6 +71,7 @@ struct URLFixerTests {
     }
     
     @Test("Decode HTML entities")
+    @MainActor
     func testHTMLEntityDecoding() throws {
         let testCases: [(input: String, expected: String)] = [
             (
@@ -94,6 +97,7 @@ struct URLFixerTests {
     }
     
     @Test("Fix common URL issues")
+    @MainActor
     func testCommonURLIssues() throws {
         let testCases: [(input: String, expected: String)] = [
             (
@@ -114,6 +118,7 @@ struct URLFixerTests {
     }
     
     @Test("URL verification works correctly")
+    @MainActor
     func testURLVerification() throws {
         let validURL = "https://example.com/recipe"
         let invalidURL = "not-a-url"
@@ -149,6 +154,7 @@ struct URLFixerTests {
     // MARK: - Test Full File Processing
     
     @Test("Fix URLs in complete JSON file")
+    @MainActor
     func testCompleteFileFixing() throws {
         // Create test JSON with various issues
         let testLinks = [
@@ -222,6 +228,7 @@ struct URLFixerTests {
     }
     
     @Test("Complete workflow: fix and clean")
+    @MainActor
     func testCompleteWorkflow() throws {
         // Create test JSON with issues and duplicates
         let testLinks = [
@@ -283,6 +290,7 @@ struct URLFixerTests {
     // MARK: - Helper Methods
     
     /// Helper to run a fix test on a single link
+    @MainActor
     private func runFixTest(
         link: JSONLink,
         expectedURL: String,

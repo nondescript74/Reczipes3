@@ -44,8 +44,9 @@ struct HTMLTagCleaningTests {
     
     // MARK: - JSONLinkValidator Tests
     
+    @MainActor
     @Test("JSONLinkValidator detects HTML tags in URLs")
-    func validatorDetectsHTMLTags() throws {
+    func validatorDetectsHTMLTags() async throws {
         // Given: Links with HTML tags
         let testLinks = [
             JSONLink(
@@ -85,8 +86,9 @@ struct HTMLTagCleaningTests {
         #expect(htmlTagErrors.count == 3, "Should detect 3 URLs with HTML tags")
     }
     
+    @MainActor
     @Test("JSONLinkValidator accepts clean URLs")
-    func validatorAcceptsCleanURLs() throws {
+    func validatorAcceptsCleanURLs() async throws {
         // Given: Links with clean URLs
         let testLinks = [
             JSONLink(
@@ -161,7 +163,7 @@ struct HTMLTagCleaningTests {
     func extractorCleansURLs() async throws {
         // Given: A URL with HTML tags
         let dirtyURL = "https://httpbin.org/status/404<br></div>"
-        let extractor = await WebRecipeExtractor()
+        let extractor = WebRecipeExtractor()
         
         // When: Attempting to fetch (will fail but should clean first)
         do {
@@ -179,7 +181,7 @@ struct HTMLTagCleaningTests {
     func extractorHandlesCleanURLs() async throws {
         // Given: A clean URL
         let cleanURL = "https://httpbin.org/status/404"
-        let extractor = await WebRecipeExtractor()
+        let extractor = WebRecipeExtractor()
         
         // When: Attempting to fetch
         do {
@@ -270,6 +272,7 @@ struct HTMLTagCleaningTests {
         try? FileManager.default.removeItem(at: outputURL)
     }
     
+    @MainActor
     @Test("Validation → Cleaning workflow")
     func validationThenCleaning() async throws {
         // Given: Links with issues
@@ -285,11 +288,11 @@ struct HTMLTagCleaningTests {
         let jsonData = try encoder.encode(testLinks)
         
         // When: First validating
-        let validationResult = await JSONLinkValidator.validate(data: jsonData)
+        let validationResult = JSONLinkValidator.validate(data: jsonData)
         
         // Then: Should detect issues
-        let isValid = await validationResult.isValid
-        let errorCount = await validationResult.errors.count
+        let isValid = validationResult.isValid
+        let errorCount = validationResult.errors.count
         #expect(!isValid, "Should fail validation")
         #expect(errorCount > 0, "Should have errors")
         
@@ -300,7 +303,7 @@ struct HTMLTagCleaningTests {
             .appendingPathComponent("test_val_clean_output.json")
         
         try jsonData.write(to: inputURL)
-        try await JSONLinkValidator.clean(
+        try JSONLinkValidator.clean(
             inputURL: inputURL,
             outputURL: outputURL,
             removeDuplicates: false
@@ -308,10 +311,10 @@ struct HTMLTagCleaningTests {
         
         // Then: Cleaned file should pass validation
         let cleanedData = try Data(contentsOf: outputURL)
-        let cleanedValidation = await JSONLinkValidator.validate(data: cleanedData)
+        let cleanedValidation = JSONLinkValidator.validate(data: cleanedData)
         
-        let cleanedIsValid = await cleanedValidation.isValid
-        let cleanedErrors = await cleanedValidation.errors
+        let cleanedIsValid = cleanedValidation.isValid
+        let cleanedErrors = cleanedValidation.errors
         #expect(cleanedIsValid, "Cleaned file should pass validation")
         #expect(cleanedErrors.isEmpty, "Should have no errors after cleaning")
         

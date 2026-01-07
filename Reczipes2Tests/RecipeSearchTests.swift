@@ -10,6 +10,7 @@ import Foundation
 @testable import Reczipes2
 
 @Suite("Recipe Search Service Tests")
+@MainActor
 struct RecipeSearchTests {
     
     let searchService = RecipeSearchService()

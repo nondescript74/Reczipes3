@@ -12,6 +12,7 @@ import SwiftData
 @testable import Reczipes2
 
 @Suite("Recipe Export/Import Basic Tests")
+@MainActor
 struct RecipeExportImportBasicTests {
     
     // MARK: - Test Data Factories
@@ -134,7 +135,6 @@ struct RecipeExportImportBasicTests {
     // MARK: - RecipeModel Encoding/Decoding Tests
     
     @Test("RecipeModel complete encoding and decoding")
-    @MainActor
     func testCompleteRecipeModelCoding() throws {
         let original = createCompleteRecipeModel()
         
@@ -192,7 +192,6 @@ struct RecipeExportImportBasicTests {
     }
     
     @Test("RecipeModel minimal encoding and decoding")
-    @MainActor
     func testMinimalRecipeModelCoding() throws {
         let original = createMinimalRecipeModel()
         
@@ -218,7 +217,6 @@ struct RecipeExportImportBasicTests {
     }
     
     @Test("RecipeModel handles empty arrays")
-    @MainActor
     func testRecipeModelWithEmptyArrays() throws {
         let model = RecipeModel(
             title: "Empty Recipe",
@@ -241,7 +239,6 @@ struct RecipeExportImportBasicTests {
     // MARK: - Recipe to RecipeModel Conversion Tests
     
     @Test("Recipe initializes from RecipeModel with all fields")
-    @MainActor
     func testRecipeInitFromCompleteRecipeModel() throws {
         let model = createCompleteRecipeModel()
         
@@ -297,7 +294,6 @@ struct RecipeExportImportBasicTests {
     }
     
     @Test("Recipe initializes from minimal RecipeModel")
-    @MainActor
     func testRecipeInitFromMinimalRecipeModel() throws {
         let model = createMinimalRecipeModel()
         
@@ -320,7 +316,6 @@ struct RecipeExportImportBasicTests {
     // MARK: - Component Tests
     
     @Test("Ingredient preserves all metric and imperial data")
-    @MainActor
     func testIngredientMetricAndImperialUnits() throws {
         let ingredient = Ingredient(
             quantity: "1",
@@ -345,7 +340,6 @@ struct RecipeExportImportBasicTests {
     }
     
     @Test("RecipeNote all types encode correctly")
-    @MainActor
     func testRecipeNoteTypes() throws {
         let notes = [
             RecipeNote(type: .tip, text: "A helpful tip"),
@@ -370,7 +364,6 @@ struct RecipeExportImportBasicTests {
     }
     
     @Test("Recipe computed properties work correctly")
-    @MainActor
     func testRecipeComputedProperties() throws {
         let model = RecipeModel(
             title: "Test Recipe",
@@ -420,7 +413,6 @@ struct RecipeExportImportBasicTests {
     // MARK: - Backward Compatibility Tests
     
     @Test("Old RecipeModel format without new fields still decodes")
-    @MainActor
     func testBackwardCompatibility() throws {
         // Simulate an old JSON format without additionalImageNames or imageURLs
         let oldJSON = """

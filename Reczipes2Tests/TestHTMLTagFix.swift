@@ -57,7 +57,7 @@ struct HTMLTagFixTester {
         print("=" * 60)
         print()
         
-        let extractor = await WebRecipeExtractor()
+        let extractor = WebRecipeExtractor()
         
         for (index, test) in testURLs.enumerated() {
             print("Test \(index + 1): \(test.name)")
@@ -86,6 +86,7 @@ struct HTMLTagFixTester {
     // MARK: - Test JSONLinkValidator Validation
     
     @Test("JSONLinkValidator detects HTML tags in URLs")
+    @MainActor
     func testValidation() throws {
         print("=" * 60)
         print("Testing JSONLinkValidator HTML Tag Detection")
@@ -160,6 +161,7 @@ struct HTMLTagFixTester {
     // MARK: - Test JSONLinkValidator Cleaning
     
     @Test("JSONLinkValidator cleans HTML tags from URLs")
+    @MainActor
     func testCleaning() throws {
         print("=" * 60)
         print("Testing JSONLinkValidator HTML Tag Cleaning")

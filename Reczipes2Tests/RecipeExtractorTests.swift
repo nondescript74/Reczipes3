@@ -13,16 +13,16 @@ class RecipeExtractorTests: XCTestCase {
     var apiClient: ClaudeAPIClient!
     var imagePreprocessor: ImagePreprocessor!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         // Use a test API key or mock
-        apiClient = ClaudeAPIClient(apiKey: "test-key")
+        apiClient = await ClaudeAPIClient(apiKey: "test-key")
         imagePreprocessor = ImagePreprocessor()
     }
     
     // MARK: - Image Preprocessing Tests
     
-    func testImagePreprocessing() throws {
+    func testImagePreprocessing() async throws {
         // Generate a test image instead of loading from assets
         guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
             throw XCTSkip("Could not generate test image")
@@ -39,7 +39,7 @@ class RecipeExtractorTests: XCTestCase {
         }
     }
     
-    func testLightweightPreprocessing() throws {
+    func testLightweightPreprocessing() async throws {
         guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
             throw XCTSkip("Could not generate test image")
         }
@@ -50,7 +50,8 @@ class RecipeExtractorTests: XCTestCase {
     
     // MARK: - Recipe Model Tests
     
-    func testRecipeModelInitialization() {
+    @MainActor
+    func testRecipeModelInitialization() async throws {
         let ingredient = Ingredient(
             quantity: "1",
             unit: "cup",
@@ -58,13 +59,19 @@ class RecipeExtractorTests: XCTestCase {
             preparation: "sifted"
         )
         
-        XCTAssertEqual(ingredient.quantity, "1")
-        XCTAssertEqual(ingredient.unit, "cup")
-        XCTAssertEqual(ingredient.name, "flour")
-        XCTAssertEqual(ingredient.preparation, "sifted")
+        let quantity = ingredient.quantity
+        let unit = ingredient.unit
+        let name = ingredient.name
+        let preparation = ingredient.preparation
+        
+        XCTAssertEqual(quantity, "1")
+        XCTAssertEqual(unit, "cup")
+        XCTAssertEqual(name, "flour")
+        XCTAssertEqual(preparation, "sifted")
     }
     
-    func testRecipeWithMultipleSections() {
+    @MainActor
+    func testRecipeWithMultipleSections() async throws {
         let recipe = RecipeModel(
             title: "Test Recipe",
             yield: "4 servings",
@@ -91,14 +98,17 @@ class RecipeExtractorTests: XCTestCase {
             ]
         )
         
-        XCTAssertEqual(recipe.ingredientSections.count, 2)
-        XCTAssertEqual(recipe.instructionSections.count, 1)
+        let ingredientSectionsCount = recipe.ingredientSections.count
+        let instructionSectionsCount = recipe.instructionSections.count
+        
+        XCTAssertEqual(ingredientSectionsCount, 2)
+        XCTAssertEqual(instructionSectionsCount, 1)
     }
     
     // MARK: - JSON Parsing Tests
     
     @MainActor
-    func testRecipeResponseParsing() {
+    func testRecipeResponseParsing() async throws {
         let json = """
         {
             "title": "Test Recipe",
@@ -125,10 +135,15 @@ class RecipeExtractorTests: XCTestCase {
             let recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
             let recipe = recipeResponse.toRecipeModel()
             
-            XCTAssertEqual(recipe.title, "Test Recipe")
-            XCTAssertEqual(recipe.yield, "4 servings")
-            XCTAssertEqual(recipe.ingredientSections.count, 1)
-            XCTAssertEqual(recipe.instructionSections.count, 1)
+            let title = recipe.title
+            let yield = recipe.yield
+            let ingredientSectionsCount = recipe.ingredientSections.count
+            let instructionSectionsCount = recipe.instructionSections.count
+            
+            XCTAssertEqual(title, "Test Recipe")
+            XCTAssertEqual(yield, "4 servings")
+            XCTAssertEqual(ingredientSectionsCount, 1)
+            XCTAssertEqual(instructionSectionsCount, 1)
         } catch {
             XCTFail("Failed to parse JSON: \(error)")
         }
@@ -136,24 +151,24 @@ class RecipeExtractorTests: XCTestCase {
     
     // MARK: - Keychain Tests
     
-    func testKeychainStorage() {
+    func testKeychainStorage() async {
         let testKey = "test_api_key_\(UUID().uuidString)"
         let testValue = "sk-ant-test-key-123"
         
         // Test save
-        let saveSuccess = KeychainManager.shared.save(key: testKey, value: testValue)
+        let saveSuccess = await KeychainManager.shared.save(key: testKey, value: testValue)
         XCTAssertTrue(saveSuccess, "Should save to keychain")
         
         // Test retrieve
-        let retrieved = KeychainManager.shared.get(key: testKey)
+        let retrieved = await KeychainManager.shared.get(key: testKey)
         XCTAssertEqual(retrieved, testValue, "Should retrieve correct value")
         
         // Test delete
-        let deleteSuccess = KeychainManager.shared.delete(key: testKey)
+        let deleteSuccess = await KeychainManager.shared.delete(key: testKey)
         XCTAssertTrue(deleteSuccess, "Should delete from keychain")
         
         // Verify deleted
-        let afterDelete = KeychainManager.shared.get(key: testKey)
+        let afterDelete = await KeychainManager.shared.get(key: testKey)
         XCTAssertNil(afterDelete, "Should be nil after deletion")
     }
 }
@@ -232,6 +247,7 @@ class RecipeExtractorTests: XCTestCase {
 extension RecipeExtractorViewModel {
     
     /// Debug helper to print extraction details
+    @MainActor
     func debugPrint() {
         print("=== Recipe Extractor Debug Info ===")
         print("Is Loading: \(isLoading)")
@@ -258,6 +274,7 @@ extension RecipeExtractorViewModel {
 extension RecipeModel {
     
     /// Sample recipe for testing UI
+    @MainActor
     static var sampleRecipe: RecipeModel {
         RecipeModel(
             title: "Classic Chocolate Chip Cookies",
@@ -327,6 +344,7 @@ extension RecipeModel {
     }
     
     /// Minimal recipe for testing edge cases
+    @MainActor
     static var minimalRecipe: RecipeModel {
         RecipeModel(
             title: "Simple Toast",
@@ -390,9 +408,10 @@ class TestImageGenerator {
 
 // MARK: - Performance Testing
 
+@MainActor
 class RecipeExtractorPerformanceTests: XCTestCase {
     
-    func testImagePreprocessingPerformance() throws {
+    func testImagePreprocessingPerformance() async throws {
         guard let testImage = UIImage(named: "test_recipe_card") else {
             throw XCTSkip("Test image not available")
         }
@@ -400,12 +419,13 @@ class RecipeExtractorPerformanceTests: XCTestCase {
         let preprocessor = ImagePreprocessor()
         
         measure {
-            _ = preprocessor.preprocessForOCR(testImage)
+            Task {
+                _ = preprocessor.preprocessForOCR(testImage)
+            }
         }
     }
     
-    @MainActor
-    func testRecipeJSONParsingPerformance() {
+    func testRecipeJSONParsingPerformance() async throws {
         let json = createLargeRecipeJSON()
         let jsonData = json.data(using: .utf8)!
         
@@ -415,7 +435,6 @@ class RecipeExtractorPerformanceTests: XCTestCase {
     }
     
     // Helper function to decode RecipeResponse
-    @MainActor
     private func decodeRecipeResponse(from data: Data) throws -> RecipeResponse {
         let decoder = JSONDecoder()
         return try decoder.decode(RecipeResponse.self, from: data)

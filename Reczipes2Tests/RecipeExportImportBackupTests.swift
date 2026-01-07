@@ -23,6 +23,7 @@ struct RecipeExportImportBackupTests {
     }
     
     /// Creates a minimal RecipeModel with only required fields
+    @MainActor
     func createMinimalRecipeModel() -> RecipeModel {
         return RecipeModel(
             title: "Simple Toast",
@@ -46,6 +47,7 @@ struct RecipeExportImportBackupTests {
     }
     
     /// Creates a complete RecipeModel with all fields populated
+    @MainActor
     func createCompleteRecipeModel() -> RecipeModel {
         return RecipeModel(
             id: UUID(),

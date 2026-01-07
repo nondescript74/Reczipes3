@@ -11,6 +11,7 @@ import Foundation
 @testable import Reczipes2
 
 @Suite("Improved Ingredient Matching Tests")
+@MainActor
 struct ImprovedIngredientMatchingTests {
     
     // MARK: - Test Data Setup
@@ -422,6 +423,7 @@ struct ImprovedIngredientMatchingTests {
 // MARK: - Claude API Prompt Tests
 
 @Suite("Claude API Context-Aware Prompt Tests")
+@MainActor
 struct ClaudePromptTests {
     
     @Test("Prompt includes full ingredient context")

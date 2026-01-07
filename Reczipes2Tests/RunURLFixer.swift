@@ -11,6 +11,7 @@ import Foundation
 @testable import Reczipes2
 
 @Suite("Run URL Fixer on Real Files")
+@MainActor
 struct RunURLFixer {
     
     /// Run this test to fix the actual links_from_notes.json file

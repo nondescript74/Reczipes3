@@ -12,6 +12,7 @@ import SwiftData
 @testable import Reczipes2
 
 @Suite("Recipe Backup Restore Tests")
+@MainActor
 struct RecipeExportImportRestoreTests {
     
     // MARK: - Helper Functions
@@ -68,7 +69,6 @@ struct RecipeExportImportRestoreTests {
     // MARK: - Import Success Tests
     
     @Test("Importing backup from Reczipes2 folder succeeds")
-    @MainActor
     func testImportBackupFromReczipes2Folder() async throws {
         // Create export
         let exportSchema = Schema([Recipe.self, RecipeBook.self])
@@ -107,7 +107,6 @@ struct RecipeExportImportRestoreTests {
     }
     
     @Test("Import with keepBoth mode preserves existing recipes")
-    @MainActor
     func testImportKeepBothMode() async throws {
         let schema = Schema([Recipe.self, RecipeBook.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -141,7 +140,6 @@ struct RecipeExportImportRestoreTests {
     }
     
     @Test("Import with skip mode skips existing recipes")
-    @MainActor
     func testImportSkipMode() async throws {
         let schema = Schema([Recipe.self, RecipeBook.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -175,7 +173,6 @@ struct RecipeExportImportRestoreTests {
     }
     
     @Test("Import with overwrite mode replaces existing recipes")
-    @MainActor
     func testImportOverwriteMode() async throws {
         let schema = Schema([Recipe.self, RecipeBook.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -211,7 +208,6 @@ struct RecipeExportImportRestoreTests {
     // MARK: - Import Failure Tests
     
     @Test("Importing from non-existent file throws error")
-    @MainActor
     func testImportNonExistentFile() async {
         let nonExistentURL = getBackupDirectory().appendingPathComponent("DoesNotExist.reczipes")
         
@@ -236,7 +232,6 @@ struct RecipeExportImportRestoreTests {
     }
     
     @Test("Importing corrupted backup file throws decoding error")
-    @MainActor
     func testImportCorruptedBackupFile() async throws {
         // Create a corrupted backup file
         let backupDir = getBackupDirectory()
@@ -271,7 +266,6 @@ struct RecipeExportImportRestoreTests {
     }
     
     @Test("Importing empty backup file throws error")
-    @MainActor
     func testImportEmptyBackupFile() async throws {
         let backupDir = getBackupDirectory()
         try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
@@ -304,7 +298,6 @@ struct RecipeExportImportRestoreTests {
     // MARK: - Backup Persistence Tests
     
     @Test("Backup persists across app sessions")
-    @MainActor
     func testBackupPersistence() async throws {
         let schema = Schema([Recipe.self, RecipeBook.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -352,7 +345,6 @@ struct RecipeExportImportRestoreTests {
     }
     
     @Test("Multiple sequential backups all persist")
-    @MainActor
     func testMultipleSequentialBackups() async throws {
         let schema = Schema([Recipe.self, RecipeBook.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
