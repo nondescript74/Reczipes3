@@ -11,7 +11,7 @@ import Foundation
 import SwiftData
 @testable import Reczipes2
 
-@Suite("Recipe Export/Import Basic Tests")
+@Suite("Recipe Export/Import Basic Tests", .serialized)
 @MainActor
 struct RecipeExportImportBasicTests {
     

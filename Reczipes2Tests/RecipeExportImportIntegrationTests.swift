@@ -11,7 +11,7 @@ import Foundation
 import SwiftData
 @testable import Reczipes2
 
-@Suite("Recipe Export/Import Integration Tests")
+@Suite("Recipe Export/Import Integration Tests", .serialized)
 struct RecipeExportImportIntegrationTests {
     
     /// Helper to get the Reczipes2 backup directory path

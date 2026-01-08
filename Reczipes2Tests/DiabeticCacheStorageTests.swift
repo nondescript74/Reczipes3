@@ -13,7 +13,7 @@ import SwiftUI
 import OSLog
 @testable import Reczipes2
 
-@Suite("Diabetic Cache Storage Tests")
+@Suite("Diabetic Cache Storage Tests", .serialized)
 @MainActor
 struct DiabeticCacheStorageTests {
     

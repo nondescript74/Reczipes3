@@ -25,7 +25,7 @@ actor AttemptCounter {
     }
 }
 
-@Suite("Extraction Retry Manager Tests")
+@Suite("Extraction Retry Manager Tests", .serialized)
 struct ExtractionRetryTests {
     
     // MARK: - Successful Operation

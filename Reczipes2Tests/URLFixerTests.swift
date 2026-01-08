@@ -9,7 +9,7 @@ import Testing
 import Foundation
 @testable import Reczipes2
 
-@Suite("URL Fixer Tests")
+@Suite("URL Fixer Tests", .serialized)
 struct URLFixerTests {
     
     // MARK: - Test Individual URL Fixes

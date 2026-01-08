@@ -11,7 +11,7 @@ import Foundation
 import SwiftData
 @testable import Reczipes2
 
-@Suite("Recipe Export/Import Edge Cases")
+@Suite("Recipe Export/Import Edge Cases", .serialized)
 struct RecipeExportImportEdgeCaseTests {
     
     // MARK: - Special Characters Tests

@@ -11,7 +11,7 @@ import Foundation
 import SwiftData
 @testable import Reczipes2
 
-@Suite("Recipe Backup Creation Tests")
+@Suite("Recipe Backup Creation Tests", .serialized)
 struct RecipeExportImportBackupTests {
     
     // MARK: - Test Configuration
@@ -20,6 +20,18 @@ struct RecipeExportImportBackupTests {
     func getBackupDirectory() -> URL {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+    }
+    
+    /// Helper to wait for file to be fully written and accessible
+    func waitForFileToExist(at url: URL, timeout: TimeInterval = 2.0) async throws {
+        let startTime = Date()
+        while !FileManager.default.fileExists(atPath: url.path) {
+            if Date().timeIntervalSince(startTime) > timeout {
+                throw NSError(domain: "TestError", code: 1, 
+                            userInfo: [NSLocalizedDescriptionKey: "Timeout waiting for file to exist at \(url.path)"])
+            }
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        }
     }
     
     /// Creates a minimal RecipeModel with only required fields
@@ -271,6 +283,19 @@ struct RecipeExportImportBackupTests {
         let backupDir = getBackupDirectory()
         try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
         
+        // Clean up any existing .reczipes files to ensure clean test environment
+        let existingContents = try? FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: nil)
+        if let contents = existingContents {
+            for file in contents where file.pathExtension == "reczipes" {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+        
+        // Verify clean slate
+        let afterCleanup = (try? FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: nil).filter { $0.pathExtension == "reczipes" }) ?? []
+        print("✓ After cleanup: \(afterCleanup.count) .reczipes files in directory")
+        #expect(afterCleanup.isEmpty, "Directory should be empty after cleanup")
+        
         // Create a test recipe
         let schema = Schema([Recipe.self, RecipeBook.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -280,20 +305,65 @@ struct RecipeExportImportBackupTests {
         let testRecipe = Recipe(from: createMinimalRecipeModel())
         context.insert(testRecipe)
         
-        // Create multiple backups
+        // Create first backup
+        print("⏳ Creating first backup...")
         let backup1URL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        print("✓ Created first backup: \(backup1URL.lastPathComponent)")
         
-        // Wait a moment to ensure different timestamps
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        // Wait for file to be fully written to disk
+        try await waitForFileToExist(at: backup1URL)
         
+        // Verify first backup exists
+        let firstExists = FileManager.default.fileExists(atPath: backup1URL.path)
+        #expect(firstExists, "First backup should exist after creation")
+        
+        // Wait to ensure different timestamps
+        try await Task.sleep(nanoseconds: 200_000_000) // 200 milliseconds
+        
+        // Create second backup
+        print("⏳ Creating second backup...")
         let backup2URL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
+        print("✓ Created second backup: \(backup2URL.lastPathComponent)")
+        
+        // Wait for file to be fully written to disk
+        try await waitForFileToExist(at: backup2URL)
+        
+        // Verify second backup exists
+        let secondExists = FileManager.default.fileExists(atPath: backup2URL.path)
+        #expect(secondExists, "Second backup should exist after creation")
+        
+        // Verify they have different paths
+        #expect(backup1URL.path != backup2URL.path,
+                "Backup files should have different filenames")
+        
+        // Double-check both files still exist
+        let firstStillExists = FileManager.default.fileExists(atPath: backup1URL.path)
+        let secondStillExists = FileManager.default.fileExists(atPath: backup2URL.path)
+        
+        print("✓ First backup exists: \(firstStillExists)")
+        print("✓ Second backup exists: \(secondStillExists)")
+        
+        #expect(firstStillExists, "First backup should still exist")
+        #expect(secondStillExists, "Second backup should still exist")
         
         // List available backups
         let availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
         
-        // Should find both backups
-        #expect(availableBackups.count >= 2, 
-                "Should find at least 2 backups, found: \(availableBackups.count)")
+        print("✓ Found \(availableBackups.count) backup(s)")
+        for backup in availableBackups {
+            print("  - \(backup.fileName)")
+        }
+        
+        // Should find exactly 2 backups
+        #expect(availableBackups.count == 2, 
+                "Should find exactly 2 backups, found: \(availableBackups.count)")
+        
+        // Verify our specific backup files are in the list
+        let backupPaths = Set(availableBackups.map { $0.url.path })
+        #expect(backupPaths.contains(backup1URL.path),
+                "Should find first backup in list")
+        #expect(backupPaths.contains(backup2URL.path),
+                "Should find second backup in list")
         
         // Backups should be sorted by modification date (most recent first)
         if availableBackups.count >= 2 {
@@ -304,13 +374,13 @@ struct RecipeExportImportBackupTests {
         }
         
         // Verify backup info is populated
-        for backup in availableBackups.prefix(2) {
+        for backup in availableBackups {
             #expect(backup.fileSize > 0, "Backup file size should be greater than 0")
             #expect(!backup.fileName.isEmpty, "Backup filename should not be empty")
             #expect(!backup.displayName.isEmpty, "Backup display name should not be empty")
             #expect(!backup.fileSizeFormatted.isEmpty, "Backup formatted file size should not be empty")
             
-            print("✓ Found backup: \(backup.displayName) - \(backup.fileSizeFormatted)")
+            print("✓ Verified backup: \(backup.displayName) - \(backup.fileSizeFormatted)")
         }
         
         // Cleanup

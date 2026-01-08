@@ -10,7 +10,7 @@ import Testing
 import Foundation
 @testable import Reczipes2
 
-@Suite("Improved Ingredient Matching Tests")
+@Suite("Improved Ingredient Matching Tests", .serialized)
 @MainActor
 struct ImprovedIngredientMatchingTests {
     

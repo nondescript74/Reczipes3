@@ -9,7 +9,7 @@ import Testing
 import Foundation
 @testable import Reczipes2
 
-@Suite("HTML Tag Cleaning Tests")
+@Suite("HTML Tag Cleaning Tests", .serialized)
 struct HTMLTagCleaningTests {
     
     // MARK: - Test Data

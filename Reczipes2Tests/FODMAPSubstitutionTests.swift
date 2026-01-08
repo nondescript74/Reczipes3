@@ -10,7 +10,7 @@ import Testing
 import Foundation
 @testable import Reczipes2
 
-@Suite("FODMAP Substitution Tests")
+@Suite("FODMAP Substitution Tests", .serialized)
 struct FODMAPSubstitutionTests {
     
     // MARK: - Database Tests

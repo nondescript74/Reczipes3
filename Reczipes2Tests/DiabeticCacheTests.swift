@@ -10,7 +10,7 @@ import Foundation
 import OSLog
 @testable import Reczipes2
 
-@Suite("Diabetic Analysis Caching Tests")
+@Suite("Diabetic Analysis Caching Tests", .serialized)
 struct DiabeticCacheTests {
     
     // Logger for test diagnostics

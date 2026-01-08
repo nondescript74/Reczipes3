@@ -11,7 +11,7 @@ import Foundation
 import OSLog
 @testable import Reczipes2
 
-@Suite("Diabetic Cache Edge Cases")
+@Suite("Diabetic Cache Edge Cases", .serialized)
 struct DiabeticCacheEdgeCaseTests {
     
     private let logger = Logger(subsystem: "com.reczipes.tests", category: "edge-cases")

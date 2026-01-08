@@ -12,7 +12,7 @@ import OSLog
 import SwiftUI
 @testable import Reczipes2
 
-@Suite("Diabetic Analysis Integration Tests")
+@Suite("Diabetic Analysis Integration Tests", .serialized)
 struct DiabeticCacheIntegrationTests {
     
     private let logger = Logger(subsystem: "com.reczipes.tests", category: "integration")

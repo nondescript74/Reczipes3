@@ -9,7 +9,7 @@ import Testing
 import Foundation
 @testable import Reczipes2
 
-@Suite("Recipe Search Service Tests")
+@Suite("Recipe Search Service Tests", .serialized)
 @MainActor
 struct RecipeSearchTests {
     

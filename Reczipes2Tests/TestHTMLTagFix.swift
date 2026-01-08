@@ -10,7 +10,7 @@ import Foundation
 @testable import Reczipes2
 
 /// Test the HTML tag cleaning functionality
-@Suite("HTML Tag Fix Tester")
+@Suite("HTML Tag Fix Tester", .serialized)
 struct HTMLTagFixTester {
     
     // MARK: - Test URLs

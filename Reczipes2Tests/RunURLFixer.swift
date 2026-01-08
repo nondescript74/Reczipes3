@@ -10,7 +10,7 @@ import Testing
 import Foundation
 @testable import Reczipes2
 
-@Suite("Run URL Fixer on Real Files")
+@Suite("Run URL Fixer on Real Files", .serialized)
 @MainActor
 struct RunURLFixer {
     

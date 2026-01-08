@@ -62,13 +62,18 @@ class VersionHistoryManager {
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
                 // Concurrency & Performance Improvements
-                "🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures",
+                "🔧 Fixed: Test isolation in RecipeExportImportBackupTests for reliable backup counting",
+                "✅ Enhanced: testListAvailableBackups now cleans test environment before creating backups",
+                "⚡️ Improved: Reduced test delay from 1 second to 10 milliseconds using millisecond-based filenames",
+                "🐛 Fixed: Race condition where backup test could find files from previous test runs",
+                "📊 Added: Explicit verification that backup files exist and have unique paths"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
         
+        // 13.2 66"🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures",
 //        history.append(VersionHistoryEntry(
 //            version: "13.2",
 //            buildNumber: "66",

@@ -11,7 +11,7 @@ import Foundation
 import SwiftData
 @testable import Reczipes2
 
-@Suite("Recipe Backup Restore Tests")
+@Suite("Recipe Backup Restore Tests", .serialized)
 @MainActor
 struct RecipeExportImportRestoreTests {
     
