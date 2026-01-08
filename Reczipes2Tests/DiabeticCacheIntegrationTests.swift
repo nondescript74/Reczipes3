@@ -139,6 +139,7 @@ struct DiabeticCacheIntegrationTests {
     // MARK: - Integration Tests
     
     @Test("First analysis creates cache entry")
+    @MainActor
     func firstAnalysisCreatesCache() async throws {
         logger.info("🧪 Testing first analysis creates cache")
         
@@ -158,7 +159,7 @@ struct DiabeticCacheIntegrationTests {
         logger.info("✅ Analysis completed")
         
         // Create cache entry
-        let cached = try await CachedDiabeticAnalysis.create(from: analysis, recipe: recipe)
+        let cached = try CachedDiabeticAnalysis.create(from: analysis, recipe: recipe)
         cacheManager.setCachedAnalysis(cached, for: recipe)
         logger.info("💾 Cache entry created")
         
@@ -172,6 +173,7 @@ struct DiabeticCacheIntegrationTests {
     }
     
     @Test("Cached analysis is reused when valid")
+    @MainActor
     func cachedAnalysisReused() async throws {
         logger.info("🧪 Testing cache reuse")
         
@@ -183,7 +185,7 @@ struct DiabeticCacheIntegrationTests {
         // First analysis (pass IDs, not Recipe object)
         logger.info("🔄 First analysis...")
         let analysis1 = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
-        let cached = try await CachedDiabeticAnalysis.create(from: analysis1, recipe: recipe)
+        let cached = try CachedDiabeticAnalysis.create(from: analysis1, recipe: recipe)
         cacheManager.setCachedAnalysis(cached, for: recipe)
         logger.info("💾 First analysis cached")
         
@@ -203,6 +205,7 @@ struct DiabeticCacheIntegrationTests {
     }
     
     @Test("Cache invalidation triggers new analysis")
+    @MainActor
     func cacheInvalidationTriggersAnalysis() async throws {
         logger.info("🧪 Testing cache invalidation")
         
@@ -214,14 +217,14 @@ struct DiabeticCacheIntegrationTests {
         // First analysis (pass IDs, not Recipe object)
         logger.info("🔄 First analysis...")
         let analysis1 = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
-        let cached = try await CachedDiabeticAnalysis.create(from: analysis1, recipe: recipe)
+        let cached = try CachedDiabeticAnalysis.create(from: analysis1, recipe: recipe)
         cacheManager.setCachedAnalysis(cached, for: recipe)
         let initialCallCount = await service.getCallCount()
         logger.info("💾 First analysis cached, call count: \(initialCallCount)")
         
         // Modify recipe ingredients
         logger.info("🔧 Modifying recipe ingredients...")
-        let newIngredients = await [
+        let newIngredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "3", unit: "cups", name: "sugar") // Changed!
             ])
@@ -240,7 +243,7 @@ struct DiabeticCacheIntegrationTests {
                 // Perform new analysis (pass IDs, not Recipe object)
                 logger.info("🔄 Cache invalid, performing new analysis...")
                 let analysis2 = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
-                let newCached = try await CachedDiabeticAnalysis.create(from: analysis2, recipe: recipe)
+                let newCached = try CachedDiabeticAnalysis.create(from: analysis2, recipe: recipe)
                 cacheManager.setCachedAnalysis(newCached, for: recipe)
                 logger.info("💾 New analysis cached")
             }
@@ -254,6 +257,7 @@ struct DiabeticCacheIntegrationTests {
     }
     
     @Test("Multiple recipes have independent caches")
+    @MainActor
     func independentCaches() async throws {
         logger.info("🧪 Testing independent caches")
         
@@ -271,7 +275,7 @@ struct DiabeticCacheIntegrationTests {
         logger.info("🔄 Analyzing all recipes...")
         for recipe in [recipe1, recipe2, recipe3] {
             let analysis = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
-            let cached = try await CachedDiabeticAnalysis.create(from: analysis, recipe: recipe)
+            let cached = try CachedDiabeticAnalysis.create(from: analysis, recipe: recipe)
             cacheManager.setCachedAnalysis(cached, for: recipe)
         }
         
@@ -285,7 +289,7 @@ struct DiabeticCacheIntegrationTests {
         
         // Modify one recipe
         logger.info("🔧 Modifying recipe 2...")
-        let newIngredients = await [
+        let newIngredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "5", unit: "cups", name: "modified ingredient")
             ])
@@ -306,6 +310,7 @@ struct DiabeticCacheIntegrationTests {
     }
     
     @Test("Analysis failure handling")
+    @MainActor
     func analysisFailureHandling() async throws {
         logger.info("🧪 Testing analysis failure handling")
         
@@ -328,12 +333,14 @@ struct DiabeticCacheIntegrationTests {
     }
     
     @Test("Concurrent analysis requests")
+    @MainActor
     func concurrentAnalysisRequests() async throws {
         logger.info("🧪 Testing concurrent analysis requests")
         
         let service = MockDiabeticAnalysisService()
         await service.setResponseDelay(0.5) // Longer delay to test concurrency
         
+        // Create recipes on main actor
         let recipes = (1...5).map { createTestRecipe(title: "Recipe \($0)") }
         
         logger.info("📝 Created 5 recipes for concurrent analysis")
@@ -381,6 +388,7 @@ struct DiabeticCacheIntegrationTests {
     
     // MARK: - Helper Methods
     
+    @MainActor
     private func createTestRecipe(title: String) -> Recipe {
         let ingredients = [
             IngredientSection(ingredients: [

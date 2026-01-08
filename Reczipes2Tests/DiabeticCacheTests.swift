@@ -107,13 +107,13 @@ struct DiabeticCacheTests {
     }
     
     @Test("Recipe version increments on ingredient update")
-    nonisolated func recipeVersionIncrement() async throws {
+    @MainActor func recipeVersionIncrement() async throws {
         logger.info("🧪 Starting recipeVersionIncrement test")
         let encoder = JSONEncoder()
         
         // Create a recipe
         logger.info("📝 Creating recipe")
-        let recipeModel = await RecipeModel(
+        let recipeModel = RecipeModel(
             title: "Test Recipe",
             ingredientSections: [
                 IngredientSection(
@@ -143,7 +143,7 @@ struct DiabeticCacheTests {
         
         // Update ingredients
         logger.info("📝 Creating new ingredients")
-        let newIngredients = await [
+        let newIngredients = [
             IngredientSection(
                 title: "Main",
                 ingredients: [

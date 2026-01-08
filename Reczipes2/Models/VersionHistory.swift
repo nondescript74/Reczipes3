@@ -62,260 +62,261 @@ class VersionHistoryManager {
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
                 // Concurrency & Performance Improvements
-
+                "🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures",
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
         
-        history.append(VersionHistoryEntry(
-            version: "13.2",
-            buildNumber: "66",
-            releaseDate: Date(),
-            changes: [
-
-            ]
-        ))
-        
-        
-        history.append(VersionHistoryEntry(
-            version: "13.1",
-            buildNumber: "65",
-            releaseDate: Date(),
-            changes: [
-                "Fixed memory leaks in CloudKit sync monitoring by replacing NotificationCenter observers with async notification streams",
-                "Replaced legacy DispatchQueue.main.async calls with modern Swift Concurrency (@MainActor isolation)",
-                "Eliminated Timer memory leaks in ExtractionLoadingView by using SwiftUI's .task modifier with structured concurrency",
-                "Improved notification monitoring with automatic cancellation when views disappear",
-
-                // Swift Concurrency Best Practices
-                "Migrated CloudKitSyncStatusMonitorView to use async/await throughout for better reliability",
-                "Updated SyncStatusLogger to use @MainActor isolation for thread-safe UI updates",
-                "Replaced Date-based animation calculations with state-driven SwiftUI animations",
-
-                // SwiftData & Actor Isolation Fixes
-                "Fixed Sendable compliance errors in DiabeticAnalysisService by introducing CachedData transfer object",
-                "Resolved actor isolation warnings by properly handling SwiftData models within ModelActor boundaries",
-                "Improved cache invalidation to work correctly across actor boundaries with proper data isolation",
-                "⚡️ Enhanced: Intelligent retry logic with exponential backoff for recipe extraction network failures",
-                "🔧 Added: Comprehensive test suite for retry manager covering transient errors, rate limiting, and terminal failures"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "13.0",
-            buildNumber: "63",
-            releaseDate: Date(),
-            changes: [
-                "🔧 Refactored: Split 2,864-line RecipeExportImportTests into 5 focused test files for better maintainability",
-                "✅ Organized: Test suites now grouped by functionality (Basic, Backup, Restore, Integration, Edge Cases)",
-                "⚡️ Enhanced: Tests can now run independently, improving development workflow",
-                "🐛 Fixed: Edge case test expectation for nil vs empty string in ingredient encoding"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.9",
-            buildNumber: "62",
-            releaseDate: Date(),
-            changes: [
-                "💾 Enhanced: Recipe backups now save to Files/Reczipes2 folder instead of temporary storage",
-                "✨ Added: Automatic backup discovery - available backups are listed in the import view",
-                "📁 Improved: Backups are now persistent and accessible via iOS/iPadOS Files app",
-                "🔄 Added: Refresh button to reload available backups in import view",
-                "📊 Enhanced: Backup list shows file name, date, and size for each backup",
-                "☁️ Added: Backups in Documents folder can sync via iCloud if enabled",
-                "🔧 Added: Comprehensive test suite for backup/restore with 25+ test cases",
-                "✅ Added: Integration tests for complete backup/restore workflows",
-                "🐛 Added: Failure scenario tests with instructive error messages",
-                "📝 Added: Step-by-step workflow tests simulating real-world usage",
-                "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
-                "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
-                "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",
-                "⚡️ Fixed: Recipe detail sheets appearing too small on iPad, now uses device-appropriate presentation"
-
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.8",
-            buildNumber: "61",
-            releaseDate: Date(),
-            changes: [
-                "✨ Added: Rerun Analysis button for diabetic-friendly recipe analysis",
-                "🔗 Added: Clickable recipe reference URLs that open in Safari Reader mode",
-                "🔒 Enhanced: Reference URLs open in secure SFSafariViewController with restricted navigation",
-                "🎨 Improved: Recipe references now display as interactive buttons with Safari icon for valid URLs"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.7",
-            buildNumber: "59",
-            releaseDate: Date(),
-            changes: [
-                "🔧 Fixed: Swift 6 concurrency warnings in UserAllergenProfile and SchemaMigration files",
-                "📝 Improved: JSON encoding/decoding patterns for nutritional goals and sensitivities",
-                "💾 Enhanced: Schema V3 compatibility with CloudKit sync for nutritional data",
-                "✅ Verified: All SwiftData models properly configured for main actor isolation"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.6",
-            buildNumber: "58",
-            releaseDate: Date(),
-            changes: [
-                "🐛 Fixed: Startup crash caused by SchemaV3 initialization with nil nutritional goals",
-                "🔧 Fixed: Main actor isolation warnings in UserAllergenProfile schema definitions",
-                "⚡️ Improved: Enhanced ModelContainer initialization logging for better debugging",
-                "🔍 Added: Detailed error logging during container creation to diagnose CloudKit issues"
-            
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.5",
-            buildNumber: "57",
-            releaseDate: Date(),
-            changes: [
-                "🐛 Fixed: Recipe Book import decompression error when importing .recipebook files",
-                "🔧 Enhanced: ZIP file extraction now properly handles raw DEFLATE compression with zlib wrapper",
-                "⚡️ Improved: More descriptive error messages when archive decompression fails",
-                "📚 Fixed: Recipe Books exported from the app can now be successfully imported on other devices",
-                "✨ Added: Nutritional Goals system with daily targets for calories, sodium, fat, sugar, fiber, and more",
-                "⚠️ Added: Personalized nutritional goal profiles (Weight Loss, Diabetes Management, Heart Health, General Health, Athletic Performance)",
-                "🏥 Added: Medical guidelines integration from American Heart Association, American Diabetes Association, and CDC",
-                "📊 Added: Recipe nutritional analysis showing how recipes fit within daily goals",
-                "⚡️ Added: Smart nutrition alerts for high sodium, saturated fat, sugar, and positive fiber content",
-                "🎯 Added: Recipe compatibility scoring (0-100) based on nutritional goals",
-                "💾 Added: Schema V3.0.0 for UserAllergenProfile with nutritional goals data storage"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.4",
-            buildNumber: "56",
-            releaseDate: Date(),
-            changes: [
-                "✨ Added: Recipe Book integration with context menus and visual badges showing book membership",
-                "⚡️ Improved: Background filter processing with caching to prevent UI blocking during allergen and diabetes analysis",
-                "🔧 Enhanced: Recipe deletion now automatically cleans up associated image files and assignments"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "12.3",
-            buildNumber: "54",
-            releaseDate: Date(),
-            changes: [
-                "✨ Added: Cooking Mode with step-by-step recipe tracking and completion checkmarks",
-                "⚡️ Added: Dynamic serving size adjustment with automatic ingredient quantity scaling",
-                "🎨 Added: Persistent cooking session state across app launches using SwiftData",
-                "🔧 Fixed: CloudKit sync compatibility for CookingSession model with proper default values",
-                "✅ Added Recipe Book Query",
-                "✅ Enhanced Recipe Row with Book Badges",
-                "✅ Added Add to Book Context Menu",
-                "✅ Added Helper Methods",
-                "✅ Added View Books Toolbar Button",
-                "✅ Created RecipeBookBadge Component"
-
-            ]
-        ))
-        
-        
-        history.append(VersionHistoryEntry(
-            version: "12.2",
-            buildNumber: "53",
-            releaseDate: Date(),
-            changes: [
-                "⚡️ Added: Tips can be added to existing recipes",
-                "🎨 Fixed: AppClip not compiling",
-                "⚡️ Added: Adds an image size reduction function to ImagePreprocessor",
-                "⚡️ Added: Updates the ViewModel to reduce image sizes before sending to Claude",
-                "⚡️ Added: Handles this for camera, library, and web URL images",
-                "⚡️ Improved: Image cropping performance - crop handles now respond instantly to touch",
-                "🎨 Fixed: Laggy crop rectangle dragging during recipe image extraction",
-                "🐛 Fixed: Slow response when adjusting crop corners and moving crop area",
-                "⚡️ Added: Added tip creation UI to RecipeDetailView with Add a Tip button",
-                "⚡️ Added: Pending tips shown with orange border and badge before save",
-                "⚡️ Added: Tips automatically included when recipe is saved",
-                "⚡️ Added: Save button displays pending tip count"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "11.8",
-            buildNumber: "50",
-            releaseDate: Date(),
-            changes: [
-                "🎨 Enhanced: Animated loading indicators for recipe extraction with rotating status messages",
-                "⚡️ Added: 'Preparing image...' spinner between photo selection and crop screen",
-                "🐛 Fixed: Crop screen not appearing after selecting library photo (timing conflict)",
-                "🐛 Fixed: Loading indicator hidden behind UI elements during extraction",
-                "⚡️ Improved: UI now hides all controls during extraction to focus on progress",
-                "🔧 Added: Debug logging for image selection and extraction flow",
-                "✅ Added 0.6s delay between sheet dismiss and fullScreenCover present (prevents SwiftUI conflict)",
-                "✅ Hide source buttons when imageToCrop != nil (shows preparing spinner instead)",
-                "✅ Added Preparing image... indicator between picker and crop",
-                "✅ Added debug logging to trace the flow",
-                "✅ Hide UI elements during extraction to show only loading indicator",
-                "📱 Fixed: Hang on image extraction",
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "11.7",
-            buildNumber: "49",
-            releaseDate: Date(),
-            changes: [
-                "📱 Removed: Spoonacular minor reference in url",
-                "📱 Added: Version History viewer in Settings",
-                "🎨 Enhanced: Launch screen now shows every app launch"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "11.6",
-            buildNumber: "48",
-            releaseDate: Date(),
-            changes: [
-                "🎨 Enhanced: Launch screen now shows every app launch",
-                "📱 Added: Version History viewer in Settings",
-                "🔧 Added: Version Debug view for troubleshooting",
-                "📝 Improved: What's New section auto-populated from version database",
-                "⚡️ Improved: Launch screen uses dynamic data from VersionHistoryManager",
-                "📚 Added: Comprehensive documentation for version management",
-                "🎯 Added: Emoji categorization guide for changelog entries",
-                "🔄 Added: Share changelog functionality",
-                "🗂️ Added: Expandable/collapsible version entries",
-                "📊 Added: Automatic version/build detection from Info.plist",
-                "🐛 Added: Developer reset button for version tracking (DEBUG)",
-                "🐛 Fixed: Version history debug function mutation error"
-            ]
-        ))
-        
-        history.append(VersionHistoryEntry(
-            version: "11.5",
-            buildNumber: "47",
-            releaseDate: Calendar.current.date(byAdding: .day, value: -1, to: Date())!,
-            changes: [
-                "📚 Export & Import Recipe Books",
-                "🔄 Share Collections with Friends",
-                "🤖 AI-Powered Recipe Extraction with Claude",
-                "☁️ iCloud Sync Enabled",
-                "🏷️ Recipe Image Assignment System",
-                "⚠️ Allergen Profile Tracking",
-                "💉 Diabetes Analysis for Recipes",
-                "🔍 Advanced Recipe Search & Filtering",
-                "📝 Recipe Books Organization",
-                "🔗 Save & Extract from URLs",
-                "📊 FODMAP Substitution Guide",
-                "🎨 Liquid Glass Design Elements",
-                "📱 State Preservation & Task Restoration"
-            ]
-        ))
+//        history.append(VersionHistoryEntry(
+//            version: "13.2",
+//            buildNumber: "66",
+//            releaseDate: Date(),
+//            changes: [
+//                "🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures"
+//
+//            ]
+//        ))
+//        
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "13.1",
+//            buildNumber: "65",
+//            releaseDate: Date(),
+//            changes: [
+//                "Fixed memory leaks in CloudKit sync monitoring by replacing NotificationCenter observers with async notification streams",
+//                "Replaced legacy DispatchQueue.main.async calls with modern Swift Concurrency (@MainActor isolation)",
+//                "Eliminated Timer memory leaks in ExtractionLoadingView by using SwiftUI's .task modifier with structured concurrency",
+//                "Improved notification monitoring with automatic cancellation when views disappear",
+//
+//                // Swift Concurrency Best Practices
+//                "Migrated CloudKitSyncStatusMonitorView to use async/await throughout for better reliability",
+//                "Updated SyncStatusLogger to use @MainActor isolation for thread-safe UI updates",
+//                "Replaced Date-based animation calculations with state-driven SwiftUI animations",
+//
+//                // SwiftData & Actor Isolation Fixes
+//                "Fixed Sendable compliance errors in DiabeticAnalysisService by introducing CachedData transfer object",
+//                "Resolved actor isolation warnings by properly handling SwiftData models within ModelActor boundaries",
+//                "Improved cache invalidation to work correctly across actor boundaries with proper data isolation",
+//                "⚡️ Enhanced: Intelligent retry logic with exponential backoff for recipe extraction network failures",
+//                "🔧 Added: Comprehensive test suite for retry manager covering transient errors, rate limiting, and terminal failures"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "13.0",
+//            buildNumber: "63",
+//            releaseDate: Date(),
+//            changes: [
+//                "🔧 Refactored: Split 2,864-line RecipeExportImportTests into 5 focused test files for better maintainability",
+//                "✅ Organized: Test suites now grouped by functionality (Basic, Backup, Restore, Integration, Edge Cases)",
+//                "⚡️ Enhanced: Tests can now run independently, improving development workflow",
+//                "🐛 Fixed: Edge case test expectation for nil vs empty string in ingredient encoding"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.9",
+//            buildNumber: "62",
+//            releaseDate: Date(),
+//            changes: [
+//                "💾 Enhanced: Recipe backups now save to Files/Reczipes2 folder instead of temporary storage",
+//                "✨ Added: Automatic backup discovery - available backups are listed in the import view",
+//                "📁 Improved: Backups are now persistent and accessible via iOS/iPadOS Files app",
+//                "🔄 Added: Refresh button to reload available backups in import view",
+//                "📊 Enhanced: Backup list shows file name, date, and size for each backup",
+//                "☁️ Added: Backups in Documents folder can sync via iCloud if enabled",
+//                "🔧 Added: Comprehensive test suite for backup/restore with 25+ test cases",
+//                "✅ Added: Integration tests for complete backup/restore workflows",
+//                "🐛 Added: Failure scenario tests with instructive error messages",
+//                "📝 Added: Step-by-step workflow tests simulating real-world usage",
+//                "🎨 Improved: Recipe details now use full-screen presentation on iPad for better reading experience",
+//                "✨ Added: Clear and prominent dismiss button when viewing recipes in Recipe Books on iPad",
+//                "📱 Enhanced: Optimized sheet presentations for iPad with proper sizing and drag indicators",
+//                "⚡️ Fixed: Recipe detail sheets appearing too small on iPad, now uses device-appropriate presentation"
+//
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.8",
+//            buildNumber: "61",
+//            releaseDate: Date(),
+//            changes: [
+//                "✨ Added: Rerun Analysis button for diabetic-friendly recipe analysis",
+//                "🔗 Added: Clickable recipe reference URLs that open in Safari Reader mode",
+//                "🔒 Enhanced: Reference URLs open in secure SFSafariViewController with restricted navigation",
+//                "🎨 Improved: Recipe references now display as interactive buttons with Safari icon for valid URLs"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.7",
+//            buildNumber: "59",
+//            releaseDate: Date(),
+//            changes: [
+//                "🔧 Fixed: Swift 6 concurrency warnings in UserAllergenProfile and SchemaMigration files",
+//                "📝 Improved: JSON encoding/decoding patterns for nutritional goals and sensitivities",
+//                "💾 Enhanced: Schema V3 compatibility with CloudKit sync for nutritional data",
+//                "✅ Verified: All SwiftData models properly configured for main actor isolation"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.6",
+//            buildNumber: "58",
+//            releaseDate: Date(),
+//            changes: [
+//                "🐛 Fixed: Startup crash caused by SchemaV3 initialization with nil nutritional goals",
+//                "🔧 Fixed: Main actor isolation warnings in UserAllergenProfile schema definitions",
+//                "⚡️ Improved: Enhanced ModelContainer initialization logging for better debugging",
+//                "🔍 Added: Detailed error logging during container creation to diagnose CloudKit issues"
+//            
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.5",
+//            buildNumber: "57",
+//            releaseDate: Date(),
+//            changes: [
+//                "🐛 Fixed: Recipe Book import decompression error when importing .recipebook files",
+//                "🔧 Enhanced: ZIP file extraction now properly handles raw DEFLATE compression with zlib wrapper",
+//                "⚡️ Improved: More descriptive error messages when archive decompression fails",
+//                "📚 Fixed: Recipe Books exported from the app can now be successfully imported on other devices",
+//                "✨ Added: Nutritional Goals system with daily targets for calories, sodium, fat, sugar, fiber, and more",
+//                "⚠️ Added: Personalized nutritional goal profiles (Weight Loss, Diabetes Management, Heart Health, General Health, Athletic Performance)",
+//                "🏥 Added: Medical guidelines integration from American Heart Association, American Diabetes Association, and CDC",
+//                "📊 Added: Recipe nutritional analysis showing how recipes fit within daily goals",
+//                "⚡️ Added: Smart nutrition alerts for high sodium, saturated fat, sugar, and positive fiber content",
+//                "🎯 Added: Recipe compatibility scoring (0-100) based on nutritional goals",
+//                "💾 Added: Schema V3.0.0 for UserAllergenProfile with nutritional goals data storage"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.4",
+//            buildNumber: "56",
+//            releaseDate: Date(),
+//            changes: [
+//                "✨ Added: Recipe Book integration with context menus and visual badges showing book membership",
+//                "⚡️ Improved: Background filter processing with caching to prevent UI blocking during allergen and diabetes analysis",
+//                "🔧 Enhanced: Recipe deletion now automatically cleans up associated image files and assignments"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.3",
+//            buildNumber: "54",
+//            releaseDate: Date(),
+//            changes: [
+//                "✨ Added: Cooking Mode with step-by-step recipe tracking and completion checkmarks",
+//                "⚡️ Added: Dynamic serving size adjustment with automatic ingredient quantity scaling",
+//                "🎨 Added: Persistent cooking session state across app launches using SwiftData",
+//                "🔧 Fixed: CloudKit sync compatibility for CookingSession model with proper default values",
+//                "✅ Added Recipe Book Query",
+//                "✅ Enhanced Recipe Row with Book Badges",
+//                "✅ Added Add to Book Context Menu",
+//                "✅ Added Helper Methods",
+//                "✅ Added View Books Toolbar Button",
+//                "✅ Created RecipeBookBadge Component"
+//
+//            ]
+//        ))
+//        
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "12.2",
+//            buildNumber: "53",
+//            releaseDate: Date(),
+//            changes: [
+//                "⚡️ Added: Tips can be added to existing recipes",
+//                "🎨 Fixed: AppClip not compiling",
+//                "⚡️ Added: Adds an image size reduction function to ImagePreprocessor",
+//                "⚡️ Added: Updates the ViewModel to reduce image sizes before sending to Claude",
+//                "⚡️ Added: Handles this for camera, library, and web URL images",
+//                "⚡️ Improved: Image cropping performance - crop handles now respond instantly to touch",
+//                "🎨 Fixed: Laggy crop rectangle dragging during recipe image extraction",
+//                "🐛 Fixed: Slow response when adjusting crop corners and moving crop area",
+//                "⚡️ Added: Added tip creation UI to RecipeDetailView with Add a Tip button",
+//                "⚡️ Added: Pending tips shown with orange border and badge before save",
+//                "⚡️ Added: Tips automatically included when recipe is saved",
+//                "⚡️ Added: Save button displays pending tip count"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "11.8",
+//            buildNumber: "50",
+//            releaseDate: Date(),
+//            changes: [
+//                "🎨 Enhanced: Animated loading indicators for recipe extraction with rotating status messages",
+//                "⚡️ Added: 'Preparing image...' spinner between photo selection and crop screen",
+//                "🐛 Fixed: Crop screen not appearing after selecting library photo (timing conflict)",
+//                "🐛 Fixed: Loading indicator hidden behind UI elements during extraction",
+//                "⚡️ Improved: UI now hides all controls during extraction to focus on progress",
+//                "🔧 Added: Debug logging for image selection and extraction flow",
+//                "✅ Added 0.6s delay between sheet dismiss and fullScreenCover present (prevents SwiftUI conflict)",
+//                "✅ Hide source buttons when imageToCrop != nil (shows preparing spinner instead)",
+//                "✅ Added Preparing image... indicator between picker and crop",
+//                "✅ Added debug logging to trace the flow",
+//                "✅ Hide UI elements during extraction to show only loading indicator",
+//                "📱 Fixed: Hang on image extraction",
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "11.7",
+//            buildNumber: "49",
+//            releaseDate: Date(),
+//            changes: [
+//                "📱 Removed: Spoonacular minor reference in url",
+//                "📱 Added: Version History viewer in Settings",
+//                "🎨 Enhanced: Launch screen now shows every app launch"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "11.6",
+//            buildNumber: "48",
+//            releaseDate: Date(),
+//            changes: [
+//                "🎨 Enhanced: Launch screen now shows every app launch",
+//                "📱 Added: Version History viewer in Settings",
+//                "🔧 Added: Version Debug view for troubleshooting",
+//                "📝 Improved: What's New section auto-populated from version database",
+//                "⚡️ Improved: Launch screen uses dynamic data from VersionHistoryManager",
+//                "📚 Added: Comprehensive documentation for version management",
+//                "🎯 Added: Emoji categorization guide for changelog entries",
+//                "🔄 Added: Share changelog functionality",
+//                "🗂️ Added: Expandable/collapsible version entries",
+//                "📊 Added: Automatic version/build detection from Info.plist",
+//                "🐛 Added: Developer reset button for version tracking (DEBUG)",
+//                "🐛 Fixed: Version history debug function mutation error"
+//            ]
+//        ))
+//        
+//        history.append(VersionHistoryEntry(
+//            version: "11.5",
+//            buildNumber: "47",
+//            releaseDate: Calendar.current.date(byAdding: .day, value: -1, to: Date())!,
+//            changes: [
+//                "📚 Export & Import Recipe Books",
+//                "🔄 Share Collections with Friends",
+//                "🤖 AI-Powered Recipe Extraction with Claude",
+//                "☁️ iCloud Sync Enabled",
+//                "🏷️ Recipe Image Assignment System",
+//                "⚠️ Allergen Profile Tracking",
+//                "💉 Diabetes Analysis for Recipes",
+//                "🔍 Advanced Recipe Search & Filtering",
+//                "📝 Recipe Books Organization",
+//                "🔗 Save & Extract from URLs",
+//                "📊 FODMAP Substitution Guide",
+//                "🎨 Liquid Glass Design Elements",
+//                "📱 State Preservation & Task Restoration"
+//            ]
+//        ))
         
         return history
     }
