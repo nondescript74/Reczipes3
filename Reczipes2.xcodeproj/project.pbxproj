@@ -8,6 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		F82B66222F01B60E00500EDE /* Reczipes2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82B65D12F01B60E00500EDE /* Reczipes2App.swift */; };
+		F8335B272F1169D10033AD65 /* Reczipes2UtilitiesCloudKitContainerValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8335B262F1169D10033AD65 /* Reczipes2UtilitiesCloudKitContainerValidator.swift */; };
+		F8335B292F1169F50033AD65 /* Reczipes2ViewsSettingsCloudKitContainerValidationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8335B282F1169F50033AD65 /* Reczipes2ViewsSettingsCloudKitContainerValidationView.swift */; };
+		F8335B2C2F116A7B0033AD65 /* CLOUDKIT_FIX_IMPLEMENTATION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = F8335B2B2F116A7B0033AD65 /* CLOUDKIT_FIX_IMPLEMENTATION_SUMMARY.md */; };
+		F8335B2E2F116A890033AD65 /* CLOUDKIT_FIX_QUICKSTART.md in Resources */ = {isa = PBXBuildFile; fileRef = F8335B2D2F116A890033AD65 /* CLOUDKIT_FIX_QUICKSTART.md */; };
+		F8335B302F116B050033AD65 /* CLOUDKIT_SCHEMA_FIX.md in Resources */ = {isa = PBXBuildFile; fileRef = F8335B2F2F116B050033AD65 /* CLOUDKIT_SCHEMA_FIX.md */; };
+		F8335B322F116B3B0033AD65 /* CLOUDKIT_ENTITLEMENTS_SETUP.md in Resources */ = {isa = PBXBuildFile; fileRef = F8335B312F116B3B0033AD65 /* CLOUDKIT_ENTITLEMENTS_SETUP.md */; };
+		F8335B342F116B710033AD65 /* CLOUDKIT_FIX_SUMMARY_FINAL.md in Resources */ = {isa = PBXBuildFile; fileRef = F8335B332F116B710033AD65 /* CLOUDKIT_FIX_SUMMARY_FINAL.md */; };
 		F84466D32F058B8B005AC874 /* Reczipes2Clip.app in Embed App Clips */ = {isa = PBXBuildFile; fileRef = F84466AF2F058B8A005AC874 /* Reczipes2Clip.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F89D3B622EF60B9700B52212 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -64,6 +71,13 @@
 
 /* Begin PBXFileReference section */
 		F82B65D12F01B60E00500EDE /* Reczipes2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reczipes2App.swift; sourceTree = "<group>"; };
+		F8335B262F1169D10033AD65 /* Reczipes2UtilitiesCloudKitContainerValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reczipes2UtilitiesCloudKitContainerValidator.swift; sourceTree = "<group>"; };
+		F8335B282F1169F50033AD65 /* Reczipes2ViewsSettingsCloudKitContainerValidationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reczipes2ViewsSettingsCloudKitContainerValidationView.swift; sourceTree = "<group>"; };
+		F8335B2B2F116A7B0033AD65 /* CLOUDKIT_FIX_IMPLEMENTATION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLOUDKIT_FIX_IMPLEMENTATION_SUMMARY.md; sourceTree = "<group>"; };
+		F8335B2D2F116A890033AD65 /* CLOUDKIT_FIX_QUICKSTART.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLOUDKIT_FIX_QUICKSTART.md; sourceTree = "<group>"; };
+		F8335B2F2F116B050033AD65 /* CLOUDKIT_SCHEMA_FIX.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLOUDKIT_SCHEMA_FIX.md; sourceTree = "<group>"; };
+		F8335B312F116B3B0033AD65 /* CLOUDKIT_ENTITLEMENTS_SETUP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLOUDKIT_ENTITLEMENTS_SETUP.md; sourceTree = "<group>"; };
+		F8335B332F116B710033AD65 /* CLOUDKIT_FIX_SUMMARY_FINAL.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLOUDKIT_FIX_SUMMARY_FINAL.md; sourceTree = "<group>"; };
 		F84466AF2F058B8A005AC874 /* Reczipes2Clip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reczipes2Clip.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F84466BF2F058B8B005AC874 /* Reczipes2ClipTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2ClipTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F84466C92F058B8B005AC874 /* Reczipes2ClipUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Reczipes2ClipUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -134,6 +148,7 @@
 				BLANK_SCREEN_FIX.md,
 				BUILD_2_RELEASE_NOTES.md,
 				CLOUDKIT_BACKGROUND_MODE_FIX.md,
+				CLOUDKIT_CONTAINER_FIX_GUIDE.md,
 				CLOUDKIT_DEBUGGING_GUIDE.md,
 				CLOUDKIT_HELP_INTEGRATION_SUMMARY.md,
 				CLOUDKIT_SETUP_GUIDE.md,
@@ -377,6 +392,13 @@
 				F84466C22F058B8B005AC874 /* Reczipes2ClipTests */,
 				F84466CC2F058B8B005AC874 /* Reczipes2ClipUITests */,
 				F8C80F452EE246D200AA52E7 /* Products */,
+				F8335B262F1169D10033AD65 /* Reczipes2UtilitiesCloudKitContainerValidator.swift */,
+				F8335B282F1169F50033AD65 /* Reczipes2ViewsSettingsCloudKitContainerValidationView.swift */,
+				F8335B2B2F116A7B0033AD65 /* CLOUDKIT_FIX_IMPLEMENTATION_SUMMARY.md */,
+				F8335B2D2F116A890033AD65 /* CLOUDKIT_FIX_QUICKSTART.md */,
+				F8335B2F2F116B050033AD65 /* CLOUDKIT_SCHEMA_FIX.md */,
+				F8335B312F116B3B0033AD65 /* CLOUDKIT_ENTITLEMENTS_SETUP.md */,
+				F8335B332F116B710033AD65 /* CLOUDKIT_FIX_SUMMARY_FINAL.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -600,7 +622,12 @@
 		F8C80F422EE246D200AA52E7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				F8335B302F116B050033AD65 /* CLOUDKIT_SCHEMA_FIX.md in Resources */,
+				F8335B342F116B710033AD65 /* CLOUDKIT_FIX_SUMMARY_FINAL.md in Resources */,
+				F8335B322F116B3B0033AD65 /* CLOUDKIT_ENTITLEMENTS_SETUP.md in Resources */,
+				F8335B2E2F116A890033AD65 /* CLOUDKIT_FIX_QUICKSTART.md in Resources */,
 				F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */,
+				F8335B2C2F116A7B0033AD65 /* CLOUDKIT_FIX_IMPLEMENTATION_SUMMARY.md in Resources */,
 			);
 		};
 		F8C80F512EE246D300AA52E7 /* Resources */ = {
@@ -634,6 +661,8 @@
 		F8C80F402EE246D200AA52E7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				F8335B292F1169F50033AD65 /* Reczipes2ViewsSettingsCloudKitContainerValidationView.swift in Sources */,
+				F8335B272F1169D10033AD65 /* Reczipes2UtilitiesCloudKitContainerValidator.swift in Sources */,
 				F82B66222F01B60E00500EDE /* Reczipes2App.swift in Sources */,
 			);
 		};

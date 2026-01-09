@@ -29,15 +29,16 @@ enum SchemaV1: VersionedSchema {
     
     @Model
     final class UserAllergenProfile {
-        var id: UUID
-        var name: String
-        var isActive: Bool
+        // CloudKit requires optional properties
+        var id: UUID?
+        var name: String?
+        var isActive: Bool?
         var sensitivitiesData: Data?
-        var dateCreated: Date
-        var dateModified: Date
+        var dateCreated: Date?
+        var dateModified: Date?
         
         init(id: UUID = UUID(),
-             name: String,
+             name: String = "",
              isActive: Bool = false,
              sensitivitiesData: Data? = nil,
              dateCreated: Date = Date(),
@@ -72,16 +73,17 @@ enum SchemaV2: VersionedSchema {
     
     @Model
     final class UserAllergenProfile {
-        var id: UUID
-        var name: String
-        var isActive: Bool
+        // CloudKit requires optional properties
+        var id: UUID?
+        var name: String?
+        var isActive: Bool?
         var sensitivitiesData: Data?
-        var diabetesStatusRaw: String  // NEW: Added in V2
-        var dateCreated: Date
-        var dateModified: Date
+        var diabetesStatusRaw: String?  // NEW: Added in V2
+        var dateCreated: Date?
+        var dateModified: Date?
         
         init(id: UUID = UUID(),
-             name: String,
+             name: String = "",
              isActive: Bool = false,
              sensitivitiesData: Data? = nil,
              diabetesStatus: DiabetesStatus = .none,
@@ -99,7 +101,8 @@ enum SchemaV2: VersionedSchema {
         // Computed property for diabetes status
         nonisolated var diabetesStatus: DiabetesStatus {
             get {
-                DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
+                guard let raw = diabetesStatusRaw else { return .none }
+                return DiabetesStatus(rawValue: raw) ?? .none
             }
             set {
                 diabetesStatusRaw = newValue.rawValue
@@ -167,14 +170,16 @@ enum SchemaV3: VersionedSchema {
     
     @Model
     final class UserAllergenProfile {
-        @Attribute(.unique) var id: UUID
-        var name: String
-        var isActive: Bool
+        // CloudKit doesn't support unique constraints
+        // CloudKit requires properties to be optional OR have defaults - we make them optional
+        var id: UUID?
+        var name: String?
+        var isActive: Bool?
         var sensitivitiesData: Data?
-        var diabetesStatusRaw: String
+        var diabetesStatusRaw: String?
         var nutritionalGoalsData: Data?  // NEW: Added in V3
-        var dateCreated: Date
-        var dateModified: Date
+        var dateCreated: Date?
+        var dateModified: Date?
         
         init(
             id: UUID = UUID(),
@@ -206,7 +211,8 @@ enum SchemaV3: VersionedSchema {
         // Computed property for diabetes status
         var diabetesStatus: DiabetesStatus {
             get {
-                DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
+                guard let raw = diabetesStatusRaw else { return .none }
+                return DiabetesStatus(rawValue: raw) ?? .none
             }
             set {
                 diabetesStatusRaw = newValue.rawValue
@@ -313,7 +319,7 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             var migratedCount = 0
             for profile in profiles {
                 // Ensure diabetes status is set (should be automatic with default value)
-                if profile.diabetesStatusRaw.isEmpty {
+                if profile.diabetesStatusRaw == nil || profile.diabetesStatusRaw?.isEmpty == true {
                     profile.diabetesStatusRaw = DiabetesStatus.none.rawValue
                     migratedCount += 1
                 }
@@ -404,6 +410,7 @@ struct SchemaVersionManager {
  - Original schema
  - UserAllergenProfile without diabetes status or nutritional goals
  - Basic profile with sensitivities only
+ - **CloudKit Compatibility**: All properties made optional (CloudKit requirement)
  
  ### Version 2.0.0
  - Added `diabetesStatusRaw` to UserAllergenProfile
@@ -411,6 +418,7 @@ struct SchemaVersionManager {
  - Supports: None, Prediabetic, Diabetic
  - Migration: Automatic with default value assignment
  - Backward compatible: Old profiles get "None" status
+ - **CloudKit Compatibility**: All properties made optional (CloudKit requirement)
  
  ### Version 3.0.0 (Current)
  - Added `nutritionalGoalsData` to UserAllergenProfile
@@ -418,6 +426,11 @@ struct SchemaVersionManager {
  - Optional field (nil by default)
  - Supports tracking of daily nutritional targets
  - Migration: Automatic, no data transformation needed
+ - **CloudKit Compatibility**: 
+   - Removed @Attribute(.unique) from id field (CloudKit doesn't support unique constraints)
+   - Made all properties optional (CloudKit requirement)
+   - Properties initialized with default values in init()
+   - Allows seamless CloudKit sync with existing data
  
  ## Future Versions
  

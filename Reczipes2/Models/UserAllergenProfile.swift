@@ -6,6 +6,11 @@
 //  Schema Version: 3.0.0 - Added nutritional goals support
 //  Previous: 2.0.0 - Added diabetes status support
 //
+//  CloudKit Compatibility Notes:
+//  - All properties are optional (CloudKit requirement)
+//  - No unique constraints (CloudKit doesn't support them)
+//  - Default values provided in init() method
+//
 
 import Foundation
 import SwiftData
@@ -39,22 +44,24 @@ enum DiabetesStatus: String, Codable, CaseIterable, Sendable {
 
 @Model
 final class UserAllergenProfile {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var isActive: Bool
+    // CloudKit doesn't support unique constraints - removed @Attribute(.unique)
+    // CloudKit requires all properties to be optional OR have default values
+    var id: UUID?
+    var name: String?
+    var isActive: Bool?
     var sensitivitiesData: Data?
     
     // Added in Schema V2.0.0
     // Default value ensures automatic migration works without deleting the app
-    var diabetesStatusRaw: String
+    var diabetesStatusRaw: String?
     
     // Added in Schema V3.0.0
     // Nutritional goals (calories, sodium, fat, etc.)
     // Stored as encoded Data for CloudKit compatibility
     var nutritionalGoalsData: Data?
     
-    var dateCreated: Date
-    var dateModified: Date
+    var dateCreated: Date?
+    var dateModified: Date?
     
     init(
         id: UUID = UUID(),
@@ -86,7 +93,8 @@ final class UserAllergenProfile {
     // Computed property for diabetes status
     nonisolated var diabetesStatus: DiabetesStatus {
         get {
-            DiabetesStatus(rawValue: diabetesStatusRaw) ?? .none
+            guard let raw = diabetesStatusRaw else { return .none }
+            return DiabetesStatus(rawValue: raw) ?? .none
         }
         set {
             diabetesStatusRaw = newValue.rawValue

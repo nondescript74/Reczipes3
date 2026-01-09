@@ -91,6 +91,16 @@ struct SettingsView: View {
                     NavigationLink(destination: PersistentContainerInfoView()) {
                         Label("Container Details", systemImage: "cylinder.split.1x2")
                     }
+                    
+                    NavigationLink(destination: CloudKitContainerValidationView()) {
+                        HStack {
+                            Label("Validate CloudKit Container", systemImage: "checkmark.seal.fill")
+                            Spacer()
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.blue)
+                                .font(.caption)
+                        }
+                    }
                 }
                 
                 Section {

@@ -49,13 +49,14 @@ struct Reczipes2App: App {
         // To disable CloudKit and use local-only storage, comment out the cloudKitDatabase parameter below
         
         // CloudKit configuration with migration plan
+        // Use a specific URL to avoid conflicts with old database files
+        let cloudKitURL = URL.applicationSupportDirectory.appending(path: "CloudKitModel.sqlite")
         let cloudKitConfiguration = ModelConfiguration(
-            isStoredInMemoryOnly: false,
-            allowsSave: true,
+            url: cloudKitURL,
             cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
         )
         
-        // Fallback configuration without CloudKit
+        // Fallback configuration without CloudKit (uses default.store)
         let localConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             allowsSave: true,
@@ -88,6 +89,7 @@ struct Reczipes2App: App {
             )
             print("✅ ModelContainer created successfully with CloudKit sync enabled")
             print("   Container: iCloud.com.headydiscy.reczipes")
+            print("   Database: CloudKitModel.sqlite (separate from local-only)")
             print("   Migration Plan: Reczipes2MigrationPlan")
             print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
             print("   Automatic schema migration enabled")
@@ -315,8 +317,16 @@ struct Reczipes2App: App {
         print("Configuration: Private Database")
         print("Framework: SwiftData (not Core Data)")
         print("")
-        print("⚠️  NOTE: SwiftData uses ModelContainer, NOT NSPersistentCloudKitContainer")
-        print("   If you need NSPersistentCloudKitContainer, you must migrate to Core Data")
+        print("⚠️  IMPORTANT: Using explicit container identifier")
+        print("   Cannot use .automatic as it would create different container")
+        print("   Existing container: iCloud.com.headydiscy.reczipes")
+        print("")
+        print("📋 TROUBLESHOOTING:")
+        print("   If CloudKit sync is not working:")
+        print("   1. Go to Settings → Validate CloudKit Container")
+        print("   2. Run the validation tool")
+        print("   3. Follow the specific recommendations")
+        print("   4. Most likely: Add container to entitlements in Xcode")
         print("")
         print("Models registered for sync:")
         print("  - Recipe")
@@ -325,6 +335,7 @@ struct Reczipes2App: App {
         print("  - CachedDiabeticAnalysis")
         print("  - SavedLink")
         print("  - RecipeBook")
+        print("  - CookingSession")
         print("========================================")
     }
 }

@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var filterMode: RecipeFilterMode = .none
     @State private var showOnlySafe = false
     @State private var isProcessingFilter = false
+    @State private var cachedAllRecipes: [RecipeModel] = [] // NEW: Cache for all recipes
     @State private var cachedFilteredRecipes: [RecipeModel] = []
     @State private var cachedAllergenScores: [UUID: RecipeAllergenScore] = [:]
     @State private var cachedDiabetesScores: [UUID: DiabetesScore] = [:]
@@ -37,7 +38,7 @@ struct ContentView: View {
     
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
-        allergenProfiles.first { $0.isActive }
+        allergenProfiles.first { $0.isActive == true }
     }
     
     // Helper to get image name for a recipe
@@ -50,10 +51,25 @@ struct ContentView: View {
         cachedCombinedScores
     }
     
-    // All available recipe models from SwiftData (Claude API-extracted)
-    // Merged with image assignments for real-time updates
+    // All available recipe models - now returns cached version
     private var availableRecipesBeforeFilter: [RecipeModel] {
-        logDebug("Refreshing available recipes", category: "recipe")
+        cachedAllRecipes
+    }
+    
+    // Filtered recipes based on filter settings (now uses cached results)
+    private var availableRecipes: [RecipeModel] {
+        if filterMode != .none {
+            return cachedFilteredRecipes
+        } else {
+            return cachedAllRecipes
+        }
+    }
+    
+    // MARK: - Recipe Loading
+    
+    /// Load and cache all recipes from SwiftData
+    private func refreshRecipeCache() {
+        logDebug("🔄 Refreshing recipe cache", category: "recipe")
         logDebug("Saved recipes count: \(savedRecipes.count)", category: "recipe")
         
         let allRecipes = RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
@@ -62,7 +78,6 @@ struct ContentView: View {
         let recipes = allRecipes.map { recipe in
             // First check if the recipe model itself has an imageName (directly from Recipe object)
             if recipe.imageName != nil {
-                //logDebug("Recipe '\(recipe.title)' already has imageName: '\(recipe.imageName!)' (ID: \(recipe.id))", category: "recipe")
                 return recipe
             }
             // Fallback to checking RecipeImageAssignment (for legacy support)
@@ -70,20 +85,17 @@ struct ContentView: View {
                 logDebug("Found image assignment '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))", category: "recipe")
                 return recipe.withImageName(assignedImageName)
             } else {
-                logWarning("No image for '\(recipe.title)' (ID: \(recipe.id))", category: "recipe")
                 return recipe
             }
         }
         logDebug("Total assignments in DB: \(imageAssignments.count)", category: "storage")
-        return recipes
-    }
-    
-    // Filtered recipes based on filter settings (now uses cached results)
-    private var availableRecipes: [RecipeModel] {
-        if filterMode != .none {
-            return cachedFilteredRecipes
-        } else {
-            return availableRecipesBeforeFilter
+        
+        // Update cache
+        cachedAllRecipes = recipes
+        
+        // If not filtering, update filtered cache too
+        if filterMode == .none {
+            cachedFilteredRecipes = recipes
         }
     }
     
@@ -93,7 +105,7 @@ struct ContentView: View {
     private func processFilter() {
         // If no filter, just use all recipes
         guard filterMode != .none else {
-            cachedFilteredRecipes = availableRecipesBeforeFilter
+            cachedFilteredRecipes = cachedAllRecipes
             cachedAllergenScores = [:]
             cachedDiabetesScores = [:]
             cachedCombinedScores = [:]
@@ -104,7 +116,7 @@ struct ContentView: View {
         isProcessingFilter = true
         
         // Capture values to use in task
-        let recipesToProcess = availableRecipesBeforeFilter
+        let recipesToProcess = cachedAllRecipes
         let shouldShowOnlySafe = showOnlySafe
         let currentMode = filterMode
         let currentProfile = activeProfile
@@ -207,8 +219,8 @@ struct ContentView: View {
             }
             .onAppear {
                 restoreSelectedRecipe()
-                // Initialize cached recipes
-                cachedFilteredRecipes = availableRecipesBeforeFilter
+                // Initialize recipe cache
+                refreshRecipeCache()
             }
             .onChange(of: filterMode) { _, _ in
                 processFilter()
@@ -229,11 +241,10 @@ struct ContentView: View {
                 }
             }
             .onChange(of: savedRecipes.count) { _, _ in
-                // Recipes changed, update cache
+                // Recipes changed, refresh cache and reprocess filter if needed
+                refreshRecipeCache()
                 if filterMode != .none {
                     processFilter()
-                } else {
-                    cachedFilteredRecipes = availableRecipesBeforeFilter
                 }
             }
             .onChange(of: selectedRecipe) { _, newRecipe in

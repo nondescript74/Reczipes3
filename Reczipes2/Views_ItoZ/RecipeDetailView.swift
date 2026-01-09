@@ -69,7 +69,7 @@ struct RecipeDetailView: View {
     
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
-        allergenProfiles.first { $0.isActive }
+        allergenProfiles.first { $0.isActive == true }
     }
     
     // Allergen score for this recipe
@@ -95,7 +95,7 @@ struct RecipeDetailView: View {
                     RecipeAllergenBadge(score: score)
                 }
                 
-                Text("Based on \(profile.name)")
+                Text("Based on \(String(describing: profile.name))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
@@ -204,7 +204,7 @@ struct RecipeDetailView: View {
         
         // Show profile note if analysis is triggered by profile diabetes status
         if let profile = activeProfile, profile.hasDiabetesConcern {
-            Text("Analysis based on \(profile.name) - \(profile.diabetesStatus.description)")
+            Text("Analysis based on \(String(describing: profile.name)) - \(profile.diabetesStatus.description)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

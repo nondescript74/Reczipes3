@@ -78,7 +78,7 @@ struct ProfileRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(profile.name)
+                    Text(profile.name ?? "Unnamed Profile")
                         .font(.headline)
                     
                     if profile.diabetesStatus != .none {
@@ -121,7 +121,7 @@ struct ProfileRow: View {
             
             Spacer()
             
-            if profile.isActive {
+            if profile.isActive ?? false {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
@@ -203,10 +203,13 @@ struct ProfileEditorView: View {
     var body: some View {
         List {
             Section("Profile Info") {
-                TextField("Name", text: $profile.name)
+                TextField("Name", text: Binding(
+                    get: { profile.name ?? "" },
+                    set: { profile.name = $0 }
+                ))
                 
                 Toggle("Active Profile", isOn: Binding(
-                    get: { profile.isActive },
+                    get: { profile.isActive ?? false },
                     set: { newValue in
                         if newValue {
                             // When activating this profile, deactivate all others
@@ -222,7 +225,7 @@ struct ProfileEditorView: View {
                 ))
             }
             Section {
-                if profile.isActive {
+                if profile.isActive ?? false {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
@@ -313,7 +316,7 @@ struct ProfileEditorView: View {
                 }
             }
         }
-        .navigationTitle(profile.name)
+        .navigationTitle(profile.name ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingAddSensitivity) {
             AddSensitivitySheet(profile: profile)
