@@ -233,6 +233,22 @@ struct CloudKitContainerValidationView: View {
         isValidating = true
         validationResult = nil
         
+        // DEBUG: Check what entitlements are actually embedded
+        print("🔍 DEBUG: Checking embedded entitlements...")
+        print("   Bundle ID: \(Bundle.main.bundleIdentifier ?? "nil")")
+        
+        if let entitlements = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-container-identifiers") {
+            print("   ✅ Found container identifiers: \(entitlements)")
+        } else {
+            print("   ❌ No container identifiers found in embedded entitlements")
+        }
+        
+        if let services = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-services") {
+            print("   ✅ Found iCloud services: \(services)")
+        } else {
+            print("   ❌ No iCloud services found in embedded entitlements")
+        }
+        
         Task {
             let result = await CloudKitContainerValidator.validateContainer(identifier: targetContainer)
             
