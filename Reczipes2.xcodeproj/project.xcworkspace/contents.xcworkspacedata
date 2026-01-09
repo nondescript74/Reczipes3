@@ -4,10 +4,4 @@
    <FileRef
       location = "self:">
    </FileRef>
-   <FileRef
-      location = "group:BUNDLE_ID_CHANGE_VERIFICATION.md">
-   </FileRef>
-   <FileRef
-      location = "group:QUICK_BUNDLE_ID_CHECKLIST.md">
-   </FileRef>
 </Workspace>

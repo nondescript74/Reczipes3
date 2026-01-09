@@ -62,19 +62,33 @@ class VersionHistoryManager {
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
                 
-                // Recipe Book Cover Image Fixes
-                "🐛 Fixed: Recipe book cover images not displaying after save",
-                "🐛 Fixed: Cover images not updating without navigating away from books view",
-                "⚡️ Improved: RecipeImageView now properly reloads when image file changes",
-                "🔧 Enhanced: Recipe books view now force-refreshes after editing to show immediate changes",
-                "🎨 Improved: Book cards now properly react to all property changes (name, description, color, cover image)"
-                
+                // Simplified Backup Access
+                "🔧 Removed: Backup & Restore button from Recipes view toolbar",
+                "📱 Improved: Backup and restore functionality now centralized in Settings under User Content Backup",
+                "🎨 Streamlined: Cleaner Recipes view interface with unified backup access point",
+
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 14.1.74
         
+        // Recipe Book Cover Image Fixes
+//        "🐛 Fixed: Recipe book cover images not displaying after save",
+//        "🐛 Fixed: Cover images not updating without navigating away from books view",
+//        "⚡️ Improved: RecipeImageView now properly reloads when image file changes",
+//        "🔧 Enhanced: Recipe books view now force-refreshes after editing to show immediate changes",
+//        "🎨 Improved: Book cards now properly react to all property changes (name, description, color, cover image)",
+        
+        // Unified User Content Backup System
+//        "✨ Added: Unified User Content Backup & Restore system",
+//        "📚 Enhanced: Backup system now handles both recipes and recipe books in one place",
+//        "🔄 Added: Export individual recipe books as .recipebook files with all images",
+//        "📦 Improved: Recipe books export now includes cover images and all recipe images",
+//        "🎨 Redesigned: Tabbed interface to switch between recipes and books backup",
+//        "⚡️ Enhanced: Import recipe books directly from backup view",
+//        "🔧 Renamed: 'Recipe Backup & Restore' to 'User Content Backup' for clarity"
         // 13.2.72
 //        "🐛 Fixed: CloudKit validator false error reporting entitlements as missing when they were correct",
 //        "🔧 Enhanced: Validator now correctly relies on actual CloudKit access test instead of impossible runtime entitlements check",

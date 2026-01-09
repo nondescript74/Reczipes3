@@ -22,7 +22,6 @@ struct ContentView: View {
     @State private var showingDebug = false
     @State private var showingRecipeExtractor = false
     @State private var showingAllergenProfiles = false
-    @State private var showingBackup = false
     @State private var showingImport = false
     @State private var showingSearch = false
     @State private var showingSavedLinks = false
@@ -397,12 +396,6 @@ struct ContentView: View {
                         } label: {
                             Label("Saved Links", systemImage: "link.circle")
                         }
-                        
-                        Button {
-                            showingBackup = true
-                        } label: {
-                            Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
-                        }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }
@@ -458,14 +451,6 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showingBackup = true
-                    } label: {
-                        Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
                         showingSearch = true
                     } label: {
                         Label("Search Recipes", systemImage: "magnifyingglass")
@@ -489,9 +474,6 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingAllergenProfiles) {
                 AllergenProfileView()
-            }
-            .sheet(isPresented: $showingBackup) {
-                RecipeBackupView()
             }
             .sheet(isPresented: $showingImport) {
                 RecipeBookImportView()
