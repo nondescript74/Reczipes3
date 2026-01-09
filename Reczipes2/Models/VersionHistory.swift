@@ -61,12 +61,14 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                // Concurrency & Performance Improvements
-                "🔧 Fixed: Test isolation in RecipeExportImportBackupTests for reliable backup counting",
-                "✅ Enhanced: testListAvailableBackups now cleans test environment before creating backups",
-                "⚡️ Improved: Reduced test delay from 1 second to 10 milliseconds using millisecond-based filenames",
-                "🐛 Fixed: Race condition where backup test could find files from previous test runs",
-                "📊 Added: Explicit verification that backup files exist and have unique paths"
+                // Test Infrastructure Improvements
+                "🔧 Converted: RecipeExtractorTests from XCTest to Swift Testing framework",
+                "✅ Modernized: All test suites now use consistent Swift Testing macros and patterns",
+                "⚡️ Improved: Performance tests now use manual timing with time limits instead of XCTest measure blocks",
+                "🐛 Fixed: Test isolation in RecipeExportImportBackupTests using .serialized trait",
+                "📊 Enhanced: Backup tests run sequentially to prevent file system race conditions",
+                "🔧 Added: Custom TestSkipError for consistent test skipping across all test suites",
+                "✅ Removed: XCTest dependency from recipe extraction tests for better Swift 6 compatibility"
             ]
         ))
         
@@ -74,15 +76,13 @@ class VersionHistoryManager {
         // These represent past releases and should not change
         
         // 13.2 66"🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures",
-//        history.append(VersionHistoryEntry(
-//            version: "13.2",
-//            buildNumber: "66",
-//            releaseDate: Date(),
-//            changes: [
-//                "🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures"
-//
-//            ]
-//        ))
+        // 13.2.67                 "🔧 Converted: RecipeExtractorTests from XCTest to Swift Testing framework",
+//        "✅ Modernized: All test suites now use consistent Swift Testing macros and patterns",
+//        "⚡️ Improved: Performance tests now use manual timing with time limits instead of XCTest measure blocks",
+//        "🐛 Fixed: Test isolation in RecipeExportImportBackupTests using .serialized trait",
+//        "📊 Enhanced: Backup tests run sequentially to prevent file system race conditions",
+//        "🔧 Added: Custom TestSkipError for consistent test skipping across all test suites",
+//        "✅ Removed: XCTest dependency from recipe extraction tests for better Swift 6 compatibility"
 //        
 //        
 //        history.append(VersionHistoryEntry(

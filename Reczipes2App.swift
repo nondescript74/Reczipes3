@@ -49,11 +49,10 @@ struct Reczipes2App: App {
         // To disable CloudKit and use local-only storage, comment out the cloudKitDatabase parameter below
         
         // CloudKit configuration with migration plan
-        // TEMPORARILY DISABLED FOR DEBUGGING
         let cloudKitConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             allowsSave: true,
-            cloudKitDatabase: .none  // Temporarily disabled to debug startup crash
+            cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
         )
         
         // Fallback configuration without CloudKit

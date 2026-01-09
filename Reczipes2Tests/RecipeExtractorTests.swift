@@ -5,51 +5,50 @@
 //  Testing utilities and examples for recipe extraction
 //
 
-import XCTest
+import Testing
+import Foundation
+import UIKit
 @testable import Reczipes2
 
-class RecipeExtractorTests: XCTestCase {
-    
-    var apiClient: ClaudeAPIClient!
-    var imagePreprocessor: ImagePreprocessor!
-    
-    override func setUp() async throws {
-        try await super.setUp()
-        // Use a test API key or mock
-        apiClient = await ClaudeAPIClient(apiKey: "test-key")
-        imagePreprocessor = ImagePreprocessor()
-    }
+@Suite("Recipe Extractor Tests")
+struct RecipeExtractorTests {
     
     // MARK: - Image Preprocessing Tests
     
+    @Test("Image preprocessing returns valid data")
     func testImagePreprocessing() async throws {
         // Generate a test image instead of loading from assets
         guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
-            throw XCTSkip("Could not generate test image")
+            throw TestSkipError()
         }
+        
+        let imagePreprocessor = ImagePreprocessor()
         
         // Test preprocessing
         let processedData = imagePreprocessor.preprocessForOCR(testImage)
-        XCTAssertNotNil(processedData, "Preprocessing should return data")
+        #expect(processedData != nil, "Preprocessing should return data")
         
         // Verify processed image can be decoded
         if let processedData = processedData {
             let processedImage = UIImage(data: processedData)
-            XCTAssertNotNil(processedImage, "Processed data should create valid image")
+            #expect(processedImage != nil, "Processed data should create valid image")
         }
     }
     
+    @Test("Lightweight preprocessing returns valid data")
     func testLightweightPreprocessing() async throws {
         guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
-            throw XCTSkip("Could not generate test image")
+            throw TestSkipError()
         }
         
+        let imagePreprocessor = ImagePreprocessor()
         let processedData = imagePreprocessor.preprocessLightweight(testImage)
-        XCTAssertNotNil(processedData, "Lightweight preprocessing should return data")
+        #expect(processedData != nil, "Lightweight preprocessing should return data")
     }
     
     // MARK: - Recipe Model Tests
     
+    @Test("Recipe model ingredient initialization")
     @MainActor
     func testRecipeModelInitialization() async throws {
         let ingredient = Ingredient(
@@ -59,17 +58,13 @@ class RecipeExtractorTests: XCTestCase {
             preparation: "sifted"
         )
         
-        let quantity = ingredient.quantity
-        let unit = ingredient.unit
-        let name = ingredient.name
-        let preparation = ingredient.preparation
-        
-        XCTAssertEqual(quantity, "1")
-        XCTAssertEqual(unit, "cup")
-        XCTAssertEqual(name, "flour")
-        XCTAssertEqual(preparation, "sifted")
+        #expect(ingredient.quantity == "1")
+        #expect(ingredient.unit == "cup")
+        #expect(ingredient.name == "flour")
+        #expect(ingredient.preparation == "sifted")
     }
     
+    @Test("Recipe with multiple sections")
     @MainActor
     func testRecipeWithMultipleSections() async throws {
         let recipe = RecipeModel(
@@ -98,15 +93,13 @@ class RecipeExtractorTests: XCTestCase {
             ]
         )
         
-        let ingredientSectionsCount = recipe.ingredientSections.count
-        let instructionSectionsCount = recipe.instructionSections.count
-        
-        XCTAssertEqual(ingredientSectionsCount, 2)
-        XCTAssertEqual(instructionSectionsCount, 1)
+        #expect(recipe.ingredientSections.count == 2)
+        #expect(recipe.instructionSections.count == 1)
     }
     
     // MARK: - JSON Parsing Tests
     
+    @Test("Recipe response JSON parsing")
     @MainActor
     func testRecipeResponseParsing() async throws {
         let json = """
@@ -131,45 +124,47 @@ class RecipeExtractorTests: XCTestCase {
         
         let jsonData = json.data(using: .utf8)!
         
-        do {
-            let recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
-            let recipe = recipeResponse.toRecipeModel()
-            
-            let title = recipe.title
-            let yield = recipe.yield
-            let ingredientSectionsCount = recipe.ingredientSections.count
-            let instructionSectionsCount = recipe.instructionSections.count
-            
-            XCTAssertEqual(title, "Test Recipe")
-            XCTAssertEqual(yield, "4 servings")
-            XCTAssertEqual(ingredientSectionsCount, 1)
-            XCTAssertEqual(instructionSectionsCount, 1)
-        } catch {
-            XCTFail("Failed to parse JSON: \(error)")
-        }
+        let recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
+        let recipe = recipeResponse.toRecipeModel()
+        
+        #expect(recipe.title == "Test Recipe")
+        #expect(recipe.yield == "4 servings")
+        #expect(recipe.ingredientSections.count == 1)
+        #expect(recipe.instructionSections.count == 1)
     }
     
     // MARK: - Keychain Tests
     
+    @Test("Keychain storage and retrieval")
     func testKeychainStorage() async {
         let testKey = "test_api_key_\(UUID().uuidString)"
         let testValue = "sk-ant-test-key-123"
         
         // Test save
         let saveSuccess = await KeychainManager.shared.save(key: testKey, value: testValue)
-        XCTAssertTrue(saveSuccess, "Should save to keychain")
+        #expect(saveSuccess, "Should save to keychain")
         
         // Test retrieve
         let retrieved = await KeychainManager.shared.get(key: testKey)
-        XCTAssertEqual(retrieved, testValue, "Should retrieve correct value")
+        #expect(retrieved == testValue, "Should retrieve correct value")
         
         // Test delete
         let deleteSuccess = await KeychainManager.shared.delete(key: testKey)
-        XCTAssertTrue(deleteSuccess, "Should delete from keychain")
+        #expect(deleteSuccess, "Should delete from keychain")
         
         // Verify deleted
         let afterDelete = await KeychainManager.shared.get(key: testKey)
-        XCTAssertNil(afterDelete, "Should be nil after deletion")
+        #expect(afterDelete == nil, "Should be nil after deletion")
+    }
+}
+
+// MARK: - Test Skip Error
+
+struct TestSkipError: Error {
+    let reason: String
+    
+    init(reason: String = "Test skipped") {
+        self.reason = reason
     }
 }
 
@@ -408,36 +403,41 @@ class TestImageGenerator {
 
 // MARK: - Performance Testing
 
-@MainActor
-class RecipeExtractorPerformanceTests: XCTestCase {
+@Suite("Recipe Extractor Performance Tests")
+struct RecipeExtractorPerformanceTests {
     
+    @Test("Image preprocessing performance", .timeLimit(.minutes(1)))
     func testImagePreprocessingPerformance() async throws {
-        guard let testImage = UIImage(named: "test_recipe_card") else {
-            throw XCTSkip("Test image not available")
+        guard let testImage = TestImageGenerator.generateTestRecipeImage() else {
+            throw TestSkipError(reason: "Test image not available")
         }
         
         let preprocessor = ImagePreprocessor()
         
-        measure {
-            Task {
-                _ = preprocessor.preprocessForOCR(testImage)
-            }
-        }
+        // Run preprocessing and measure time
+        let startTime = Date()
+        _ = preprocessor.preprocessForOCR(testImage)
+        let duration = Date().timeIntervalSince(startTime)
+        
+        // Verify it completes in reasonable time (< 5 seconds)
+        #expect(duration < 5.0, "Preprocessing should complete in under 5 seconds, took \(duration)s")
+        print("✓ Image preprocessing completed in \(String(format: "%.3f", duration))s")
     }
     
+    @Test("Recipe JSON parsing performance", .timeLimit(.minutes(1)))
+    @MainActor
     func testRecipeJSONParsingPerformance() async throws {
         let json = createLargeRecipeJSON()
         let jsonData = json.data(using: .utf8)!
         
-        measure {
-            _ = try? decodeRecipeResponse(from: jsonData)
-        }
-    }
-    
-    // Helper function to decode RecipeResponse
-    private func decodeRecipeResponse(from data: Data) throws -> RecipeResponse {
-        let decoder = JSONDecoder()
-        return try decoder.decode(RecipeResponse.self, from: data)
+        // Run parsing and measure time
+        let startTime = Date()
+        _ = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
+        let duration = Date().timeIntervalSince(startTime)
+        
+        // Verify it completes in reasonable time (< 1 second)
+        #expect(duration < 1.0, "JSON parsing should complete in under 1 second, took \(duration)s")
+        print("✓ JSON parsing completed in \(String(format: "%.3f", duration))s")
     }
     
     private func createLargeRecipeJSON() -> String {
