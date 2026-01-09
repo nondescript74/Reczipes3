@@ -15,7 +15,7 @@
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.headydiscy.ImageExtract.recipebook</string>
+				<string>com.headydiscy.reczipes2.recipebook</string>
 			</array>
 		</dict>
 	</array>
@@ -59,7 +59,7 @@
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>com.headydiscy.ImageExtract.recipebook</string>
+			<string>com.headydiscy.reczipes2.recipebook</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -78,7 +78,7 @@
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>com.headydiscy.ImageExtract.recipebook</string>
+			<string>com.headydiscy.reczipes2.recipebook</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

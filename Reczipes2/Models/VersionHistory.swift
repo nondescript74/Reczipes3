@@ -62,13 +62,12 @@ class VersionHistoryManager {
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
                 
-                // CloudKit Validator Fix
-                "🐛 Fixed: CloudKit validator false error reporting entitlements as missing when they were correct",
-                "🔧 Enhanced: Validator now correctly relies on actual CloudKit access test instead of impossible runtime entitlements check",
-                "📚 Improved: CloudKit validation messages now explain that entitlements can't be read at runtime",
-                "✅ Removed: Misleading debug messages showing 'entitlements not found' when they were properly configured",
-                "🔒 Technical: Entitlements are in app code signature, not accessible via Bundle.main APIs",
-                "💡 Added: Clear explanation that successful CloudKit access proves entitlements are correct",
+                // Recipe Book Cover Image Fixes
+                "🐛 Fixed: Recipe book cover images not displaying after save",
+                "🐛 Fixed: Cover images not updating without navigating away from books view",
+                "⚡️ Improved: RecipeImageView now properly reloads when image file changes",
+                "🔧 Enhanced: Recipe books view now force-refreshes after editing to show immediate changes",
+                "🎨 Improved: Book cards now properly react to all property changes (name, description, color, cover image)"
                 
             ]
         ))
@@ -76,6 +75,13 @@ class VersionHistoryManager {
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
         
+        // 13.2.72
+//        "🐛 Fixed: CloudKit validator false error reporting entitlements as missing when they were correct",
+//        "🔧 Enhanced: Validator now correctly relies on actual CloudKit access test instead of impossible runtime entitlements check",
+//        "📚 Improved: CloudKit validation messages now explain that entitlements can't be read at runtime",
+//        "✅ Removed: Misleading debug messages showing 'entitlements not found' when they were properly configured",
+//        "🔒 Technical: Entitlements are in app code signature, not accessible via Bundle.main APIs",
+//        "💡 Added: Clear explanation that successful CloudKit access proves entitlements are correct",
         // 13.2.69
         // Performance Optimization
 //        "⚡️ Optimized: Recipe list caching eliminates redundant SwiftData queries during UI rendering",

@@ -79,9 +79,11 @@ struct RecipeImageView: View {
                 }
             }
         }
-        .task {
+        .task(id: imageName) {
             if let imageName {
                 loadedImage = loadImageFromDocuments(imageName)
+            } else {
+                loadedImage = nil
             }
         }
     }

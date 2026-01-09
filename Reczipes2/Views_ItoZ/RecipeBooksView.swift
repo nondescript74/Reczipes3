@@ -18,6 +18,7 @@ struct RecipeBooksView: View {
     @State private var editingBook: RecipeBook?
     @State private var searchText = ""
     @State private var showingImport = false
+    @State private var refreshID = UUID()
     
     // Grid layout
     private let columns = [
@@ -69,6 +70,8 @@ struct RecipeBooksView: View {
                 RecipeBookEditorView(book: editingBook)
                     .onDisappear {
                         editingBook = nil
+                        // Force refresh to ensure images reload
+                        refreshID = UUID()
                     }
             }
             .sheet(isPresented: $showingImport) {
@@ -104,6 +107,7 @@ struct RecipeBooksView: View {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(filteredBooks) { book in
                     BookCardView(book: book, savedRecipes: savedRecipes)
+                        .id("\(book.id)-\(refreshID)")
                         .onTapGesture {
                             selectedBook = book
                         }
@@ -152,6 +156,23 @@ struct BookCardView: View {
     let book: RecipeBook
     let savedRecipes: [Recipe]
     
+    // Use computed properties to ensure we get fresh data
+    private var coverImageName: String? {
+        book.coverImageName
+    }
+    
+    private var bookName: String {
+        book.name
+    }
+    
+    private var recipeCount: Int {
+        book.recipeCount
+    }
+    
+    private var bookDescription: String? {
+        book.bookDescription
+    }
+    
     private var bookColor: Color {
         if let colorHex = book.color {
             return Color(hex: colorHex) ?? .blue
@@ -163,7 +184,7 @@ struct BookCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover image or placeholder
             ZStack {
-                if let coverImageName = book.coverImageName {
+                if let coverImageName = coverImageName {
                     RecipeImageView(
                         imageName: coverImageName,
                         size: CGSize(width: 160, height: 220),
@@ -185,7 +206,7 @@ struct BookCardView: View {
                                     .font(.system(size: 48))
                                     .foregroundStyle(.white)
                                 
-                                Text(book.name)
+                                Text(bookName)
                                     .font(.headline)
                                     .foregroundStyle(.white)
                                     .multilineTextAlignment(.center)
@@ -199,7 +220,7 @@ struct BookCardView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        Text("\(book.recipeCount)")
+                        Text("\(recipeCount)")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
@@ -214,15 +235,15 @@ struct BookCardView: View {
             .frame(height: 220)
             
             // Book name (if we have cover image)
-            if book.coverImageName != nil {
-                Text(book.name)
+            if coverImageName != nil {
+                Text(bookName)
                     .font(.headline)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
             
             // Description
-            if let description = book.bookDescription, !description.isEmpty {
+            if let description = bookDescription, !description.isEmpty {
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)

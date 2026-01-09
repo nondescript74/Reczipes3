@@ -5,6 +5,9 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:RECIPE_BOOK_IMPORT_GUIDE.md">
+      location = "group:BUNDLE_ID_CHANGE_VERIFICATION.md">
+   </FileRef>
+   <FileRef
+      location = "group:QUICK_BUNDLE_ID_CHECKLIST.md">
    </FileRef>
 </Workspace>
