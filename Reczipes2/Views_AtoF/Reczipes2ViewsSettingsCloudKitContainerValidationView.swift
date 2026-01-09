@@ -173,47 +173,83 @@ struct CloudKitContainerValidationView: View {
                     .foregroundColor(.secondary)
             }
             
-            HStack {
-                Text("CloudKit Enabled")
-                Spacer()
-                Text(entitlements.hasCloudKit ? "✅ Yes" : "❌ No")
-                    .foregroundColor(entitlements.hasCloudKit ? .green : .red)
-            }
-            
-            if entitlements.hasContainerIdentifiers {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Container Identifiers:")
+            // Show the note if present
+            if let note = entitlements.runtimeCheckNote {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(note)
                         .font(.caption)
-                        .bold()
-                    ForEach(entitlements.containerIdentifiers, id: \.self) { container in
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 4)
+                    
+                    Text("The real test is whether we can access CloudKit (see Container Access above).")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .italic()
+                    
+                    if result.canAccessPrivateDatabase {
                         HStack {
-                            if container == targetContainer {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                            } else {
-                                Image(systemName: "circle")
-                                    .foregroundColor(.secondary)
-                            }
-                            Text(container)
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Container access works → Entitlements are correct!")
                                 .font(.caption)
-                                .foregroundColor(container == targetContainer ? .green : .secondary)
+                                .foregroundColor(.green)
                         }
+                        .padding(.top, 4)
+                    } else {
+                        HStack {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text("Container access failed → Check entitlements in Xcode")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        .padding(.top, 4)
                     }
                 }
             } else {
+                // Old style display (shouldn't happen with updated validator)
                 HStack {
-                    Text("Container Identifiers")
+                    Text("CloudKit Enabled")
                     Spacer()
-                    Text("❌ None Found")
-                        .foregroundColor(.red)
+                    Text(entitlements.hasCloudKit ? "✅ Yes" : "❌ No")
+                        .foregroundColor(entitlements.hasCloudKit ? .green : .red)
                 }
-            }
-            
-            HStack {
-                Text("Target Container Listed")
-                Spacer()
-                Text(entitlements.containsTargetContainer ? "✅ Yes" : "❌ No")
-                    .foregroundColor(entitlements.containsTargetContainer ? .green : .red)
+                
+                if entitlements.hasContainerIdentifiers {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Container Identifiers:")
+                            .font(.caption)
+                            .bold()
+                        ForEach(entitlements.containerIdentifiers, id: \.self) { container in
+                            HStack {
+                                if container == targetContainer {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                } else {
+                                    Image(systemName: "circle")
+                                        .foregroundColor(.secondary)
+                                }
+                                Text(container)
+                                    .font(.caption)
+                                    .foregroundColor(container == targetContainer ? .green : .secondary)
+                            }
+                        }
+                    }
+                } else {
+                    HStack {
+                        Text("Container Identifiers")
+                        Spacer()
+                        Text("❌ None Found")
+                            .foregroundColor(.red)
+                    }
+                }
+                
+                HStack {
+                    Text("Target Container Listed")
+                    Spacer()
+                    Text(entitlements.containsTargetContainer ? "✅ Yes" : "❌ No")
+                        .foregroundColor(entitlements.containsTargetContainer ? .green : .red)
+                }
             }
         }
         
@@ -233,21 +269,9 @@ struct CloudKitContainerValidationView: View {
         isValidating = true
         validationResult = nil
         
-        // DEBUG: Check what entitlements are actually embedded
-        print("🔍 DEBUG: Checking embedded entitlements...")
-        print("   Bundle ID: \(Bundle.main.bundleIdentifier ?? "nil")")
-        
-        if let entitlements = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-container-identifiers") {
-            print("   ✅ Found container identifiers: \(entitlements)")
-        } else {
-            print("   ❌ No container identifiers found in embedded entitlements")
-        }
-        
-        if let services = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-services") {
-            print("   ✅ Found iCloud services: \(services)")
-        } else {
-            print("   ❌ No iCloud services found in embedded entitlements")
-        }
+        // Note: Entitlements cannot be read at runtime using Bundle.main.object(forInfoDictionaryKey:)
+        // They are in the code signature, not Info.plist
+        // The validator will test actual CloudKit access instead
         
         Task {
             let result = await CloudKitContainerValidator.validateContainer(identifier: targetContainer)

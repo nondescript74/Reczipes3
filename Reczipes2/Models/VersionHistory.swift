@@ -62,25 +62,35 @@ class VersionHistoryManager {
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
                 
-                // Performance Optimization
-                "⚡️ Optimized: Recipe list caching eliminates redundant SwiftData queries during UI rendering",
-                "🔧 Fixed: Eliminated 10x redundant recipe refreshes on ContentView load",
-                "💾 Added: Smart recipe cache that only updates when recipes are added, edited, or deleted",
-                "📊 Enhanced: Recipe filtering now uses cached data for instant performance",
+                // CloudKit Validator Fix
+                "🐛 Fixed: CloudKit validator false error reporting entitlements as missing when they were correct",
+                "🔧 Enhanced: Validator now correctly relies on actual CloudKit access test instead of impossible runtime entitlements check",
+                "📚 Improved: CloudKit validation messages now explain that entitlements can't be read at runtime",
+                "✅ Removed: Misleading debug messages showing 'entitlements not found' when they were properly configured",
+                "🔒 Technical: Entitlements are in app code signature, not accessible via Bundle.main APIs",
+                "💡 Added: Clear explanation that successful CloudKit access proves entitlements are correct",
                 
-                // Test Infrastructure Improvements
-                "🔧 Converted: RecipeExtractorTests from XCTest to Swift Testing framework",
-                "✅ Modernized: All test suites now use consistent Swift Testing macros and patterns",
-                "⚡️ Improved: Performance tests now use manual timing with time limits instead of XCTest measure blocks",
-                "🐛 Fixed: Test isolation in RecipeExportImportBackupTests using .serialized trait",
-                "📊 Enhanced: Backup tests run sequentially to prevent file system race conditions",
-                "🔧 Added: Custom TestSkipError for consistent test skipping across all test suites",
-                "✅ Removed: XCTest dependency from recipe extraction tests for better Swift 6 compatibility"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        
+        // 13.2.69
+        // Performance Optimization
+//        "⚡️ Optimized: Recipe list caching eliminates redundant SwiftData queries during UI rendering",
+//        "🔧 Fixed: Eliminated 10x redundant recipe refreshes on ContentView load",
+//        "💾 Added: Smart recipe cache that only updates when recipes are added, edited, or deleted",
+//        "📊 Enhanced: Recipe filtering now uses cached data for instant performance",
+//        
+//        // Test Infrastructure Improvements
+//        "🔧 Converted: RecipeExtractorTests from XCTest to Swift Testing framework",
+//        "✅ Modernized: All test suites now use consistent Swift Testing macros and patterns",
+//        "⚡️ Improved: Performance tests now use manual timing with time limits instead of XCTest measure blocks",
+//        "🐛 Fixed: Test isolation in RecipeExportImportBackupTests using .serialized trait",
+//        "📊 Enhanced: Backup tests run sequentially to prevent file system race conditions",
+//        "🔧 Added: Custom TestSkipError for consistent test skipping across all test suites",
+//        "✅ Removed: XCTest dependency from recipe extraction tests for better Swift 6 compatibility"
         
         // 13.2 66"🐛 Fixed: DiabeticCacheIntegrationTests for main actor concurrency failures",
         // 13.2.67                 "🔧 Converted: RecipeExtractorTests from XCTest to Swift Testing framework",

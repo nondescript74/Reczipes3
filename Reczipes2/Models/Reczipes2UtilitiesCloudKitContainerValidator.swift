@@ -89,24 +89,29 @@ actor CloudKitContainerValidator {
     private static func checkEntitlements(for containerID: String) -> EntitlementsCheck {
         var check = EntitlementsCheck()
         
-        // Check for iCloud services entitlement
-        if let services = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-services") as? [String] {
-            check.hasICloudServices = true
-            check.iCloudServices = services
-            check.hasCloudKit = services.contains("CloudKit")
-        }
+        // IMPORTANT: Entitlements cannot be reliably read at runtime using Bundle APIs
+        // They are embedded in the app's code signature, not in Info.plist
+        // The only way to truly verify entitlements is:
+        // 1. At build time using Xcode
+        // 2. Using `codesign` command line tool
+        // 3. By attempting actual CloudKit operations (which we do in validation)
         
-        // Check for container identifiers entitlement
-        if let containers = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-container-identifiers") as? [String] {
-            check.hasContainerIdentifiers = true
-            check.containerIdentifiers = containers
-            check.containsTargetContainer = containers.contains(containerID)
-        }
+        // Instead, we'll check if we can access CloudKit functionality
+        // which indirectly proves entitlements are correct
         
-        // Check for ubiquity container identifiers (for iCloud Drive)
-        if let ubiquityContainers = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.ubiquity-container-identifiers") as? [String] {
-            check.ubiquityContainers = ubiquityContainers
-        }
+        // NOTE: The old code was checking Bundle.main.object(forInfoDictionaryKey:)
+        // which would never find entitlements because they're not in Info.plist
+        
+        // Mark as "cannot determine from runtime" - we rely on actual CloudKit access test
+        check.hasICloudServices = true // Assumed if CloudKit access works
+        check.iCloudServices = ["CloudKit"] // Assumed
+        check.hasCloudKit = true // Assumed if container access succeeds
+        check.hasContainerIdentifiers = true // Assumed
+        check.containerIdentifiers = [containerID] // Assumed
+        check.containsTargetContainer = true // Will be validated by actual container access
+        
+        // Set note for user
+        check.runtimeCheckNote = "⚠️ Entitlements cannot be read at runtime. Validation is based on actual CloudKit access test."
         
         return check
     }
@@ -142,20 +147,30 @@ actor CloudKitContainerValidator {
         
         print("\n🔐 ENTITLEMENTS CHECK:")
         let entitlements = result.entitlementsCheck
-        print("   iCloud Services: \(entitlements.hasICloudServices ? "✅" : "❌")")
-        if entitlements.hasICloudServices {
-            print("      Services: \(entitlements.iCloudServices.joined(separator: ", "))")
-        }
-        print("   CloudKit Enabled: \(entitlements.hasCloudKit ? "✅" : "❌")")
-        print("   Container Identifiers: \(entitlements.hasContainerIdentifiers ? "✅" : "❌")")
-        if entitlements.hasContainerIdentifiers {
-            print("      Containers:")
-            for container in entitlements.containerIdentifiers {
-                let marker = container == result.containerIdentifier ? "  ➜" : "   "
-                print("\(marker) \(container)")
+        
+        if let note = entitlements.runtimeCheckNote {
+            print("   \(note)")
+            print("")
+            print("   💡 Real test: Can we access CloudKit? (See Container Access above)")
+            print("      - If container access works → Entitlements are correct ✅")
+            print("      - If container access fails → Check entitlements in Xcode ❌")
+        } else {
+            // Old style reporting (won't happen with new code)
+            print("   iCloud Services: \(entitlements.hasICloudServices ? "✅" : "❌")")
+            if entitlements.hasICloudServices {
+                print("      Services: \(entitlements.iCloudServices.joined(separator: ", "))")
             }
+            print("   CloudKit Enabled: \(entitlements.hasCloudKit ? "✅" : "❌")")
+            print("   Container Identifiers: \(entitlements.hasContainerIdentifiers ? "✅" : "❌")")
+            if entitlements.hasContainerIdentifiers {
+                print("      Containers:")
+                for container in entitlements.containerIdentifiers {
+                    let marker = container == result.containerIdentifier ? "  ➜" : "   "
+                    print("\(marker) \(container)")
+                }
+            }
+            print("   Target Container Listed: \(entitlements.containsTargetContainer ? "✅" : "❌")")
         }
-        print("   Target Container Listed: \(entitlements.containsTargetContainer ? "✅" : "❌")")
         
         print("\n🔍 DIAGNOSIS:")
         let diagnosis = result.diagnose()
@@ -214,28 +229,27 @@ struct ValidationResult {
             recommendations.append("Sign into iCloud in Settings app")
         }
         
-        // Check entitlements
-        if !entitlementsCheck.hasCloudKit {
-            issues.append("CloudKit not enabled in entitlements")
-            recommendations.append("Add iCloud capability with CloudKit in Xcode")
-        }
+        // IMPORTANT: Don't check entitlements directly as they can't be read at runtime
+        // Instead, rely on the actual CloudKit access test
+        // If we can access the container, entitlements are correct!
         
-        if !entitlementsCheck.containsTargetContainer {
-            issues.append("Container '\(containerIdentifier)' not listed in entitlements")
-            recommendations.append("Add '\(containerIdentifier)' to iCloud container identifiers in entitlements")
-        }
-        
-        // Check container access
+        // Check container access - this is the REAL test
         if !canAccessPrivateDatabase {
             issues.append("Cannot access container's private database")
             if let error = containerAccessError {
                 if error.contains("bad container") || error.contains("badContainer") {
                     recommendations.append("Container may not exist in Apple Developer Portal - create it or use existing container")
+                    recommendations.append("Or check that container identifier in entitlements matches exactly: '\(containerIdentifier)'")
                 } else if error.contains("permission") {
                     recommendations.append("Check that app is properly signed and entitlements are correct")
+                    recommendations.append("In Xcode: Signing & Capabilities → iCloud → Add container '\(containerIdentifier)'")
                 } else {
                     recommendations.append("Check error: \(error)")
                 }
+            } else {
+                // No specific error, give general guidance
+                recommendations.append("Verify entitlements in Xcode: Signing & Capabilities → iCloud → CloudKit")
+                recommendations.append("Add container '\(containerIdentifier)' to entitlements")
             }
         }
         
@@ -266,6 +280,7 @@ struct EntitlementsCheck {
     var containerIdentifiers: [String] = []
     var containsTargetContainer: Bool = false
     var ubiquityContainers: [String] = []
+    var runtimeCheckNote: String?
 }
 
 struct Diagnosis {
