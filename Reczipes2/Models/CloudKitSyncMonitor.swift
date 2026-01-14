@@ -115,11 +115,15 @@ class CloudKitSyncMonitor: ObservableObject {
     }
     
     @objc private func handleAccountChange() {
-        Task {
+        Task { @MainActor in
             print("🔄 iCloud account changed, rechecking status...")
             // Clear warnings when account changes so we get fresh feedback
             hasWarnedAboutStatus.removeAll()
             await checkAccountStatus()
+            
+            // Notify the container manager to potentially recreate the container
+            // The manager will decide if recreation is actually needed
+            await ModelContainerManager.shared.recreateContainer()
         }
     }
     
@@ -249,6 +253,21 @@ struct CloudKitSyncStatusView: View {
                 }
                 .padding(.top, 4)
             }
+            
+            // Advanced: Manual container recreation button
+            Button {
+                Task {
+                    await ModelContainerManager.shared.manuallyRecreateContainer()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Text("Reconnect to iCloud")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
         }
         .padding()
         .background(Color(.secondarySystemBackground))

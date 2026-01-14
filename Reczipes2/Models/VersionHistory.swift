@@ -61,17 +61,25 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                
-                // Simplified Backup Access
-                "🔧 Removed: Backup & Restore button from Recipes view toolbar",
-                "📱 Improved: Backup and restore functionality now centralized in Settings under User Content Backup",
-                "🎨 Streamlined: Cleaner Recipes view interface with unified backup access point",
+                "✨ Reintegrated: Batch recipe extraction from saved links as fourth extraction option in Extract view",
+                "📊 Added: Real-time progress tracking with pause/resume/stop controls for batch extraction sessions",
+                "🔄 Enhanced: Batch extraction now processes up to 50 recipes automatically with 5-second intervals and intelligent retry logic",
+                "🎨 Added: Dedicated BatchRecipeExtractorView with status cards, error logging, and completion alerts",
+                "✅ Added: Comprehensive test suite for BatchExtractionManager with 30+ test cases",
+                "🔧 Fixed: Test isolation issue where singleton state persisted across tests",
+                "🐛 Fixed: Configuration validation tests now properly clear apiKey and modelContext between runs",
+                "⚡️ Enhanced: BatchExtractionManager now includes clearConfiguration() method for better testability"
 
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 14.1.75
+        // Simplified Backup Access
+        //"🔧 Removed: Backup & Restore button from Recipes view toolbar",
+        //"📱 Improved: Backup and restore functionality now centralized in Settings under User Content Backup",
+        //"🎨 Streamlined: Cleaner Recipes view interface with unified backup access point",
         // 14.1.74
         
         // Recipe Book Cover Image Fixes

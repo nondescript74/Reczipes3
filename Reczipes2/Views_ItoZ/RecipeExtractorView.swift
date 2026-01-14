@@ -26,19 +26,23 @@ struct RecipeExtractorView: View {
     @State private var extractionSource: ExtractionSource = .none
     @State private var extractionProgress: Double = 0.0
     @State private var showPendingExtractionAlert = false
+    @State private var showBatchExtraction = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
     private let imageDownloader = WebImageDownloader()
+    private let apiKey: String
     
     enum ExtractionSource {
         case none
         case camera
         case library
         case url
+        case batch
     }
     
     init(apiKey: String) {
+        self.apiKey = apiKey
         _viewModel = StateObject(wrappedValue: RecipeExtractorViewModel(apiKey: apiKey))
     }
     
@@ -245,6 +249,9 @@ struct RecipeExtractorView: View {
             } message: {
                 Text("You have an extraction in progress. Would you like to resume where you left off?")
             }
+            .sheet(isPresented: $showBatchExtraction) {
+                BatchRecipeExtractorView(apiKey: apiKey, modelContext: modelContext)
+            }
         }
     }
     
@@ -326,6 +333,32 @@ struct RecipeExtractorView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(extractionSource == .url ? Color.blue : Color.clear, lineWidth: 2)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                // Row 3: Batch Extract (full width)
+                Button {
+                    extractionSource = .batch
+                    showBatchExtraction = true
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "square.stack.3d.up.fill")
+                            .font(.system(size: 40))
+                        Text("Batch Extract")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("Extract multiple recipes from saved links")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(extractionSource == .batch ? Color.purple.opacity(0.2) : Color.purple.opacity(0.1))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(extractionSource == .batch ? Color.purple : Color.clear, lineWidth: 2)
                     )
                 }
                 .buttonStyle(.plain)

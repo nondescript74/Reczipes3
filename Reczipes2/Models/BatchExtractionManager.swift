@@ -155,6 +155,12 @@ class BatchExtractionManager: ObservableObject {
         startTime = nil
     }
     
+    /// Clear configuration (primarily for testing)
+    func clearConfiguration() {
+        apiKey = nil
+        modelContext = nil
+    }
+    
     // MARK: - Background Extraction
     
     private func performBatchExtraction(links: [SavedLink], apiKey: String, modelContext: ModelContext) async {

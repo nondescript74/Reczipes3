@@ -14,6 +14,7 @@ struct Reczipes2App: App {
     // State management
     @StateObject private var appState = AppStateManager.shared
     @StateObject private var taskRestoration = TaskRestorationCoordinator.shared
+    @StateObject private var containerManager = ModelContainerManager.shared
     
     init() {
         // Suppress Auto Layout constraint warnings from UIKit internals
@@ -39,7 +40,13 @@ struct Reczipes2App: App {
         logCloudKitConfiguration()
     }
     
-    var sharedModelContainer: ModelContainer = {
+    // Use the shared container from the manager instead of creating our own
+    var sharedModelContainer: ModelContainer {
+        containerManager.container
+    }
+    
+    // Keep the old static initializer for reference, but don't use it
+    private static var _legacySharedModelContainer: ModelContainer = {
         // Log schema version information
         print("🚀 STARTING MODEL CONTAINER INITIALIZATION")
         print("   Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
@@ -149,83 +156,111 @@ struct Reczipes2App: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                MainTabView()
-                    .modelContainer(sharedModelContainer)
-                    .environmentObject(appState)
-                    .environmentObject(taskRestoration)
-                    .fullScreenCover(isPresented: $showLicenseAgreement) {
-                        LicenseAgreementView(isPresented: $showLicenseAgreement)
-                            .onDisappear {
-                                // After license is accepted, check if API key setup is needed
-                                if LicenseHelper.hasAcceptedLicense {
-                                    showAPIKeySetup = !APIKeyHelper.isConfigured
+                // Show loading overlay when container is being recreated
+                if containerManager.isRecreating {
+                    containerRecreationOverlay
+                } else {
+                    MainTabView()
+                        .modelContainer(sharedModelContainer)
+                        .environmentObject(appState)
+                        .environmentObject(taskRestoration)
+                        .fullScreenCover(isPresented: $showLicenseAgreement) {
+                            LicenseAgreementView(isPresented: $showLicenseAgreement)
+                                .onDisappear {
+                                    // After license is accepted, check if API key setup is needed
+                                    if LicenseHelper.hasAcceptedLicense {
+                                        showAPIKeySetup = !APIKeyHelper.isConfigured
+                                    }
                                 }
+                        }
+                        .fullScreenCover(isPresented: $showAPIKeySetup) {
+                            APIKeySetupView(isPresented: $showAPIKeySetup)
+                        }
+                        .onAppear {
+                            // Check license and API key status on appear
+                            showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
+                            if LicenseHelper.hasAcceptedLicense {
+                                showAPIKeySetup = !APIKeyHelper.isConfigured
                             }
-                    }
-                    .fullScreenCover(isPresented: $showAPIKeySetup) {
-                        APIKeySetupView(isPresented: $showAPIKeySetup)
-                    }
-                    .onAppear {
-                        // Check license and API key status on appear
-                        showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
-                        if LicenseHelper.hasAcceptedLicense {
-                            showAPIKeySetup = !APIKeyHelper.isConfigured
+                            
+                            // Show launch screen every launch (only if onboarding is complete)
+                            if LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
+                                showLaunchScreen = appState.shouldShowLaunchScreen()
+                            }
+                            
+                            // Check if images need restoration (after app reinstall)
+                            Task {
+                                await checkAndRestoreImages()
+                            }
+                            
+                            // Check for App Clip data
+                            checkForAppClipData()
                         }
-                        
-                        // Show launch screen every launch (only if onboarding is complete)
-                        if LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
-                            showLaunchScreen = appState.shouldShowLaunchScreen()
-                        }
-                        
-                        // Check if images need restoration (after app reinstall)
-                        Task {
-                            await checkAndRestoreImages()
-                        }
-                        
-                        // Check for App Clip data
-                        checkForAppClipData()
-                    }
-                
-                // Launch screen overlay - shows briefly on every launch (after onboarding)
-                if showLaunchScreen && LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
-                    LaunchScreenView {
-                        // Dismiss launch screen
-                        withAnimation {
-                            showLaunchScreen = false
-                        }
-                    }
-                    .transition(.opacity)
-                    .zIndex(1)
-                }
-                
-                // App Clip import banner
-                if showAppClipImportBanner {
-                    VStack {
-                        AppClipImportBanner(
-                            recipeName: importedRecipeName,
-                            isPresented: $showAppClipImportBanner
-                        )
-                        .padding()
-                        Spacer()
-                    }
-                    .zIndex(2)
-                }
-                
-                // Task restoration prompt
-                if taskRestoration.showRestorationPrompt {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                        .zIndex(2)
                     
-                    TaskRestorationPromptView(
-                        coordinator: taskRestoration,
-                        modelContainer: sharedModelContainer
-                    )
-                    .zIndex(3)
+                    // Launch screen overlay - shows briefly on every launch (after onboarding)
+                    if showLaunchScreen && LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
+                        LaunchScreenView {
+                            // Dismiss launch screen
+                            withAnimation {
+                                showLaunchScreen = false
+                            }
+                        }
+                        .transition(.opacity)
+                        .zIndex(1)
+                    }
+                    
+                    // App Clip import banner
+                    if showAppClipImportBanner {
+                        VStack {
+                            AppClipImportBanner(
+                                recipeName: importedRecipeName,
+                                isPresented: $showAppClipImportBanner
+                            )
+                            .padding()
+                            Spacer()
+                        }
+                        .zIndex(2)
+                    }
+                    
+                    // Task restoration prompt
+                    if taskRestoration.showRestorationPrompt {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .zIndex(2)
+                        
+                        TaskRestorationPromptView(
+                            coordinator: taskRestoration,
+                            modelContainer: sharedModelContainer
+                        )
+                        .zIndex(3)
+                    }
                 }
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
+            }
+        }
+    }
+    
+    // MARK: - Container Recreation Overlay
+    
+    private var containerRecreationOverlay: some View {
+        ZStack {
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .scaleEffect(1.5)
+                
+                Text("Updating iCloud Connection")
+                    .font(.headline)
+                
+                Text("Please wait while we reconnect to iCloud...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
         }
     }
