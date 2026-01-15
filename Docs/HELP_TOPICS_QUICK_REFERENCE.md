@@ -176,6 +176,19 @@
 - View license agreement
 - Browse help topics
 
+### 19. Batch Image Extraction 📚
+**What:** Extract multiple recipes at once from Photos library  
+**When to use:** Digitizing recipe collections, processing many photos  
+**Key tips:**
+- Process up to 10 images at a time
+- Optional cropping for each image  
+- Pause/resume/stop controls available
+- Start small (3-5 images) to learn
+- Use WiFi for best results
+- Each extraction costs ~$0.02
+- All successful recipes auto-saved
+- Error log shows any failures
+
 ---
 
 ## 📊 Help Topic Organization

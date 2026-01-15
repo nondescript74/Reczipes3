@@ -61,6 +61,9 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
+                "⚡️ Enhanced: Intelligent retry system handles transient failures during batch recipe extraction",
+                "📸 Added: Automatic multi-image download support during batch extraction sessions",
+                "📊 Added: Comprehensive batch extraction UI with live progress, error logs, and session controls",
                 "✨ Reintegrated: Batch recipe extraction from saved links as fourth extraction option in Extract view",
                 "📊 Added: Real-time progress tracking with pause/resume/stop controls for batch extraction sessions",
                 "🔄 Enhanced: Batch extraction now processes up to 50 recipes automatically with 5-second intervals and intelligent retry logic",

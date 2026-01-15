@@ -152,6 +152,27 @@ struct AppHelp {
         relatedTopics: ["Recipe Extraction", "Claude API"]
     )
     
+    static let batchImageExtraction_image = HelpTopic(
+        title: "Batch Image Extraction",
+        icon: "photo.stack.fill",
+        description: """
+        Extract multiple recipes at once from images in your Photos library. Perfect for digitizing recipe collections quickly - process up to 10 images at a time with optional cropping.
+        """,
+        tips: [
+            "Tap 'Batch Extract Images' from the Extract tab to get started",
+            "Select multiple recipe photos from your Photos library",
+            "Toggle 'Crop each image' ON to adjust each photo individually, or OFF for fastest processing",
+            "The app processes images sequentially in batches of 10 with progress updates",
+            "Use Pause to temporarily stop, Resume to continue, or Stop to cancel the entire batch",
+            "Each extraction takes 10-30 seconds per image depending on complexity",
+            "All successfully extracted recipes are automatically saved to your collection",
+            "Review the error log if any images fail - you can retry them individually later",
+            "Start with 3-5 images to learn the workflow before processing larger batches",
+            "Best results on WiFi to avoid data charges and ensure stable connection"
+        ],
+        relatedTopics: ["Recipe Extraction", "Image Preprocessing", "Claude API", "Image Assignment"]
+    )
+    
     // MARK: - Allergen Features
     
     static let allergenProfiles = HelpTopic(
@@ -589,6 +610,7 @@ struct AppHelp {
         // Image Features
         "imageAssignment": imageAssignment,
         "imagePreprocessing": imagePreprocessing,
+        "batchImageExtraction": batchImageExtraction_image,
         
         // Allergen Features
         "allergenProfiles": allergenProfiles,
@@ -655,6 +677,11 @@ struct AppHelp {
         ]),
         ("Images", "photo.fill", [
             imageAssignment,
+            imagePreprocessing
+        ]),
+        ("Extraction Features", "camera.fill", [
+            extractTab,
+            batchImageExtraction,
             imagePreprocessing
         ]),
         ("Allergen & Dietary", "heart.fill", [

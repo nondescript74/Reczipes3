@@ -1,0 +1,501 @@
+# Batch Image Extraction - Workflow Diagrams
+
+## High-Level Flow
+
+```
+┌─────────────────────────┐
+│  RecipeExtractorView    │
+│                         │
+│  • Camera               │
+│  • Library (Single)     │
+│  • Web URL              │
+│  • Batch URLs           │
+│  • Batch Images ←NEW    │
+└────────┬────────────────┘
+         │
+         │ User taps "Batch Extract Images"
+         ↓
+┌─────────────────────────┐
+│ BatchImageExtractorView │
+│                         │
+│  Empty State:           │
+│  "Select Photos"        │
+└────────┬────────────────┘
+         │
+         │ User taps "Select Photos"
+         ↓
+┌─────────────────────────┐
+│   PhotosPickerSheet     │
+│                         │
+│  Grid of all photos     │
+│  Multi-select enabled   │
+└────────┬────────────────┘
+         │
+         │ User selects 5 images
+         ↓
+┌─────────────────────────┐
+│  Selection View         │
+│                         │
+│  Summary: 5 images      │
+│  □ Crop option toggle   │
+│  [Start Extraction]     │
+└────────┬────────────────┘
+         │
+         ├─────────────────┬─────────────────┐
+         │                 │                 │
+    Crop OFF          Crop ON          Crop ON
+         │                 │           (per-image)
+         ↓                 ↓                 ↓
+    Fast Mode      Auto Crop All    Ask Each Time
+         │                 │                 │
+         └─────────────────┴─────────────────┘
+                           │
+                           ↓
+                  ┌─────────────────────────┐
+                  │   Extraction Progress   │
+                  │                         │
+                  │  Progress: 2/5          │
+                  │  Success: 1             │
+                  │  Failed: 1              │
+                  │  Current: [Image 3]     │
+                  │  Queue: [4, 5]          │
+                  │                         │
+                  │  [Pause] [Stop]         │
+                  └────────┬────────────────┘
+                           │
+                           ↓
+                  ┌─────────────────────────┐
+                  │  Completion Alert       │
+                  │                         │
+                  │  Extracted 3 recipes    │
+                  │  with 2 failures        │
+                  │                         │
+                  │  [View Recipes] [OK]    │
+                  └─────────────────────────┘
+```
+
+## Detailed Processing Flow
+
+```
+START
+  │
+  ├─→ [User selects N images]
+  │
+  ├─→ [User chooses crop option]
+  │     • ON: Will prompt for each image
+  │     • OFF: Process all as-is
+  │
+  ├─→ [Start batch extraction]
+  │
+  ├─→ Initialize:
+  │     • totalToExtract = N
+  │     • currentProgress = 0
+  │     • successCount = 0
+  │     • failureCount = 0
+  │     • remainingAssets = [all N assets]
+  │
+  ├─→ FOR EACH asset IN remainingAssets:
+  │     │
+  │     ├─→ Check if stopped → BREAK
+  │     │
+  │     ├─→ WHILE paused:
+  │     │     └─→ Wait 0.1s
+  │     │
+  │     ├─→ Load image from Photos
+  │     │     ├─ Success → Continue
+  │     │     └─ Failure → Log error, increment failureCount, CONTINUE
+  │     │
+  │     ├─→ IF crop enabled:
+  │     │     │
+  │     │     ├─→ Show image preview
+  │     │     │
+  │     │     ├─→ Ask: "Skip or Crop?"
+  │     │     │     ├─ Skip → Use original
+  │     │     │     └─ Crop → Show crop UI
+  │     │     │           ├─ Cropped → Use cropped
+  │     │     │           └─ Cancelled → Use original
+  │     │     │
+  │     ├─→ Extract recipe via API
+  │     │     ├─ Success:
+  │     │     │   ├─→ Save recipe to SwiftData
+  │     │     │   ├─→ Save image to disk
+  │     │     │   ├─→ Create image assignment
+  │     │     │   └─→ Increment successCount
+  │     │     │
+  │     │     └─ Failure:
+  │     │         ├─→ Log error with details
+  │     │         └─→ Increment failureCount
+  │     │
+  │     ├─→ Increment currentProgress
+  │     │
+  │     ├─→ Remove from remainingAssets
+  │     │
+  │     └─→ IF currentProgress % 10 == 0:
+  │           └─→ Pause 0.5s (show progress)
+  │
+  └─→ Show completion alert
+        └─→ END
+```
+
+## State Transitions
+
+```
+┌─────────────┐
+│    IDLE     │ ← Initial state
+└──────┬──────┘
+       │ startBatchExtraction()
+       ↓
+┌─────────────┐
+│ EXTRACTING  │ ← isExtracting = true
+└──────┬──────┘
+       │
+       ├───────────────┬──────────────┬─────────────┐
+       │               │              │             │
+   pause()         stop()       complete()   waitForCrop()
+       │               │              │             │
+       ↓               ↓              ↓             ↓
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌──────────────┐
+│   PAUSED    │ │   STOPPED   │ │  COMPLETE   │ │ WAITING_CROP │
+└──────┬──────┘ └─────────────┘ └─────────────┘ └──────┬───────┘
+       │                                                │
+   resume()                                  skipCrop() or showCrop()
+       │                                                │
+       └────────────────────────────────────────────────┘
+                              │
+                              ↓
+                       Back to EXTRACTING
+```
+
+## Crop Decision Flow (When Enabled)
+
+```
+┌──────────────────────────┐
+│  Load next image         │
+└────────┬─────────────────┘
+         │
+         ↓
+┌──────────────────────────┐
+│  Show image preview      │
+│  "Would you like to      │
+│   crop this image?"      │
+│                          │
+│   [Skip]    [Crop]       │
+└────┬───────────────┬─────┘
+     │               │
+  Skip clicked    Crop clicked
+     │               │
+     ↓               ↓
+Use original   ┌─────────────────┐
+     │         │  ImageCropView  │
+     │         │                 │
+     │         │  [Crop] [Cancel]│
+     │         └────┬──────┬─────┘
+     │              │      │
+     │           Crop    Cancel
+     │              │      │
+     │         Use cropped │
+     │              │      │
+     └──────────────┴──────┘
+                    │
+                    ↓
+           Extract recipe from
+           (original or cropped)
+```
+
+## Queue Management
+
+```
+Initial Queue: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+                                                    
+┌──────────────────────────────────────────────────┐
+│ Processing: 1                                    │
+│ Queue: [2, 3, 4, 5, 6, 7, 8, 9, 10] (show first 10)│
+│ Hidden: [11, 12]                                 │
+└──────────────────────────────────────────────────┘
+
+After image 1: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+┌──────────────────────────────────────────────────┐
+│ Processing: 2                                    │
+│ Queue: [3, 4, 5, 6, 7, 8, 9, 10, 11] (show first 10)│
+│ Hidden: [12]                                     │
+└──────────────────────────────────────────────────┘
+
+...continue...
+
+After image 10: [11, 12]
+└─→ Brief pause to show progress
+
+┌──────────────────────────────────────────────────┐
+│ Processing: 11                                   │
+│ Queue: [12]                                      │
+│ Hidden: []                                       │
+└──────────────────────────────────────────────────┘
+
+After image 12: []
+└─→ Show completion alert
+```
+
+## Pause/Resume Scenario
+
+```
+Timeline:
+───────────────────────────────────────────────────→
+
+Extract 1   Extract 2   [PAUSE]   (idle)   [RESUME]   Extract 3
+    ↓           ↓          ↓         ↓         ↓          ↓
+  ┌───┐      ┌───┐     ┌────┐   ┌────┐   ┌─────┐    ┌───┐
+  │ 1 │ ───→ │ 2 │ ───→│Btn │───│Wait│───│ Btn │───→│ 3 │
+  └───┘      └───┘     └────┘   └────┘   └─────┘    └───┘
+   Done       Done     Paused   Paused   Resumed    Working
+
+State:
+isExtracting:  true     true      true     true      true     true
+isPaused:      false    false     true     true      false    false
+currentProg:     1        2         2        2         2        3
+```
+
+## Error Handling Flow
+
+```
+Processing Image 3 of 10
+         ↓
+    API Call Failed
+         ↓
+┌────────────────────┐
+│  Try/Catch Block   │
+└─────────┬──────────┘
+          │
+          ├→ Log error: "API error for image 3: Rate limit"
+          ├→ Add to errorLog[(3, "Rate limit reached")]
+          ├→ Increment failureCount: 1
+          ├→ currentRecipe = nil (clear preview)
+          └→ Continue to next image (don't stop batch)
+                    ↓
+            Processing Image 4
+                    │
+                    ↓
+           [Normal processing continues]
+
+Final Summary:
+├─ Total: 10
+├─ Success: 8
+├─ Failed: 2
+└─ Error Log:
+    • Image 3: Rate limit reached
+    • Image 7: Failed to load image
+```
+
+## UI Component Hierarchy
+
+```
+BatchImageExtractorView
+│
+├── NavigationStack
+│   │
+│   ├── ZStack (main content switcher)
+│   │   │
+│   │   ├── Empty State View
+│   │   │   └── "Select Photos" button
+│   │   │
+│   │   ├── Selection View
+│   │   │   ├── Selection Summary Card
+│   │   │   ├── Crop Option Card
+│   │   │   ├── Start Button
+│   │   │   └── Selected Images Grid
+│   │   │       └── SelectedAssetThumbnail (x N)
+│   │   │
+│   │   └── Extraction Progress View
+│   │       ├── Progress Overview Card
+│   │       │   ├── Progress bar
+│   │       │   └── Statistics (Progress, Success, Failed)
+│   │       │
+│   │       ├── Current Image Card
+│   │       │   ├── Image preview
+│   │       │   └── Recipe preview (when extracted)
+│   │       │
+│   │       ├── Control Buttons
+│   │       │   ├── Pause/Resume
+│   │       │   └── Stop
+│   │       │
+│   │       ├── Remaining Queue Section
+│   │       │   └── HStack
+│   │       │       └── QueuedAssetThumbnail (x 10)
+│   │       │
+│   │       └── Error Log Section
+│   │           └── VStack
+│   │               └── Error card (per error)
+│   │
+│   ├── .sheet(PhotosPickerSheet)
+│   │   └── LazyVGrid
+│   │       └── PhotoAssetCell (x all photos)
+│   │
+│   ├── .fullScreenCover(ImageCropView)
+│   │   ├── onCrop: handleCroppedImage(image)
+│   │   └── onCancel: handleCroppedImage(nil)
+│   │
+│   └── .alert(Completion)
+│       ├── "View Recipes" → dismiss()
+│       └── "OK" → reset()
+```
+
+## Data Flow
+
+```
+                    User Actions
+                         │
+                         ↓
+        ┌────────────────────────────────┐
+        │  BatchImageExtractorView       │
+        │  (SwiftUI)                     │
+        └────────┬───────────────────────┘
+                 │ Bindings ($)
+                 ↓
+        ┌────────────────────────────────┐
+        │ BatchImageExtractorViewModel   │
+        │ (@Published properties)        │
+        └────┬──────────────┬────────────┘
+             │              │
+     State updates    Async operations
+             │              │
+             ↓              ↓
+        ┌────────┐    ┌──────────────────┐
+        │  View  │    │  Business Logic  │
+        │ Re-render    │                  │
+        └────────┘    │ • Load images    │
+                      │ • Extract recipes│
+                      │ • Save data      │
+                      └────┬──────┬──────┘
+                           │      │
+              ┌────────────┘      └───────────┐
+              ↓                               ↓
+    ┌──────────────────┐           ┌──────────────────┐
+    │ PhotoLibraryMgr  │           │  ClaudeAPIClient │
+    │                  │           │                  │
+    │ • Load images    │           │ • Extract recipe │
+    │ • Load thumbs    │           │ • API calls      │
+    └──────────────────┘           └──────────────────┘
+              │                               │
+              ↓                               ↓
+    ┌──────────────────┐           ┌──────────────────┐
+    │   Photos.framework│           │   Network        │
+    └──────────────────┘           └──────────────────┘
+
+                    Results
+                      │
+                      ↓
+            ┌──────────────────┐
+            │   SwiftData      │
+            │   • Recipe       │
+            │   • Assignment   │
+            └──────────────────┘
+                      │
+                      ↓
+            ┌──────────────────┐
+            │  FileManager     │
+            │  • Save images   │
+            └──────────────────┘
+```
+
+## Memory Management
+
+```
+Batch of 12 images processing:
+
+Memory Timeline:
+────────────────────────────────────────────────→
+
+Image 1          Image 2          Image 3
+  ↓                ↓                ↓
+┌─────┐          ┌─────┐          ┌─────┐
+│Load │          │Load │          │Load │
+│ ▓▓▓ │          │ ▓▓▓ │          │ ▓▓▓ │
+└──┬──┘          └──┬──┘          └──┬──┘
+   │                │                │
+   ├→Extract        ├→Extract        ├→Extract
+   ├→Save           ├→Save           ├→Save
+   └→Release ✓      └→Release ✓      └→Release ✓
+   
+Memory Usage:
+├─ Thumbnails: Cached by PhotoKit (minimal)
+├─ Current Image: ~5-10 MB (full res)
+├─ Processed Data: ~500 KB (compressed)
+└─ After Release: ~0 MB (garbage collected)
+
+Only ONE image in memory at a time!
+Safe for large batches (100+ images)
+```
+
+## Success Scenario (All Pass)
+
+```
+Batch: 5 images
+Crop: OFF
+
+┌──────────────────────────────────────┐
+│ Progress Timeline                    │
+├──────────────────────────────────────┤
+│                                      │
+│ Image 1: ████████ Extract ✓ Save ✓  │
+│          Progress: 1/5               │
+│          Success: 1, Failed: 0       │
+│                                      │
+│ Image 2: ████████ Extract ✓ Save ✓  │
+│          Progress: 2/5               │
+│          Success: 2, Failed: 0       │
+│                                      │
+│ Image 3: ████████ Extract ✓ Save ✓  │
+│          Progress: 3/5               │
+│          Success: 3, Failed: 0       │
+│                                      │
+│ Image 4: ████████ Extract ✓ Save ✓  │
+│          Progress: 4/5               │
+│          Success: 4, Failed: 0       │
+│                                      │
+│ Image 5: ████████ Extract ✓ Save ✓  │
+│          Progress: 5/5               │
+│          Success: 5, Failed: 0       │
+│                                      │
+├──────────────────────────────────────┤
+│ Alert: "Extracted 5 recipes!"        │
+└──────────────────────────────────────┘
+```
+
+## Mixed Scenario (Some Failures)
+
+```
+Batch: 5 images
+Crop: ON
+
+┌──────────────────────────────────────┐
+│ Progress Timeline                    │
+├──────────────────────────────────────┤
+│                                      │
+│ Image 1: Ask→Crop→████████ ✓        │
+│          Success: 1, Failed: 0       │
+│                                      │
+│ Image 2: Ask→Skip→████████ ✗        │
+│          Success: 1, Failed: 1       │
+│          Error: "API rate limit"     │
+│                                      │
+│ Image 3: Ask→Crop→████████ ✓        │
+│          Success: 2, Failed: 1       │
+│                                      │
+│ Image 4: ████████ Load Error ✗      │
+│          Success: 2, Failed: 2       │
+│          Error: "Failed to load"     │
+│                                      │
+│ Image 5: Ask→Skip→████████ ✓        │
+│          Success: 3, Failed: 2       │
+│                                      │
+├──────────────────────────────────────┤
+│ Alert: "Extracted 3 recipes with     │
+│         2 failures"                  │
+│                                      │
+│ Error Log:                           │
+│ • Image 2: API rate limit            │
+│ • Image 4: Failed to load image      │
+└──────────────────────────────────────┘
+```
+
+These workflow diagrams provide a visual representation of how the batch image extraction feature works from start to finish!

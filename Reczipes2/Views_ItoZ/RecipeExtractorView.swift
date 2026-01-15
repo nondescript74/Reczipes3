@@ -27,6 +27,7 @@ struct RecipeExtractorView: View {
     @State private var extractionProgress: Double = 0.0
     @State private var showPendingExtractionAlert = false
     @State private var showBatchExtraction = false
+    @State private var showBatchImageExtraction = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
@@ -39,6 +40,7 @@ struct RecipeExtractorView: View {
         case library
         case url
         case batch
+        case batchImages
     }
     
     init(apiKey: String) {
@@ -252,6 +254,9 @@ struct RecipeExtractorView: View {
             .sheet(isPresented: $showBatchExtraction) {
                 BatchRecipeExtractorView(apiKey: apiKey, modelContext: modelContext)
             }
+            .sheet(isPresented: $showBatchImageExtraction) {
+                BatchImageExtractorView(apiKey: apiKey, modelContext: modelContext)
+            }
         }
     }
     
@@ -337,7 +342,7 @@ struct RecipeExtractorView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Row 3: Batch Extract (full width)
+                // Row 3: Batch Extract from URLs (full width)
                 Button {
                     extractionSource = .batch
                     showBatchExtraction = true
@@ -345,7 +350,7 @@ struct RecipeExtractorView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "square.stack.3d.up.fill")
                             .font(.system(size: 40))
-                        Text("Batch Extract")
+                        Text("Batch Extract URLs")
                             .font(.caption)
                             .fontWeight(.medium)
                         Text("Extract multiple recipes from saved links")
@@ -359,6 +364,32 @@ struct RecipeExtractorView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(extractionSource == .batch ? Color.purple : Color.clear, lineWidth: 2)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                // Row 4: Batch Extract from Images (full width)
+                Button {
+                    extractionSource = .batchImages
+                    showBatchImageExtraction = true
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "photo.stack.fill")
+                            .font(.system(size: 40))
+                        Text("Batch Extract Images")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("Extract multiple recipes from Photos library")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(extractionSource == .batchImages ? Color.orange.opacity(0.2) : Color.orange.opacity(0.1))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(extractionSource == .batchImages ? Color.orange : Color.clear, lineWidth: 2)
                     )
                 }
                 .buttonStyle(.plain)
