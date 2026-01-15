@@ -80,18 +80,32 @@ struct Reczipes2App: App {
             print("     - SavedLink")
             print("     - RecipeBook")
             print("     - CookingSession")
-            
             let container = try ModelContainer(
                 for: Recipe.self,
-                RecipeImageAssignment.self,
-                UserAllergenProfile.self,
-                CachedDiabeticAnalysis.self,
-                SavedLink.self,
-                RecipeBook.self,
-                CookingSession.self,
+                    RecipeImageAssignment.self,
+                    UserAllergenProfile.self,
+                    CachedDiabeticAnalysis.self,
+                    SavedLink.self,
+                    RecipeBook.self,
+                    CookingSession.self,
+                    SharedRecipe.self,          // ADD THIS
+                    SharedRecipeBook.self,      // ADD THIS
+                    SharingPreferences.self,    // ADD THIS
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
+            
+//            let container = try ModelContainer(
+//                for: Recipe.self,
+//                RecipeImageAssignment.self,
+//                UserAllergenProfile.self,
+//                CachedDiabeticAnalysis.self,
+//                SavedLink.self,
+//                RecipeBook.self,
+//                CookingSession.self,
+//                migrationPlan: Reczipes2MigrationPlan.self,
+//                configurations: cloudKitConfiguration
+//            )
             print("✅ ModelContainer created successfully with CloudKit sync enabled")
             print("   Container: iCloud.com.headydiscy.reczipes")
             print("   Database: CloudKitModel.sqlite (separate from local-only)")
@@ -111,15 +125,29 @@ struct Reczipes2App: App {
             do {
                 let container = try ModelContainer(
                     for: Recipe.self,
-                    RecipeImageAssignment.self,
-                    UserAllergenProfile.self,
-                    CachedDiabeticAnalysis.self,
-                    SavedLink.self,
-                    RecipeBook.self,
-                    CookingSession.self,
+                        RecipeImageAssignment.self,
+                        UserAllergenProfile.self,
+                        CachedDiabeticAnalysis.self,
+                        SavedLink.self,
+                        RecipeBook.self,
+                        CookingSession.self,
+                        SharedRecipe.self,          // ADD THIS
+                        SharedRecipeBook.self,      // ADD THIS
+                        SharingPreferences.self,    // ADD THIS
                     migrationPlan: Reczipes2MigrationPlan.self,
-                    configurations: localConfiguration
+                    configurations: cloudKitConfiguration
                 )
+//                let container = try ModelContainer(
+//                    for: Recipe.self,
+//                    RecipeImageAssignment.self,
+//                    UserAllergenProfile.self,
+//                    CachedDiabeticAnalysis.self,
+//                    SavedLink.self,
+//                    RecipeBook.self,
+//                    CookingSession.self,
+//                    migrationPlan: Reczipes2MigrationPlan.self,
+//                    configurations: localConfiguration
+//                )
                 print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
                 print("   Migration Plan: Reczipes2MigrationPlan")
                 print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")

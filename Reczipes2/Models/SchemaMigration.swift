@@ -150,9 +150,9 @@ enum SchemaV2: VersionedSchema {
     }
 }
 
-// MARK: - Schema Version 3 (Current - with Nutritional Goals)
+// MARK: - Schema Version 3 (with Nutritional Goals)
 
-/// Current schema with nutritional goals added to profiles
+/// Schema V3 with nutritional goals added to profiles
 enum SchemaV3: VersionedSchema {
     static nonisolated(unsafe) var versionIdentifier = Schema.Version(3, 0, 0)
     
@@ -279,6 +279,138 @@ enum SchemaV3: VersionedSchema {
     }
 }
 
+// MARK: - Schema Version 4 (Current - with CloudKit Sharing)
+
+/// Current schema with CloudKit sharing models
+enum SchemaV4: VersionedSchema {
+    static nonisolated(unsafe) var versionIdentifier = Schema.Version(4, 0, 0)
+    
+    static var models: [any PersistentModel.Type] {
+        [
+            Recipe.self,
+            RecipeImageAssignment.self,
+            UserAllergenProfile.self,
+            CachedDiabeticAnalysis.self,
+            SavedLink.self,
+            RecipeBook.self,
+            CookingSession.self,
+            SharedRecipe.self,          // NEW: CloudKit sharing models
+            SharedRecipeBook.self,      // NEW: CloudKit sharing models
+            SharingPreferences.self,    // NEW: CloudKit sharing models
+        ]
+    }
+    
+    @Model
+    final class UserAllergenProfile {
+        // CloudKit doesn't support unique constraints
+        // CloudKit requires properties to be optional OR have defaults - we make them optional
+        var id: UUID?
+        var name: String?
+        var isActive: Bool?
+        var sensitivitiesData: Data?
+        var diabetesStatusRaw: String?
+        var nutritionalGoalsData: Data?
+        var dateCreated: Date?
+        var dateModified: Date?
+        
+        init(
+            id: UUID = UUID(),
+            name: String = "",
+            isActive: Bool = false,
+            sensitivitiesData: Data? = nil,
+            diabetesStatus: DiabetesStatus = .none,
+            nutritionalGoals: NutritionalGoals? = nil,
+            dateCreated: Date = Date(),
+            dateModified: Date = Date()
+        ) {
+            self.id = id
+            self.name = name
+            self.isActive = isActive
+            self.sensitivitiesData = sensitivitiesData
+            self.diabetesStatusRaw = diabetesStatus.rawValue
+            // Encode nutritional goals data
+            self.nutritionalGoalsData = MainActor.assumeIsolated {
+                if let goals = nutritionalGoals {
+                    return try? JSONEncoder().encode(goals)
+                } else {
+                    return nil
+                }
+            }
+            self.dateCreated = dateCreated
+            self.dateModified = dateModified
+        }
+        
+        // Computed property for diabetes status
+        var diabetesStatus: DiabetesStatus {
+            get {
+                guard let raw = diabetesStatusRaw else { return .none }
+                return DiabetesStatus(rawValue: raw) ?? .none
+            }
+            set {
+                diabetesStatusRaw = newValue.rawValue
+                dateModified = Date()
+            }
+        }
+        
+        // Computed property for nutritional goals
+        var nutritionalGoals: NutritionalGoals? {
+            get {
+                guard let data = nutritionalGoalsData else { return nil }
+                return MainActor.assumeIsolated {
+                    try? JSONDecoder().decode(NutritionalGoals.self, from: data)
+                }
+            }
+            set {
+                nutritionalGoalsData = try? JSONEncoder().encode(newValue)
+                dateModified = Date()
+            }
+        }
+        
+        // Convenience properties
+        var hasDiabetesConcern: Bool {
+            diabetesStatus != .none
+        }
+        
+        var hasNutritionalGoals: Bool {
+            nutritionalGoals != nil
+        }
+        
+        // Sensitivities management
+        var sensitivities: [UserSensitivity] {
+            get {
+                guard let data = sensitivitiesData else { return [] }
+                return MainActor.assumeIsolated {
+                    (try? JSONDecoder().decode([UserSensitivity].self, from: data)) ?? []
+                }
+            }
+            set {
+                sensitivitiesData = try? JSONEncoder().encode(newValue)
+                dateModified = Date()
+            }
+        }
+        
+        func addSensitivity(_ sensitivity: UserSensitivity) {
+            var current = sensitivities
+            current.append(sensitivity)
+            sensitivities = current
+        }
+        
+        func removeSensitivity(id: UUID) {
+            var current = sensitivities
+            current.removeAll { $0.id == id }
+            sensitivities = current
+        }
+        
+        func updateSensitivity(_ sensitivity: UserSensitivity) {
+            var current = sensitivities
+            if let index = current.firstIndex(where: { $0.id == sensitivity.id }) {
+                current[index] = sensitivity
+                sensitivities = current
+            }
+        }
+    }
+}
+
 // MARK: - Migration Plan
 
 enum Reczipes2MigrationPlan: SchemaMigrationPlan {
@@ -287,6 +419,7 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             SchemaV1.self,
             SchemaV2.self,
             SchemaV3.self,
+            SchemaV4.self,
         ]
     }
     
@@ -296,6 +429,8 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             migrateV1toV2,
             // Migration from V2 to V3: Add nutritional goals
             migrateV2toV3,
+            // Migration from V3 to V4: Add CloudKit sharing models
+            migrateV3toV4,
         ]
     }
     
@@ -366,6 +501,12 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             print("[Migration]    Note: Nutritional goals are optional and can be configured by users")
         }
     )
+    
+    /// Migration from V3 to V4: Adds CloudKit sharing models (no data migration needed)
+    static let migrateV3toV4 = MigrationStage.lightweight(
+        fromVersion: SchemaV3.self,
+        toVersion: SchemaV4.self
+    )
 }
 
 // MARK: - Schema Versioning Helper
@@ -374,7 +515,7 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
 struct SchemaVersionManager {
     
     /// Current schema version
-    static let currentVersion = SchemaV3.versionIdentifier
+    static let currentVersion = SchemaV4.versionIdentifier
     
     /// Check if migration is needed
     static func needsMigration(currentStoredVersion: Schema.Version?) -> Bool {
@@ -423,7 +564,7 @@ struct SchemaVersionManager {
  - Backward compatible: Old profiles get "None" status
  - **CloudKit Compatibility**: All properties made optional (CloudKit requirement)
  
- ### Version 3.0.0 (Current)
+ ### Version 3.0.0
  - Added `nutritionalGoalsData` to UserAllergenProfile
  - Stores encoded NutritionalGoals struct as Data
  - Optional field (nil by default)
@@ -434,6 +575,15 @@ struct SchemaVersionManager {
    - Made all properties optional (CloudKit requirement)
    - Properties initialized with default values in init()
    - Allows seamless CloudKit sync with existing data
+ 
+ ### Version 4.0.0 (Current)
+ - Added CloudKit sharing models:
+   - SharedRecipe: For sharing recipes to community
+   - SharedRecipeBook: For sharing recipe collections
+   - SharingPreferences: User preferences for sharing features
+ - Migration: Lightweight (no data transformation)
+ - Existing recipes and data are preserved
+ - New models start empty (users opt-in to sharing)
  
  ## Future Versions
  

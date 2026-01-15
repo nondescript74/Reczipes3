@@ -61,15 +61,40 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "⚡️ Fixed: Eliminated UI blocking during app launch - app now appears instantly",
-                "🔧 Improved: CloudKit availability checks now happen in background after UI loads",
-                "⚡️ Optimized: Removed artificial 1-second delay from ModelContainer initialization",
-                "🚀 Enhanced: App launches with local-only storage and upgrades to CloudKit seamlessly in background"
+                
+                // Community Sharing Features
+                "✨ Added: Community Sharing - share recipes and recipe books with all app users via CloudKit Public Database",
+                "👥 Added: Browse and import recipes shared by other users in the community",
+                "🔄 Added: Automatic sharing options - share all recipes/books automatically or select specific ones",
+                "📚 Added: Recipe Book sharing - share entire collections with the community",
+                "🎨 Added: Sharing preferences and management UI in Settings → Community section",
+                "☁️ Added: CloudKit Public Database integration for community content",
+                "🖼️ Added: Image sharing support - recipe images are included with shared content",
+                "👤 Added: User attribution - see who shared each recipe with optional name display",
+                "🔍 Added: Search and filter shared community recipes in Browse Community view",
+                "📥 Added: One-tap import of community recipes to your personal collection",
+                
+                // Schema & Migration
+                "💾 Added: Schema V4.0.0 - adds SharedRecipe, SharedRecipeBook, and SharingPreferences models",
+                "🔧 Enhanced: Lightweight migration from Schema V3 to V4 preserves all existing data",
+                "☁️ Fixed: CloudKit compatibility - all SwiftData models now have optional properties or defaults",
+                "⚡️ Improved: ModelContainer initialization includes new sharing models automatically",
+                
+                // Developer/Reliability Improvements
+                "🐛 Fixed: Schema migration issues causing recipes to disappear after adding new models",
+                "🔧 Fixed: Runtime error for non-optional properties in CloudKit-enabled SwiftData models",
+                "📊 Enhanced: DiagnosticLogger now properly handles async logging contexts",
+                "🛠️ Added: Comprehensive logging for sharing operations and CloudKit interactions"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 14.2.80
+//        "⚡️ Fixed: Eliminated UI blocking during app launch - app now appears instantly",
+//        "🔧 Improved: CloudKit availability checks now happen in background after UI loads",
+//        "⚡️ Optimized: Removed artificial 1-second delay from ModelContainer initialization",
+//        "🚀 Enhanced: App launches with local-only storage and upgrades to CloudKit seamlessly in background"
         //14.2.79
 //        "🚨 Fixed: Critical database migration issue causing recipes to disappear after app updates",
 //        "🔧 Added: Database Recovery tool to automatically detect and restore recipes from old database files",

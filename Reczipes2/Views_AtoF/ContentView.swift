@@ -186,7 +186,22 @@ struct ContentView: View {
             }
         }
     }
-
+    
+    @MainActor
+    private func shareRecipe(_ recipe: RecipeModel) async {
+        do {
+            _ = try await CloudKitSharingService.shared.shareRecipe(
+                recipe,
+                modelContext: modelContext
+            )
+            // Show success message
+            logInfo("Successfully shared recipe: \(recipe.title)", category: "sharing")
+        } catch {
+            // Show error
+            logError("Failed to share recipe: \(error)", category: "sharing")
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Global batch extraction status bar
@@ -358,6 +373,15 @@ struct ContentView: View {
                             }
                             
                             Divider()
+                            
+                            Button {
+                                Task {
+                                    await shareRecipe(recipe)
+                                }
+                            } label: {
+                                Label("Share with Community", systemImage: "square.and.arrow.up")
+                            }
+                            
                             
                             Button(role: .destructive) {
                                 deleteRecipe(recipe)

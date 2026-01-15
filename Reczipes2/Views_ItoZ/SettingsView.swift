@@ -96,6 +96,16 @@ struct SettingsView: View {
                             }
                         }
                     }
+
+                    Section("Community") {
+                        NavigationLink(destination: SharingSettingsView()) {
+                            Label("Sharing & Community", systemImage: "person.3.fill")
+                        }
+                        
+                        NavigationLink(destination: SharedRecipesBrowserView()) {
+                            Label("Browse Community Recipes", systemImage: "tray.full.fill")
+                        }
+                    }
                     
                     Section {
                         NavigationLink {
@@ -150,6 +160,7 @@ struct SettingsView: View {
                         Text("Database Investigation shows all database files and their contents. Use this if recipes are missing after an update.")
                             .font(.caption)
                     }
+
                     
                     Section("Legal") {
                         Button {

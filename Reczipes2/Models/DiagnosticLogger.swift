@@ -18,27 +18,31 @@ final class DiagnosticLogger: @unchecked Sendable {
     
     // MARK: - Properties
     
-    private let fileManager = FileManager.default
+    private let fileManager = FileManager()
     private let logFileName = "reczipes_diagnostics.log"
     private nonisolated(unsafe) var logFileURL: URL?
     private let logQueue = DispatchQueue(label: "com.reczipes.diagnosticlogger", qos: .utility)
     
     // OSLog subsystems for different areas of the app
-    private let subsystems: [String: Logger] = [
-        "general": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "general"),
-        "allergen": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "allergen"),
-        "fodmap": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "fodmap"),
-        "recipe": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "recipe"),
-        "network": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "network"),
-        "storage": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "storage"),
-        "ui": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "ui"),
-        "extraction": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "extraction"),
-        "image": Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "image")
-    ]
+    private let subsystems: [String: Logger]
     
     // MARK: - Initialization
     
     private init() {
+        // Use hardcoded bundle ID to avoid @MainActor isolation issues
+        let bundleID = "com.reczipes"
+        self.subsystems = [
+            "general": Logger(subsystem: bundleID, category: "general"),
+            "allergen": Logger(subsystem: bundleID, category: "allergen"),
+            "fodmap": Logger(subsystem: bundleID, category: "fodmap"),
+            "recipe": Logger(subsystem: bundleID, category: "recipe"),
+            "network": Logger(subsystem: bundleID, category: "network"),
+            "storage": Logger(subsystem: bundleID, category: "storage"),
+            "ui": Logger(subsystem: bundleID, category: "ui"),
+            "extraction": Logger(subsystem: bundleID, category: "extraction"),
+            "image": Logger(subsystem: bundleID, category: "image")
+        ]
+        
         setupLogFile()
         logInitialization()
     }
@@ -64,7 +68,7 @@ final class DiagnosticLogger: @unchecked Sendable {
             }
         } catch {
             // Fallback to OSLog only if file setup fails
-            Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.reczipes", category: "logger")
+            Logger(subsystem: "com.reczipes", category: "logger")
                 .error("Failed to setup log file: \(error.localizedDescription)")
         }
     }
@@ -105,7 +109,7 @@ final class DiagnosticLogger: @unchecked Sendable {
     
     // MARK: - Private Logging Implementation
     
-    private nonisolated func log(
+    nonisolated private func log(
         _ message: String,
         level: OSLogType,
         category: String,
@@ -142,7 +146,7 @@ final class DiagnosticLogger: @unchecked Sendable {
         writeToFile(fileLogMessage)
     }
     
-    private nonisolated func logLevelString(_ level: OSLogType) -> String {
+    nonisolated private func logLevelString(_ level: OSLogType) -> String {
         switch level {
         case .debug:
             return "DEBUG"
@@ -159,7 +163,7 @@ final class DiagnosticLogger: @unchecked Sendable {
         }
     }
     
-    private nonisolated func writeToFile(_ message: String) {
+    nonisolated private func writeToFile(_ message: String) {
         guard let url = logFileURL else { return }
         
         logQueue.async {
@@ -183,12 +187,12 @@ final class DiagnosticLogger: @unchecked Sendable {
     // MARK: - Log Management
     
     /// Get the current log file URL
-    nonisolated func getLogFileURL() -> URL? {
+    func getLogFileURL() -> URL? {
         return logFileURL
     }
     
     /// Get the contents of the log file
-    nonisolated func getLogContents() -> String {
+    func getLogContents() -> String {
         guard let url = logFileURL else {
             return "Log file not available"
         }
@@ -201,10 +205,11 @@ final class DiagnosticLogger: @unchecked Sendable {
     }
     
     /// Clear the log file
-    nonisolated func clearLog() {
+    func clearLog() {
         guard let url = logFileURL else { return }
         
         logQueue.async { [weak self] in
+            guard let self else { return }
             do {
                 // Clear the file
                 try "".write(to: url, atomically: true, encoding: .utf8)
@@ -219,15 +224,15 @@ final class DiagnosticLogger: @unchecked Sendable {
                 """
                 try header.write(to: url, atomically: false, encoding: .utf8)
                 
-                self?.info("Diagnostic log cleared by user", category: "general")
+                self.log("Diagnostic log cleared by user", level: .info, category: "general", file: #file, function: #function, line: #line)
             } catch {
-                self?.error("Failed to clear log file: \(error.localizedDescription)", category: "general")
+                self.log("Failed to clear log file: \(error.localizedDescription)", level: .error, category: "general", file: #file, function: #function, line: #line)
             }
         }
     }
     
     /// Get the size of the log file in bytes
-    nonisolated func getLogFileSize() -> Int64 {
+    func getLogFileSize() -> Int64 {
         guard let url = logFileURL else { return 0 }
         
         do {
@@ -239,7 +244,7 @@ final class DiagnosticLogger: @unchecked Sendable {
     }
     
     /// Get formatted file size (e.g., "1.5 MB")
-    nonisolated func getFormattedLogFileSize() -> String {
+    func getFormattedLogFileSize() -> String {
         let bytes = getLogFileSize()
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB]
@@ -267,26 +272,26 @@ private extension Data {
 // MARK: - Convenience Global Functions
 
 /// Global convenience function for debug logging
-nonisolated func logDebug(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+func logDebug(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.debug(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for info logging
-nonisolated func logInfo(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+func logInfo(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.info(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for warning logging
-nonisolated func logWarning(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+func logWarning(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.warning(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for error logging
-nonisolated func logError(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+func logError(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.error(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for critical logging
-nonisolated func logCritical(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+func logCritical(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.critical(message, category: category, file: file, function: function, line: line)
 }

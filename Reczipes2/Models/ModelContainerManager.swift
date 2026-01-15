@@ -93,6 +93,9 @@ class ModelContainerManager: ObservableObject {
                 SavedLink.self,
                 RecipeBook.self,
                 CookingSession.self,
+                SharedRecipe.self,          // NEW: CloudKit sharing models
+                SharedRecipeBook.self,      // NEW: CloudKit sharing models
+                SharingPreferences.self,    // NEW: CloudKit sharing models
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
@@ -122,6 +125,9 @@ class ModelContainerManager: ObservableObject {
                 SavedLink.self,
                 RecipeBook.self,
                 CookingSession.self,
+                SharedRecipe.self,          // NEW: CloudKit sharing models
+                SharedRecipeBook.self,      // NEW: CloudKit sharing models
+                SharingPreferences.self,    // NEW: CloudKit sharing models
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: localConfiguration
             )
