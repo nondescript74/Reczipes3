@@ -24,11 +24,22 @@ class ModelContainerManager: ObservableObject {
     private nonisolated(unsafe) var accountStatusObserver: NSObjectProtocol?
     
     private init() {
-        // Create initial container
-        self.container = Self.createModelContainer()
+        // IMPORTANT: Start with local-only container to avoid blocking initialization
+        // We'll check CloudKit asynchronously and upgrade if available
+        print("🚀 ModelContainerManager initializing...")
+        print("   Starting with local-only container, will check CloudKit availability async")
+        
+        let (container, cloudKitEnabled) = Self.createModelContainer(forceCloudKit: false)
+        self.container = container
+        self.isCloudKitEnabled = cloudKitEnabled
         
         // Monitor CloudKit account changes
         setupAccountMonitoring()
+        
+        // Check CloudKit status after initialization and upgrade if available
+        Task {
+            await checkAndUpgradeToCloudKitIfAvailable()
+        }
     }
     
     deinit {
@@ -39,49 +50,28 @@ class ModelContainerManager: ObservableObject {
     
     // MARK: - Container Creation
     
-    private static func createModelContainer() -> ModelContainer {
+    private static func createModelContainer(forceCloudKit: Bool? = nil) -> (ModelContainer, Bool) {
         // Log schema version information
         print("🚀 STARTING MODEL CONTAINER INITIALIZATION")
         print("   Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
         SchemaVersionManager.logSchemaInfo()
         
-        // Check CloudKit availability synchronously
-        let shouldUseCloudKit = checkCloudKitAvailability()
+        // Use the forced CloudKit setting
+        let shouldUseCloudKit = forceCloudKit ?? false
         
         if shouldUseCloudKit {
+            print("📦 Creating container with CloudKit enabled")
             // Try CloudKit configuration
             if let container = tryCreateCloudKitContainer() {
-                return container
+                return (container, true)
             }
             print("⚠️ CloudKit container creation failed, falling back to local-only")
         } else {
-            print("ℹ️ CloudKit not available, using local-only storage")
+            print("📦 Creating local-only container (CloudKit will be checked asynchronously)")
         }
         
         // Fall back to local-only configuration
-        return createLocalContainer()
-    }
-    
-    private static func checkCloudKitAvailability() -> Bool {
-        // Use a semaphore to make async check synchronous
-        let semaphore = DispatchSemaphore(value: 0)
-        var isAvailable = false
-        
-        Task {
-            do {
-                let status = try await CKContainer.default().accountStatus()
-                isAvailable = (status == .available)
-                print("   CloudKit account status: \(status)")
-            } catch {
-                print("   CloudKit check error: \(error.localizedDescription)")
-                isAvailable = false
-            }
-            semaphore.signal()
-        }
-        
-        // Wait with timeout
-        _ = semaphore.wait(timeout: .now() + 2.0)
-        return isAvailable
+        return (createLocalContainer(), false)
     }
     
     private static func tryCreateCloudKitContainer() -> ModelContainer? {
@@ -115,10 +105,10 @@ class ModelContainerManager: ObservableObject {
     }
     
     private static func createLocalContainer() -> ModelContainer {
+        // CRITICAL: Use the same database file as CloudKit config to preserve data!
+        let cloudKitURL = URL.applicationSupportDirectory.appending(path: "CloudKitModel.sqlite")
         let localConfiguration = ModelConfiguration(
-            isStoredInMemoryOnly: false,
-            allowsSave: true,
-            cloudKitDatabase: .none
+            url: cloudKitURL  // Use same database file, CloudKit disabled by not specifying cloudKitDatabase
         )
         
         do {
@@ -134,6 +124,8 @@ class ModelContainerManager: ObservableObject {
                 configurations: localConfiguration
             )
             print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
+            print("   Using existing database: CloudKitModel.sqlite")
+            print("   Your data is preserved even though CloudKit is disabled")
             return container
         } catch {
             print("❌ All ModelContainer initialization attempts failed")
@@ -157,6 +149,25 @@ class ModelContainerManager: ObservableObject {
         }
     }
     
+    private func checkAndUpgradeToCloudKitIfAvailable() async {
+        // Wait a moment for app to fully launch
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        
+        // Check if CloudKit is available
+        let cloudKitAvailable = await checkCurrentCloudKitStatus()
+        
+        print("🔍 Post-initialization CloudKit check:")
+        print("   CloudKit available: \(cloudKitAvailable)")
+        
+        // If CloudKit is available, upgrade the container
+        if cloudKitAvailable {
+            print("✅ CloudKit is available - upgrading container to enable sync...")
+            await recreateContainer(withCloudKitEnabled: true)
+        } else {
+            print("ℹ️ CloudKit not available - continuing with local-only storage")
+        }
+    }
+    
     private func handleAccountChange() {
         print("🔄 CloudKit account changed - checking if container recreation is needed...")
         
@@ -169,7 +180,7 @@ class ModelContainerManager: ObservableObject {
             if wasCloudKitEnabled != nowAvailable {
                 print("⚠️ CloudKit availability changed: \(wasCloudKitEnabled) → \(nowAvailable)")
                 print("   Recreating ModelContainer to match new iCloud state...")
-                await recreateContainer()
+                await recreateContainer(withCloudKitEnabled: nowAvailable)
             } else {
                 print("✓ CloudKit status unchanged, no container recreation needed")
             }
@@ -179,18 +190,18 @@ class ModelContainerManager: ObservableObject {
     private func checkCurrentCloudKitStatus() async -> Bool {
         do {
             let status = try await CKContainer.default().accountStatus()
-            isCloudKitEnabled = (status == .available)
-            return isCloudKitEnabled
+            let isAvailable = (status == .available)
+            print("   Current CloudKit status: \(status.rawValue) (\(isAvailable ? "available" : "not available"))")
+            return isAvailable
         } catch {
             print("❌ Error checking CloudKit status: \(error.localizedDescription)")
-            isCloudKitEnabled = false
             return false
         }
     }
     
     // MARK: - Container Recreation
     
-    func recreateContainer() async {
+    func recreateContainer(withCloudKitEnabled cloudKitEnabled: Bool? = nil) async {
         guard !isRecreating else {
             print("⚠️ Container recreation already in progress, skipping...")
             return
@@ -200,17 +211,37 @@ class ModelContainerManager: ObservableObject {
         defer { isRecreating = false }
         
         print("🔄 Recreating ModelContainer...")
+        if let enabled = cloudKitEnabled {
+            print("   Target CloudKit state: \(enabled ? "enabled" : "disabled")")
+        }
         
-        // Give the system a moment to settle after account change
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        // Determine appropriate wait time based on current container state
+        let wasCloudKitEnabled = isCloudKitEnabled
+        let waitTime: UInt64 = wasCloudKitEnabled ? 5_000_000_000 : 1_000_000_000 // 5s if CloudKit was on, 1s if local
         
-        // Create new container
-        let newContainer = Self.createModelContainer()
+        print("   Waiting for previous container to tear down...")
+        print("   (Wait time: \(waitTime / 1_000_000_000) seconds - \(wasCloudKitEnabled ? "CloudKit cleanup needed" : "local-only, minimal wait"))")
+        
+        // Store reference to old container
+        let oldContainer = container
+        
+        // Give the old container time to tear down properly
+        try? await Task.sleep(nanoseconds: waitTime)
+        
+        // Keep reference to ensure it stays alive until now
+        _ = oldContainer.schema
+        
+        print("   Creating new container...")
+        
+        // Create new container with known CloudKit state if provided
+        let (newContainer, actualCloudKitEnabled) = Self.createModelContainer(forceCloudKit: cloudKitEnabled)
         
         // Replace the old container
         container = newContainer
+        isCloudKitEnabled = actualCloudKitEnabled
         
         print("✅ ModelContainer recreated successfully")
+        print("   CloudKit enabled: \(actualCloudKitEnabled)")
         
         // Post notification so views can refresh if needed
         NotificationCenter.default.post(name: .modelContainerRecreated, object: nil)

@@ -61,23 +61,27 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "⚡️ Enhanced: Intelligent retry system handles transient failures during batch recipe extraction",
-                "📸 Added: Automatic multi-image download support during batch extraction sessions",
-                "📊 Added: Comprehensive batch extraction UI with live progress, error logs, and session controls",
-                "✨ Reintegrated: Batch recipe extraction from saved links as fourth extraction option in Extract view",
-                "📊 Added: Real-time progress tracking with pause/resume/stop controls for batch extraction sessions",
-                "🔄 Enhanced: Batch extraction now processes up to 50 recipes automatically with 5-second intervals and intelligent retry logic",
-                "🎨 Added: Dedicated BatchRecipeExtractorView with status cards, error logging, and completion alerts",
-                "✅ Added: Comprehensive test suite for BatchExtractionManager with 30+ test cases",
-                "🔧 Fixed: Test isolation issue where singleton state persisted across tests",
-                "🐛 Fixed: Configuration validation tests now properly clear apiKey and modelContext between runs",
-                "⚡️ Enhanced: BatchExtractionManager now includes clearConfiguration() method for better testability"
-
+                "🚨 Fixed: Critical database migration issue causing recipes to disappear after app updates",
+                "🔧 Added: Database Recovery tool to automatically detect and restore recipes from old database files",
+                "📊 Added: Database diagnostics to identify multiple database files and migration issues",
+                "💾 Enhanced: Automatic backup creation before database recovery operations",
+                "✨ Added: User-friendly recovery interface accessible from Settings → Developer Tools",
+                "☁️ Fixed: CloudKit initialization timeout preventing iCloud sync from activating",
+                "⚡️ Improved: App startup now completes instantly without blocking CloudKit checks",
+                "🔄 Enhanced: Automatic CloudKit upgrade after launch when iCloud becomes available",
+                "🐛 Fixed: Container recreation conflicts that prevented CloudKit sync from enabling",
+                "⚡️ Optimized: Smart teardown timing (1s for local→CloudKit, 5s for CloudKit→local transitions)",
+                "🔧 Improved: Async-first ModelContainer initialization eliminates main thread blocking"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 14.2.77
+//        "✨ Added: Batch extraction mode processes up to 50 saved links automatically with 5-second intervals",
+//        "⚡️ Enhanced: Intelligent retry system handles transient failures during batch recipe extraction",
+//        "📸 Added: Automatic multi-image download support during batch extraction sessions",
+//        "📊 Added: Comprehensive batch extraction UI with live progress, error logs, and session controls"
         // 14.1.75
         // Simplified Backup Access
         //"🔧 Removed: Backup & Restore button from Recipes view toolbar",

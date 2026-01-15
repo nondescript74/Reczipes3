@@ -63,11 +63,11 @@ struct Reczipes2App: App {
             cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
         )
         
-        // Fallback configuration without CloudKit (uses default.store)
+        // Fallback configuration without CloudKit 
+        // IMPORTANT: Use the SAME URL as CloudKit config to preserve existing data!
         let localConfiguration = ModelConfiguration(
-            isStoredInMemoryOnly: false,
-            allowsSave: true,
-            cloudKitDatabase: .none
+            url: cloudKitURL,  // Use same database file
+            cloudKitDatabase: .none  // Just disable CloudKit sync, keep the data
         )
 
         // Try CloudKit configuration first
@@ -356,6 +356,10 @@ struct Reczipes2App: App {
         print("   Cannot use .automatic as it would create different container")
         print("   Existing container: iCloud.com.headydiscy.reczipes")
         print("")
+        
+        // CRITICAL: Check for multiple database files
+        checkForMultipleDatabases()
+        
         print("📋 TROUBLESHOOTING:")
         print("   If CloudKit sync is not working:")
         print("   1. Go to Settings → Validate CloudKit Container")
@@ -371,6 +375,61 @@ struct Reczipes2App: App {
         print("  - SavedLink")
         print("  - RecipeBook")
         print("  - CookingSession")
+        print("========================================")
+    }
+    
+    private func checkForMultipleDatabases() {
+        print("")
+        print("🔍 DATABASE FILE DIAGNOSTICS:")
+        print("========================================")
+        
+        let appSupport = URL.applicationSupportDirectory
+        let fileManager = FileManager.default
+        
+        // Check for different database files
+        let possibleDatabases = [
+            "CloudKitModel.sqlite",
+            "default.store",
+            "Model.sqlite",
+            "Reczipes2.sqlite"
+        ]
+        
+        var foundDatabases: [(name: String, size: Int64, modified: Date)] = []
+        
+        for dbName in possibleDatabases {
+            let dbURL = appSupport.appendingPathComponent(dbName)
+            
+            if fileManager.fileExists(atPath: dbURL.path) {
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: dbURL.path)
+                    let fileSize = attributes[.size] as? Int64 ?? 0
+                    let modDate = attributes[.modificationDate] as? Date ?? Date.distantPast
+                    
+                    foundDatabases.append((name: dbName, size: fileSize, modified: modDate))
+                    
+                    print("✅ Found: \(dbName)")
+                    print("   Size: \(ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file))")
+                    print("   Modified: \(modDate)")
+                } catch {
+                    print("⚠️  Found \(dbName) but couldn't read attributes: \(error)")
+                }
+            }
+        }
+        
+        if foundDatabases.isEmpty {
+            print("⚠️  No database files found - this is a fresh install")
+        } else if foundDatabases.count > 1 {
+            print("")
+            print("🚨 CRITICAL: Multiple database files detected!")
+            print("   This may explain missing recipes after update.")
+            print("   The app might be reading from the wrong file.")
+            print("")
+            print("Largest file (likely contains user data):")
+            if let largest = foundDatabases.max(by: { $0.size < $1.size }) {
+                print("   📁 \(largest.name) - \(ByteCountFormatter.string(fromByteCount: largest.size, countStyle: .file))")
+            }
+        }
+        
         print("========================================")
     }
 }
