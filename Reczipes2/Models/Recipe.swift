@@ -427,7 +427,7 @@ final class Recipe {
         if newVersion.overflow {
             // If overflow occurs, reset to 1
             self.version = 1
-            print("Warning: Recipe version overflow detected for '\(title)', resetting to 1")
+            logWarning("Warning: Recipe version overflow detected for '\(title)', resetting to 1", category: "recipe")
         } else {
             self.version = newVersion.partialValue
         }
@@ -450,9 +450,9 @@ final class Recipe {
     }
     
     /// Reset version to a safe value if corrupted
-    func resetVersionIfNeeded() {
+    @MainActor func resetVersionIfNeeded() {
         if hasVersionIssue {
-            print("Warning: Resetting corrupted version (\(version ?? 0)) for recipe '\(title)'")
+            logWarning("Warning: Resetting corrupted version (\(version ?? 0)) for recipe '\(title)'", category: "recipe")
             self.version = 1
             self.lastModified = Date()
         }

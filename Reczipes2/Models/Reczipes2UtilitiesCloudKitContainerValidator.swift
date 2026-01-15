@@ -118,79 +118,79 @@ actor CloudKitContainerValidator {
     
     /// Print detailed validation report
     @MainActor static func printValidationReport(_ result: ValidationResult) {
-        print("\n" + String(repeating: "=", count: 70))
-        print("☁️  CLOUDKIT CONTAINER VALIDATION REPORT")
-        print(String(repeating: "=", count: 70))
+        logInfo("\n" + String(repeating: "=", count: 70), category: "storage")
+        logInfo("☁️  CLOUDKIT CONTAINER VALIDATION REPORT", category: "storage")
+        logInfo(String(repeating: "=", count: 70), category: "storage")
         
-        print("\n📦 CONTAINER INFORMATION:")
-        print("   Container ID: \(result.containerIdentifier)")
-        print("   Bundle ID: \(result.bundleID)")
-        print("   Can Create Reference: \(result.canCreateReference ? "✅" : "❌")")
+        logInfo("\n📦 CONTAINER INFORMATION:", category: "storage")
+        logInfo("   Container ID: \(result.containerIdentifier)", category: "storage")
+        logInfo("   Bundle ID: \(result.bundleID)", category: "storage")
+        logInfo("   Can Create Reference: \(result.canCreateReference ? "✅" : "❌")", category: "storage")
         
-        print("\n👤 ICLOUD ACCOUNT:")
-        print("   \(result.accountStatusMessage)")
+        logInfo("\n👤 ICLOUD ACCOUNT:", category: "storage")
+        logInfo("   \(result.accountStatusMessage)", category: "storage")
         if let error = result.accountStatusError {
-            print("   Error: \(error)")
+            logInfo("   Error: \(error)", category: "storage")
         }
         
-        print("\n🗄️  CONTAINER ACCESS:")
-        print("   \(result.containerAccessMessage)")
+        logInfo("\n🗄️  CONTAINER ACCESS:", category: "storage")
+        logInfo("   \(result.containerAccessMessage)", category: "storage")
         if result.canAccessPrivateDatabase {
-            print("   Private Database: ✅ Accessible")
+            logInfo("   Private Database: ✅ Accessible", category: "storage")
         }
         if let userID = result.userRecordID {
-            print("   User Record ID: \(userID)")
+            logInfo("   User Record ID: \(userID)", category: "storage")
         }
         if let error = result.containerAccessError {
-            print("   Error: \(error)")
+            logInfo("   Error: \(error)", category: "storage")
         }
         
-        print("\n🔐 ENTITLEMENTS CHECK:")
+        logInfo("\n🔐 ENTITLEMENTS CHECK:", category: "storage")
         let entitlements = result.entitlementsCheck
         
         if let note = entitlements.runtimeCheckNote {
-            print("   \(note)")
-            print("")
-            print("   💡 Real test: Can we access CloudKit? (See Container Access above)")
-            print("      - If container access works → Entitlements are correct ✅")
-            print("      - If container access fails → Check entitlements in Xcode ❌")
+            logInfo("   \(note)", category: "storage")
+            logInfo("", category: "storage")
+            logInfo("   💡 Real test: Can we access CloudKit? (See Container Access above)", category: "storage")
+            logInfo("      - If container access works → Entitlements are correct ✅", category: "storage")
+            logInfo("      - If container access fails → Check entitlements in Xcode ❌", category: "storage")
         } else {
             // Old style reporting (won't happen with new code)
-            print("   iCloud Services: \(entitlements.hasICloudServices ? "✅" : "❌")")
+            logInfo("   iCloud Services: \(entitlements.hasICloudServices ? "✅" : "❌")", category: "storage")
             if entitlements.hasICloudServices {
-                print("      Services: \(entitlements.iCloudServices.joined(separator: ", "))")
+                logInfo("      Services: \(entitlements.iCloudServices.joined(separator: ", "))", category: "storage")
             }
-            print("   CloudKit Enabled: \(entitlements.hasCloudKit ? "✅" : "❌")")
-            print("   Container Identifiers: \(entitlements.hasContainerIdentifiers ? "✅" : "❌")")
+            logInfo("   CloudKit Enabled: \(entitlements.hasCloudKit ? "✅" : "❌")", category: "storage")
+            logInfo("   Container Identifiers: \(entitlements.hasContainerIdentifiers ? "✅" : "❌")", category: "storage")
             if entitlements.hasContainerIdentifiers {
-                print("      Containers:")
+                logInfo("      Containers:", category: "storage")
                 for container in entitlements.containerIdentifiers {
                     let marker = container == result.containerIdentifier ? "  ➜" : "   "
-                    print("\(marker) \(container)")
+                    logInfo("\(marker) \(container)", category: "storage")
                 }
             }
-            print("   Target Container Listed: \(entitlements.containsTargetContainer ? "✅" : "❌")")
+            logInfo("   Target Container Listed: \(entitlements.containsTargetContainer ? "✅" : "❌")", category: "storage")
         }
         
-        print("\n🔍 DIAGNOSIS:")
+        logInfo("\n🔍 DIAGNOSIS:", category: "storage")
         let diagnosis = result.diagnose()
-        print("   \(diagnosis.emoji) \(diagnosis.summary)")
+        logInfo("   \(diagnosis.emoji) \(diagnosis.summary)", category: "storage")
         
         if !diagnosis.issues.isEmpty {
-            print("\n⚠️  ISSUES FOUND:")
+            logInfo("\n⚠️  ISSUES FOUND:", category: "storage")
             for (index, issue) in diagnosis.issues.enumerated() {
-                print("   \(index + 1). \(issue)")
+                logInfo("   \(index + 1). \(issue)", category: "storage")
             }
         }
         
         if !diagnosis.recommendations.isEmpty {
-            print("\n💡 RECOMMENDATIONS:")
+            logInfo("\n💡 RECOMMENDATIONS:", category: "storage")
             for (index, recommendation) in diagnosis.recommendations.enumerated() {
-                print("   \(index + 1). \(recommendation)")
+                logInfo("   \(index + 1). \(recommendation)", category: "storage")
             }
         }
         
-        print("\n" + String(repeating: "=", count: 70) + "\n")
+        logInfo("\n" + String(repeating: "=", count: 70) + "\n", category: "storage")
     }
 }
 

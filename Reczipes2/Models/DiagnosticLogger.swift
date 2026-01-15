@@ -267,26 +267,26 @@ private extension Data {
 // MARK: - Convenience Global Functions
 
 /// Global convenience function for debug logging
-func logDebug(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+nonisolated func logDebug(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.debug(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for info logging
-func logInfo(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+nonisolated func logInfo(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.info(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for warning logging
-func logWarning(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+nonisolated func logWarning(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.warning(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for error logging
-func logError(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+nonisolated func logError(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.error(message, category: category, file: file, function: function, line: line)
 }
 
 /// Global convenience function for critical logging
-func logCritical(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
+nonisolated func logCritical(_ message: String, category: String = "general", file: String = #file, function: String = #function, line: Int = #line) {
     DiagnosticLogger.shared.critical(message, category: category, file: file, function: function, line: line)
 }

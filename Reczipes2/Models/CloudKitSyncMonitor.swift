@@ -55,9 +55,9 @@ class CloudKitSyncMonitor: ObservableObject {
             case .available:
                 isSyncEnabled = true
                 lastSyncError = nil
-                // Only print once when status changes to available
+                // Only log once when status changes to available
                 if !hasWarnedAboutStatus.contains("available") {
-                    print("✅ iCloud is available and ready to sync")
+                    logInfo("✅ iCloud is available and ready to sync", category: "storage")
                     hasWarnedAboutStatus.insert("available")
                     // Clear other warnings since we're now available
                     hasWarnedAboutStatus.remove("noAccount")
@@ -70,7 +70,7 @@ class CloudKitSyncMonitor: ObservableObject {
                 isSyncEnabled = false
                 lastSyncError = "No iCloud account found. Please sign in to iCloud in Settings."
                 if !hasWarnedAboutStatus.contains("noAccount") {
-                    print("⚠️ No iCloud account")
+                    logWarning("⚠️ No iCloud account", category: "storage")
                     hasWarnedAboutStatus.insert("noAccount")
                 }
                 
@@ -78,7 +78,7 @@ class CloudKitSyncMonitor: ObservableObject {
                 isSyncEnabled = false
                 lastSyncError = "iCloud is restricted on this device."
                 if !hasWarnedAboutStatus.contains("restricted") {
-                    print("⚠️ iCloud is restricted")
+                    logWarning("⚠️ iCloud is restricted", category: "storage")
                     hasWarnedAboutStatus.insert("restricted")
                 }
                 
@@ -86,7 +86,7 @@ class CloudKitSyncMonitor: ObservableObject {
                 isSyncEnabled = false
                 lastSyncError = "Could not determine iCloud status."
                 if !hasWarnedAboutStatus.contains("couldNotDetermine") {
-                    print("⚠️ Could not determine iCloud status")
+                    logWarning("⚠️ Could not determine iCloud status", category: "storage")
                     hasWarnedAboutStatus.insert("couldNotDetermine")
                 }
                 
@@ -94,7 +94,7 @@ class CloudKitSyncMonitor: ObservableObject {
                 isSyncEnabled = false
                 lastSyncError = "iCloud is temporarily unavailable."
                 if !hasWarnedAboutStatus.contains("temporarilyUnavailable") {
-                    print("⚠️ iCloud temporarily unavailable")
+                    logWarning("⚠️ iCloud temporarily unavailable", category: "storage")
                     hasWarnedAboutStatus.insert("temporarilyUnavailable")
                 }
                 
@@ -102,21 +102,21 @@ class CloudKitSyncMonitor: ObservableObject {
                 isSyncEnabled = false
                 lastSyncError = "Unknown iCloud status."
                 if !hasWarnedAboutStatus.contains("unknown") {
-                    print("⚠️ Unknown iCloud status")
+                    logWarning("⚠️ Unknown iCloud status", category: "storage")
                     hasWarnedAboutStatus.insert("unknown")
                 }
             }
         } catch {
             isSyncEnabled = false
             lastSyncError = "Error checking iCloud status: \(error.localizedDescription)"
-            // Always print errors since they might be different each time
-            print("❌ Error checking account status: \(error)")
+            // Always log errors since they might be different each time
+            logError("❌ Error checking account status: \(error)", category: "storage")
         }
     }
     
     @objc private func handleAccountChange() {
         Task { @MainActor in
-            print("🔄 iCloud account changed, rechecking status...")
+            logInfo("🔄 iCloud account changed, rechecking status...", category: "storage")
             // Clear warnings when account changes so we get fresh feedback
             hasWarnedAboutStatus.removeAll()
             await checkAccountStatus()

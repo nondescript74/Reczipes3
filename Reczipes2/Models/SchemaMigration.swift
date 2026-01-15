@@ -305,12 +305,12 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
         toVersion: SchemaV2.self,
         willMigrate: { context in
             // Log migration start
-            print("🔄 Starting migration from Schema V1 to V2")
-            print("   Adding diabetes status to user profiles...")
+            print("[Migration] 🔄 Starting migration from Schema V1 to V2")
+            print("[Migration]    Adding diabetes status to user profiles...")
             
             // Fetch all existing profiles
             let profiles = try context.fetch(FetchDescriptor<SchemaV1.UserAllergenProfile>())
-            print("   Found \(profiles.count) profile(s) to migrate")
+            print("[Migration]    Found \(profiles.count) profile(s) to migrate")
         },
         didMigrate: { context in
             // After automatic migration, ensure all profiles have diabetes status set
@@ -328,10 +328,11 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             // Save changes
             try context.save()
             
-            print("✅ Migration to Schema V2 complete")
-            print("   Total profiles: \(profiles.count)")
-            print("   Profiles updated with default diabetes status: \(migratedCount)")
-            print("   All existing profiles now have diabetes status = 'None'")
+            // Log completion
+            print("[Migration] ✅ Migration to Schema V2 complete")
+            print("[Migration]    Total profiles: \(profiles.count)")
+            print("[Migration]    Profiles updated with default diabetes status: \(migratedCount)")
+            print("[Migration]    All existing profiles now have diabetes status = 'None'")
         }
     )
     
@@ -341,12 +342,12 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
         toVersion: SchemaV3.self,
         willMigrate: { context in
             // Log migration start
-            print("🔄 Starting migration from Schema V2 to V3")
-            print("   Adding nutritional goals support to user profiles...")
+            print("[Migration] 🔄 Starting migration from Schema V2 to V3")
+            print("[Migration]    Adding nutritional goals support to user profiles...")
             
             // Fetch all existing profiles
             let profiles = try context.fetch(FetchDescriptor<SchemaV2.UserAllergenProfile>())
-            print("   Found \(profiles.count) profile(s) to migrate")
+            print("[Migration]    Found \(profiles.count) profile(s) to migrate")
         },
         didMigrate: { context in
             // After automatic migration, nutritionalGoalsData will be nil by default
@@ -358,10 +359,11 @@ enum Reczipes2MigrationPlan: SchemaMigrationPlan {
             // Save changes
             try context.save()
             
-            print("✅ Migration to Schema V3 complete")
-            print("   Total profiles: \(profiles.count)")
-            print("   All profiles can now set nutritional goals")
-            print("   Note: Nutritional goals are optional and can be configured by users")
+            // Log completion
+            print("[Migration] ✅ Migration to Schema V3 complete")
+            print("[Migration]    Total profiles: \(profiles.count)")
+            print("[Migration]    All profiles can now set nutritional goals")
+            print("[Migration]    Note: Nutritional goals are optional and can be configured by users")
         }
     )
 }
@@ -390,13 +392,14 @@ struct SchemaVersionManager {
     
     /// Log current schema information
     static func logSchemaInfo() {
-        print("📊 Schema Version Info:")
-        print("   Current Version: \(versionString(currentVersion))")
-        print("   Available Versions:")
+        // Use print for schema info to avoid concurrency issues
+        print("[Schema] 📊 Schema Version Info:")
+        print("[Schema]    Current Version: \(versionString(currentVersion))")
+        print("[Schema]    Available Versions:")
         for schema in Reczipes2MigrationPlan.schemas {
-            print("     - \(versionString(schema.versionIdentifier)): \(schema)")
+            print("[Schema]      - \(versionString(schema.versionIdentifier)): \(schema)")
         }
-        print("   Migration Stages: \(Reczipes2MigrationPlan.stages.count)")
+        print("[Schema]    Migration Stages: \(Reczipes2MigrationPlan.stages.count)")
     }
 }
 

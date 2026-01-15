@@ -26,9 +26,9 @@ class ModelContainerManager: ObservableObject {
     private init() {
         // IMPORTANT: Start with local-only container to avoid blocking initialization
         // We'll check CloudKit asynchronously and upgrade if available
-        print("🚀 ModelContainerManager initializing...")
-        print("   Starting with local-only container for instant app launch")
-        print("   Will check CloudKit availability in background and upgrade if available")
+        logInfo("🚀 ModelContainerManager initializing...", category: "storage")
+        logInfo("   Starting with local-only container for instant app launch", category: "storage")
+        logInfo("   Will check CloudKit availability in background and upgrade if available", category: "storage")
         
         let (container, cloudKitEnabled) = Self.createModelContainer(forceCloudKit: false)
         self.container = container
@@ -54,22 +54,22 @@ class ModelContainerManager: ObservableObject {
     
     private static func createModelContainer(forceCloudKit: Bool? = nil) -> (ModelContainer, Bool) {
         // Log schema version information
-        print("🚀 STARTING MODEL CONTAINER INITIALIZATION")
-        print("   Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
+        logInfo("🚀 STARTING MODEL CONTAINER INITIALIZATION", category: "storage")
+        logInfo("   Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))", category: "storage")
         SchemaVersionManager.logSchemaInfo()
         
         // Use the forced CloudKit setting
         let shouldUseCloudKit = forceCloudKit ?? false
         
         if shouldUseCloudKit {
-            print("📦 Creating container with CloudKit enabled")
+            logInfo("📦 Creating container with CloudKit enabled", category: "storage")
             // Try CloudKit configuration
             if let container = tryCreateCloudKitContainer() {
                 return (container, true)
             }
-            print("⚠️ CloudKit container creation failed, falling back to local-only")
+            logWarning("⚠️ CloudKit container creation failed, falling back to local-only", category: "storage")
         } else {
-            print("📦 Creating local-only container (CloudKit will be checked asynchronously)")
+            logInfo("📦 Creating local-only container (CloudKit will be checked asynchronously)", category: "storage")
         }
         
         // Fall back to local-only configuration
@@ -83,7 +83,7 @@ class ModelContainerManager: ObservableObject {
             cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
         )
         
-        print("📦 Attempting to create ModelContainer with CloudKit...")
+        logInfo("📦 Attempting to create ModelContainer with CloudKit...", category: "storage")
         do {
             let container = try ModelContainer(
                 for: Recipe.self,
@@ -96,12 +96,12 @@ class ModelContainerManager: ObservableObject {
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
-            print("✅ ModelContainer created successfully with CloudKit sync enabled")
-            print("   Container: iCloud.com.headydiscy.reczipes")
-            print("   Database: CloudKitModel.sqlite")
+            logInfo("✅ ModelContainer created successfully with CloudKit sync enabled", category: "storage")
+            logInfo("   Container: iCloud.com.headydiscy.reczipes", category: "storage")
+            logInfo("   Database: CloudKitModel.sqlite", category: "storage")
             return container
         } catch {
-            print("❌ CloudKit ModelContainer creation failed: \(error.localizedDescription)")
+            logError("❌ CloudKit ModelContainer creation failed: \(error.localizedDescription)", category: "storage")
             return nil
         }
     }
@@ -125,13 +125,13 @@ class ModelContainerManager: ObservableObject {
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: localConfiguration
             )
-            print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
-            print("   Using existing database: CloudKitModel.sqlite")
-            print("   Your data is preserved even though CloudKit is disabled")
+            logInfo("✅ ModelContainer created successfully (local-only, no CloudKit sync)", category: "storage")
+            logInfo("   Using existing database: CloudKitModel.sqlite", category: "storage")
+            logInfo("   Your data is preserved even though CloudKit is disabled", category: "storage")
             return container
         } catch {
-            print("❌ All ModelContainer initialization attempts failed")
-            print("   Final error: \(error)")
+            logCritical("❌ All ModelContainer initialization attempts failed", category: "storage")
+            logCritical("   Final error: \(error)", category: "storage")
             fatalError("Could not create ModelContainer: \(error)")
         }
     }
@@ -155,20 +155,20 @@ class ModelContainerManager: ObservableObject {
         // Check if CloudKit is available immediately (no artificial delay)
         let cloudKitAvailable = await checkCurrentCloudKitStatus()
         
-        print("🔍 Post-initialization CloudKit check:")
-        print("   CloudKit available: \(cloudKitAvailable)")
+        logInfo("🔍 Post-initialization CloudKit check:", category: "storage")
+        logInfo("   CloudKit available: \(cloudKitAvailable)", category: "storage")
         
         // If CloudKit is available, upgrade the container
         if cloudKitAvailable {
-            print("✅ CloudKit is available - upgrading container to enable sync...")
+            logInfo("✅ CloudKit is available - upgrading container to enable sync...", category: "storage")
             await recreateContainer(withCloudKitEnabled: true)
         } else {
-            print("ℹ️ CloudKit not available - continuing with local-only storage")
+            logInfo("ℹ️ CloudKit not available - continuing with local-only storage", category: "storage")
         }
     }
     
     private func handleAccountChange() {
-        print("🔄 CloudKit account changed - checking if container recreation is needed...")
+        logInfo("🔄 CloudKit account changed - checking if container recreation is needed...", category: "storage")
         
         Task {
             // Check new account status
@@ -177,11 +177,11 @@ class ModelContainerManager: ObservableObject {
             
             // Only recreate if status actually changed
             if wasCloudKitEnabled != nowAvailable {
-                print("⚠️ CloudKit availability changed: \(wasCloudKitEnabled) → \(nowAvailable)")
-                print("   Recreating ModelContainer to match new iCloud state...")
+                logWarning("⚠️ CloudKit availability changed: \(wasCloudKitEnabled) → \(nowAvailable)", category: "storage")
+                logInfo("   Recreating ModelContainer to match new iCloud state...", category: "storage")
                 await recreateContainer(withCloudKitEnabled: nowAvailable)
             } else {
-                print("✓ CloudKit status unchanged, no container recreation needed")
+                logInfo("✓ CloudKit status unchanged, no container recreation needed", category: "storage")
             }
         }
     }
@@ -190,10 +190,10 @@ class ModelContainerManager: ObservableObject {
         do {
             let status = try await CKContainer.default().accountStatus()
             let isAvailable = (status == .available)
-            print("   Current CloudKit status: \(status.rawValue) (\(isAvailable ? "available" : "not available"))")
+            logInfo("   Current CloudKit status: \(status.rawValue) (\(isAvailable ? "available" : "not available"))", category: "storage")
             return isAvailable
         } catch {
-            print("❌ Error checking CloudKit status: \(error.localizedDescription)")
+            logError("❌ Error checking CloudKit status: \(error.localizedDescription)", category: "storage")
             return false
         }
     }
@@ -202,24 +202,24 @@ class ModelContainerManager: ObservableObject {
     
     func recreateContainer(withCloudKitEnabled cloudKitEnabled: Bool? = nil) async {
         guard !isRecreating else {
-            print("⚠️ Container recreation already in progress, skipping...")
+            logWarning("⚠️ Container recreation already in progress, skipping...", category: "storage")
             return
         }
         
         isRecreating = true
         defer { isRecreating = false }
         
-        print("🔄 Recreating ModelContainer...")
+        logInfo("🔄 Recreating ModelContainer...", category: "storage")
         if let enabled = cloudKitEnabled {
-            print("   Target CloudKit state: \(enabled ? "enabled" : "disabled")")
+            logInfo("   Target CloudKit state: \(enabled ? "enabled" : "disabled")", category: "storage")
         }
         
         // Determine appropriate wait time based on current container state
         let wasCloudKitEnabled = isCloudKitEnabled
         let waitTime: UInt64 = wasCloudKitEnabled ? 5_000_000_000 : 1_000_000_000 // 5s if CloudKit was on, 1s if local
         
-        print("   Waiting for previous container to tear down...")
-        print("   (Wait time: \(waitTime / 1_000_000_000) seconds - \(wasCloudKitEnabled ? "CloudKit cleanup needed" : "local-only, minimal wait"))")
+        logInfo("   Waiting for previous container to tear down...", category: "storage")
+        logInfo("   (Wait time: \(waitTime / 1_000_000_000) seconds - \(wasCloudKitEnabled ? "CloudKit cleanup needed" : "local-only, minimal wait"))", category: "storage")
         
         // Store reference to old container
         let oldContainer = container
@@ -230,7 +230,7 @@ class ModelContainerManager: ObservableObject {
         // Keep reference to ensure it stays alive until now
         _ = oldContainer.schema
         
-        print("   Creating new container...")
+        logInfo("   Creating new container...", category: "storage")
         
         // Create new container with known CloudKit state if provided
         let (newContainer, actualCloudKitEnabled) = Self.createModelContainer(forceCloudKit: cloudKitEnabled)
@@ -239,8 +239,8 @@ class ModelContainerManager: ObservableObject {
         container = newContainer
         isCloudKitEnabled = actualCloudKitEnabled
         
-        print("✅ ModelContainer recreated successfully")
-        print("   CloudKit enabled: \(actualCloudKitEnabled)")
+        logInfo("✅ ModelContainer recreated successfully", category: "storage")
+        logInfo("   CloudKit enabled: \(actualCloudKitEnabled)", category: "storage")
         
         // Post notification so views can refresh if needed
         NotificationCenter.default.post(name: .modelContainerRecreated, object: nil)
@@ -248,7 +248,7 @@ class ModelContainerManager: ObservableObject {
     
     /// Manually trigger container recreation (for testing or troubleshooting)
     func manuallyRecreateContainer() async {
-        print("🔧 Manually recreating ModelContainer...")
+        logInfo("🔧 Manually recreating ModelContainer...", category: "storage")
         await recreateContainer()
     }
 }

@@ -26,7 +26,7 @@ class CloudKitImageManager {
     }()
     
     private init() {
-        print("📸 CloudKitImageManager initialized with directory: \(imageDirectory.path)")
+        logInfo("📸 CloudKitImageManager initialized with directory: \(imageDirectory.path)", category: "image")
     }
     
     // MARK: - Image Storage
@@ -39,16 +39,16 @@ class CloudKitImageManager {
         
         // Compress image for reasonable file size (adjust quality as needed)
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            print("❌ Failed to convert image to JPEG data")
+            logInfo("❌ Failed to convert image to JPEG data", category: "image")
             return nil
         }
         
         do {
             try imageData.write(to: fileURL)
-            print("✅ Saved image: \(filename)")
+            logInfo("✅ Saved image: \(filename)", category: "image")
             return filename
         } catch {
-            print("❌ Error saving image: \(error)")
+            logError("❌ Error saving image: \(error)", category: "image")
             return nil
         }
     }
@@ -59,7 +59,7 @@ class CloudKitImageManager {
         
         guard let imageData = try? Data(contentsOf: fileURL),
               let image = UIImage(data: imageData) else {
-            print("⚠️ Could not load image: \(filename)")
+            logWarning("⚠️ Could not load image: \(filename)", category: "image")
             return nil
         }
         
@@ -72,9 +72,9 @@ class CloudKitImageManager {
         
         do {
             try FileManager.default.removeItem(at: fileURL)
-            print("🗑️ Deleted image: \(filename)")
+            logInfo("🗑️ Deleted image: \(filename)", category: "image")
         } catch {
-            print("⚠️ Error deleting image: \(error)")
+            logWarning("⚠️ Error deleting image: \(error)", category: "image")
         }
     }
     
@@ -158,7 +158,7 @@ class CloudKitImageManager {
         }
         
         if deletedCount > 0 {
-            print("🧹 Cleaned up \(deletedCount) orphaned images")
+            logInfo("🧹 Cleaned up \(deletedCount) orphaned images", category: "image")
         }
     }
 }

@@ -37,7 +37,7 @@ final class CookingViewModel {
                 createNewSession()
             }
         } catch {
-            print("Error loading cooking session: \(error)")
+            logError("Error loading cooking session: \(error)", category: "recipe")
             createNewSession()
         }
     }
@@ -64,7 +64,7 @@ final class CookingViewModel {
         do {
             try modelContext.save()
         } catch {
-            print("Error saving cooking session: \(error)")
+            logError("Error saving cooking session: \(error)", category: "recipe")
         }
     }
     
@@ -83,7 +83,7 @@ final class CookingViewModel {
         do {
             try modelContext.save()
         } catch {
-            print("Error creating new session: \(error)")
+            logError("Error creating new session: \(error)", category: "recipe")
         }
     }
     
@@ -107,7 +107,7 @@ final class CookingViewModel {
             let recipes = try modelContext.fetch(descriptor)
             return recipes.first
         } catch {
-            print("Error loading recipe \(id): \(error)")
+            logError("Error loading recipe \(id): \(error)", category: "recipe")
             return nil
         }
     }

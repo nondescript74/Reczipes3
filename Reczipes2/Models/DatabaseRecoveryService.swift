@@ -74,16 +74,16 @@ class DatabaseRecoveryService {
             let attributes = try fileManager.attributesOfItem(atPath: url.path)
             return attributes[.size] as? Int64 ?? 0
         } catch {
-            print("⚠️  Failed to get size for \(url.lastPathComponent): \(error)")
+            logWarning("⚠️  Failed to get size for \(url.lastPathComponent): \(error)", category: "storage")
             return 0
         }
     }
     
     /// Attempt to recover recipes from old database file
     static func recoverFromOldDatabase(migrationInfo: DatabaseMigrationInfo) async throws -> RecoveryResult {
-        print("🔄 Starting database recovery...")
-        print("   Old DB: \(migrationInfo.oldDatabaseURL.lastPathComponent) (\(migrationInfo.oldDatabaseSizeFormatted))")
-        print("   Current DB: \(migrationInfo.currentDatabaseURL.lastPathComponent) (\(migrationInfo.currentDatabaseSizeFormatted))")
+        logInfo("🔄 Starting database recovery...", category: "storage")
+        logInfo("   Old DB: \(migrationInfo.oldDatabaseURL.lastPathComponent) (\(migrationInfo.oldDatabaseSizeFormatted))", category: "storage")
+        logInfo("   Current DB: \(migrationInfo.currentDatabaseURL.lastPathComponent) (\(migrationInfo.currentDatabaseSizeFormatted))", category: "storage")
         
         // Create a temporary container to read from old database
         let oldConfig = ModelConfiguration(url: migrationInfo.oldDatabaseURL)
@@ -112,10 +112,10 @@ class DatabaseRecoveryService {
         let profilesDescriptor = FetchDescriptor<UserAllergenProfile>()
         let profiles = try oldContext.fetch(profilesDescriptor)
         
-        print("   Found in old database:")
-        print("   - \(recipes.count) recipes")
-        print("   - \(books.count) recipe books")
-        print("   - \(profiles.count) user profiles")
+        logInfo("   Found in old database:", category: "storage")
+        logInfo("   - \(recipes.count) recipes", category: "storage")
+        logInfo("   - \(books.count) recipe books", category: "storage")
+        logInfo("   - \(profiles.count) user profiles", category: "storage")
         
         // Create result
         return RecoveryResult(
@@ -130,14 +130,14 @@ class DatabaseRecoveryService {
     static func copyOldDatabaseToCurrent(migrationInfo: DatabaseMigrationInfo) throws {
         let fileManager = FileManager.default
         
-        print("📋 Copying database file...")
-        print("   From: \(migrationInfo.oldDatabaseURL.path)")
-        print("   To: \(migrationInfo.currentDatabaseURL.path)")
+        logInfo("📋 Copying database file...", category: "storage")
+        logInfo("   From: \(migrationInfo.oldDatabaseURL.path)", category: "storage")
+        logInfo("   To: \(migrationInfo.currentDatabaseURL.path)", category: "storage")
         
         // Remove current database if it exists (assuming it's empty)
         if fileManager.fileExists(atPath: migrationInfo.currentDatabaseURL.path) {
             try fileManager.removeItem(at: migrationInfo.currentDatabaseURL)
-            print("   Removed existing empty database")
+            logInfo("   Removed existing empty database", category: "storage")
         }
         
         // Copy old database to current location
@@ -159,7 +159,7 @@ class DatabaseRecoveryService {
             try? fileManager.copyItem(at: shmSource, to: shmDest)
         }
         
-        print("✅ Database copied successfully")
+        logInfo("✅ Database copied successfully", category: "storage")
     }
     
     /// Backup the old database before any operations
@@ -170,7 +170,7 @@ class DatabaseRecoveryService {
             .appendingPathComponent("\(url.deletingPathExtension().lastPathComponent)-backup-\(timestamp).sqlite")
         
         try fileManager.copyItem(at: url, to: backupURL)
-        print("✅ Backup created: \(backupURL.lastPathComponent)")
+        logInfo("✅ Backup created: \(backupURL.lastPathComponent)", category: "storage")
         
         return backupURL
     }

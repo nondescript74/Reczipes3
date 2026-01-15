@@ -29,16 +29,16 @@ class RemindersService {
             if #available(iOS 17.0, *) {
                 // Request full access for iOS 17+
                 let granted = try await eventStore.requestFullAccessToReminders()
-                print("📝 Reminders permission: \(granted ? "Granted" : "Denied")")
+                logInfo("📝 Reminders permission: \(granted ? "Granted" : "Denied")", category: "general")
                 return granted
             } else {
                 // Fall back to the old API for earlier iOS versions
                 let granted = try await eventStore.requestAccess(to: .reminder)
-                print("📝 Reminders permission: \(granted ? "Granted" : "Denied")")
+                logInfo("📝 Reminders permission: \(granted ? "Granted" : "Denied")", category: "general")
                 return granted
             }
         } catch {
-            print("❌ Error requesting reminders permission: \(error)")
+            logError("❌ Error requesting reminders permission: \(error)", category: "general")
             return false
         }
     }
@@ -56,14 +56,14 @@ class RemindersService {
             }
         }
         
-        print("📝 ========== ADDING INGREDIENTS TO REMINDERS ==========")
-        print("📝 Recipe: \(recipe.title)")
+        logInfo("📝 ========== ADDING INGREDIENTS TO REMINDERS ==========", category: "general")
+        logInfo("📝 Recipe: \(recipe.title)", category: "general")
         
         // Find or create a list for recipe ingredients
         let listTitle = "🍳 \(recipe.title)"
         let calendar = try findOrCreateReminderList(named: listTitle)
         
-        print("📝 Using reminder list: \(calendar.title)")
+        logInfo("📝 Using reminder list: \(calendar.title)", category: "general")
         
         var addedCount = 0
         
@@ -119,8 +119,8 @@ class RemindersService {
         // Commit all changes at once for better performance
         try eventStore.commit()
         
-        print("📝 ✅ Successfully added \(addedCount) reminders")
-        print("📝 ========== REMINDERS EXPORT COMPLETE ==========")
+        logInfo("📝 ✅ Successfully added \(addedCount) reminders", category: "general")
+        logInfo("📝 ========== REMINDERS EXPORT COMPLETE ==========", category: "general")
     }
     
     /// Find an existing reminder list or create a new one
@@ -132,12 +132,12 @@ class RemindersService {
         
         // Look for existing list with this name
         if let existingCalendar = calendars.first(where: { $0.title == name }) {
-            print("📝 Found existing reminder list: \(name)")
+            logInfo("📝 Found existing reminder list: \(name)", category: "general")
             return existingCalendar
         }
         
         // Create a new list
-        print("📝 Creating new reminder list: \(name)")
+        logInfo("📝 Creating new reminder list: \(name)", category: "general")
         let newCalendar = EKCalendar(for: .reminder, eventStore: eventStore)
         newCalendar.title = name
         

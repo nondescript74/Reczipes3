@@ -16,8 +16,8 @@ class WebRecipeExtractor {
     /// - Parameter urlString: The URL of the recipe webpage
     /// - Returns: The HTML content as a string
     func fetchWebContent(from urlString: String) async throws -> String {
-        print("🌐 ========== WEB CONTENT FETCH START ==========")
-        print("🌐 URL: \(urlString)")
+        logInfo("🌐 ========== WEB CONTENT FETCH START ==========", category: "network")
+        logInfo("🌐 URL: \(urlString)", category: "network")
         
         // Create operation ID for retry tracking
         let operationID = "web-fetch-\(urlString.hashValue)"
@@ -42,23 +42,23 @@ class WebRecipeExtractor {
         // Clean HTML tags from URL string (defense-in-depth)
         let cleanedURLString = cleanHTMLTags(from: urlString)
         if cleanedURLString != urlString {
-            print("🌐 ⚠️ Removed HTML tags from URL")
-            print("🌐 Cleaned URL: \(cleanedURLString)")
+            logInfo("🌐 ⚠️ Removed HTML tags from URL", category: "network")
+            logInfo("🌐 Cleaned URL: \(cleanedURLString)", category: "network")
         }
         
         // Validate URL
         guard let url = URL(string: cleanedURLString) else {
-            print("🌐 ❌ Invalid URL format")
+            logError("🌐 ❌ Invalid URL format", category: "network")
             throw WebExtractionError.invalidURL
         }
         
         // Ensure it's an HTTP(S) URL
         guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else {
-            print("🌐 ❌ URL must use HTTP or HTTPS protocol")
+            logError("🌐 ❌ URL must use HTTP or HTTPS protocol", category: "network")
             throw WebExtractionError.invalidURL
         }
         
-        print("🌐 Creating URL request...")
+        logInfo("🌐 Creating URL request...", category: "network")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 30
@@ -66,25 +66,25 @@ class WebRecipeExtractor {
         // Set a user agent to avoid being blocked by some sites
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         
-        print("🌐 Fetching webpage...")
+        logInfo("🌐 Fetching webpage...", category: "network")
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("🌐 ❌ Invalid response type")
+            logError("🌐 ❌ Invalid response type", category: "network")
             throw WebExtractionError.networkError
         }
         
-        print("🌐 HTTP Status: \(httpResponse.statusCode)")
+        logInfo("🌐 HTTP Status: \(httpResponse.statusCode)", category: "network")
         
         guard httpResponse.statusCode == 200 else {
-            print("🌐 ❌ HTTP error: \(httpResponse.statusCode)")
+            logError("🌐 ❌ HTTP error: \(httpResponse.statusCode)", category: "network")
             throw WebExtractionError.httpError(statusCode: httpResponse.statusCode)
         }
         
         // Detect encoding from response
         var encoding = String.Encoding.utf8
         if let encodingName = httpResponse.textEncodingName {
-            print("🌐 Detected encoding: \(encodingName)")
+            logInfo("🌐 Detected encoding: \(encodingName)", category: "network")
             let cfEncoding = CFStringConvertIANACharSetNameToEncoding(encodingName as CFString)
             if cfEncoding != kCFStringEncodingInvalidId {
                 encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(cfEncoding))
@@ -92,13 +92,13 @@ class WebRecipeExtractor {
         }
         
         guard let htmlContent = String(data: data, encoding: encoding) else {
-            print("🌐 ❌ Failed to decode HTML content")
+            logError("🌐 ❌ Failed to decode HTML content", category: "network")
             throw WebExtractionError.decodingError
         }
         
-        print("🌐 ✅ Successfully fetched HTML content")
-        print("🌐 Content length: \(htmlContent.count) characters")
-        print("🌐 ========== WEB CONTENT FETCH END ==========")
+        logInfo("🌐 ✅ Successfully fetched HTML content", category: "network")
+        logInfo("🌐 Content length: \(htmlContent.count) characters", category: "network")
+        logInfo("🌐 ========== WEB CONTENT FETCH END ==========", category: "network")
         
         return htmlContent
     }
@@ -106,7 +106,7 @@ class WebRecipeExtractor {
     /// Clean HTML content by removing unwanted tags while preserving structured data
     /// This provides a cleaner input for the LLM while keeping JSON-LD recipe data
     func cleanHTML(_ html: String) -> String {
-        print("🧹 Cleaning HTML content...")
+        logInfo("🧹 Cleaning HTML content...", category: "extraction")
         var cleaned = html
         
         // PRESERVE JSON-LD structured data - it contains the recipe!
@@ -120,7 +120,7 @@ class WebRecipeExtractor {
                 if match.numberOfRanges > 1 {
                     let jsonContent = nsString.substring(with: match.range(at: 1))
                     jsonLDScripts.append(jsonContent)
-                    print("🧹 📦 Preserved JSON-LD structured data (\(jsonContent.count) chars)")
+                    logInfo("🧹 📦 Preserved JSON-LD structured data (\(jsonContent.count) chars)", category: "extraction")
                 }
             }
         }
@@ -156,7 +156,7 @@ class WebRecipeExtractor {
             
             """
             cleaned = structuredDataSection + cleaned
-            print("🧹 ✅ Added \(jsonLDScripts.count) JSON-LD structured data block(s) to top of content")
+            logInfo("🧹 ✅ Added \(jsonLDScripts.count) JSON-LD structured data block(s) to top of content", category: "extraction")
         }
         
         // Replace common HTML entities
@@ -183,8 +183,8 @@ class WebRecipeExtractor {
             cleaned = cleaned.replacingOccurrences(of: entity, with: replacement)
         }
         
-        print("🧹 ✅ HTML cleaned")
-        print("🧹 Cleaned length: \(cleaned.count) characters")
+        logInfo("🧹 ✅ HTML cleaned", category: "extraction")
+        logInfo("🧹 Cleaned length: \(cleaned.count) characters", category: "extraction")
         
         return cleaned
     }
@@ -194,7 +194,7 @@ class WebRecipeExtractor {
     /// - Parameter html: The HTML content
     /// - Returns: Array of image URLs found in the content
     func extractImageURLs(from html: String) -> [String] {
-        print("🖼️ Extracting image URLs from HTML...")
+        logInfo("🖼️ Extracting image URLs from HTML...", category: "extraction")
         var imageURLs: [String] = []
         
         // 1. Try to extract from JSON-LD structured data (most reliable)
@@ -286,9 +286,9 @@ class WebRecipeExtractor {
             return cleanURL
         }
         
-        print("🖼️ ✅ Found \(imageURLs.count) image URL(s)")
+        logInfo("🖼️ ✅ Found \(imageURLs.count) image URL(s)", category: "extraction")
         for (index, url) in imageURLs.prefix(5).enumerated() {
-            print("🖼️   [\(index + 1)] \(url)")
+            logInfo("🖼️   [\(index + 1)] \(url)", category: "extraction")
         }
         
         return imageURLs
