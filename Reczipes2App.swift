@@ -31,13 +31,11 @@ struct Reczipes2App: App {
             logInfo("🧪 UI Testing mode enabled - bypassing onboarding", category: "testing")
         }
         
-        // Check CloudKit availability
-        Task {
-            await CloudKitSyncMonitor.shared.checkAccountStatus()
-        }
-        
-        // Log CloudKit sync status for debugging
+        // Log CloudKit configuration for debugging (synchronous, no blocking)
         logCloudKitConfiguration()
+        
+        // NOTE: CloudKit checks are now deferred to background tasks after UI appears
+        // See .task modifier in MainTabView for background initialization
     }
     
     // Use the shared container from the manager instead of creating our own
@@ -473,6 +471,23 @@ struct MainTabView: View {
                 }
                 .tag(AppTab.settings)
         }
+        .task {
+            // Perform background initialization tasks after UI has appeared
+            // This prevents blocking the UI during app launch
+            await performBackgroundInitialization()
+        }
+    }
+    
+    // MARK: - Background Initialization
+    
+    /// Performs non-critical initialization tasks in the background after UI appears
+    private func performBackgroundInitialization() async {
+        // Check CloudKit status (non-blocking)
+        // The ModelContainerManager will automatically upgrade to CloudKit if available
+        await CloudKitSyncMonitor.shared.checkAccountStatus()
+        
+        // Note: ModelContainerManager already handles CloudKit upgrade asynchronously
+        // in its own init() with a 1-second delay, so we don't need to trigger it here
     }
 }
 

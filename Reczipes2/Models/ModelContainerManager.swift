@@ -27,7 +27,8 @@ class ModelContainerManager: ObservableObject {
         // IMPORTANT: Start with local-only container to avoid blocking initialization
         // We'll check CloudKit asynchronously and upgrade if available
         print("🚀 ModelContainerManager initializing...")
-        print("   Starting with local-only container, will check CloudKit availability async")
+        print("   Starting with local-only container for instant app launch")
+        print("   Will check CloudKit availability in background and upgrade if available")
         
         let (container, cloudKitEnabled) = Self.createModelContainer(forceCloudKit: false)
         self.container = container
@@ -37,6 +38,7 @@ class ModelContainerManager: ObservableObject {
         setupAccountMonitoring()
         
         // Check CloudKit status after initialization and upgrade if available
+        // This happens in the background and won't block the UI
         Task {
             await checkAndUpgradeToCloudKitIfAvailable()
         }
@@ -150,10 +152,7 @@ class ModelContainerManager: ObservableObject {
     }
     
     private func checkAndUpgradeToCloudKitIfAvailable() async {
-        // Wait a moment for app to fully launch
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-        
-        // Check if CloudKit is available
+        // Check if CloudKit is available immediately (no artificial delay)
         let cloudKitAvailable = await checkCurrentCloudKitStatus()
         
         print("🔍 Post-initialization CloudKit check:")
