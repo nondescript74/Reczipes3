@@ -100,6 +100,16 @@ class CloudKitSharingService: ObservableObject {
             throw SharingError.notAuthenticated
         }
         
+        // Check if this recipe is already shared and active
+        let existingDescriptor = FetchDescriptor<SharedRecipe>(
+            predicate: #Predicate { $0.recipeID == recipe.id && $0.isActive == true }
+        )
+        
+        if let existingShared = try? modelContext.fetch(existingDescriptor).first {
+            logInfo("Recipe '\(recipe.title)' is already shared", category: "sharing")
+            return existingShared.cloudRecordID ?? "Already shared"
+        }
+        
         // Create CloudKit record
         let record = CKRecord(recordType: CloudKitRecordType.sharedRecipe)
         
@@ -166,6 +176,16 @@ class CloudKitSharingService: ObservableObject {
         
         guard let userID = currentUserID else {
             throw SharingError.notAuthenticated
+        }
+        
+        // Check if this book is already shared and active
+        let existingDescriptor = FetchDescriptor<SharedRecipeBook>(
+            predicate: #Predicate { $0.bookID == book.id && $0.isActive == true }
+        )
+        
+        if let existingShared = try? modelContext.fetch(existingDescriptor).first {
+            logInfo("Recipe book '\(book.name)' is already shared", category: "sharing")
+            return existingShared.cloudRecordID ?? "Already shared"
         }
         
         // Create CloudKit record

@@ -146,6 +146,10 @@ struct SharingSettingsView: View {
                         Task {
                             await shareAllRecipes()
                         }
+                    } else {
+                        Task {
+                            await unshareAllRecipes()
+                        }
                     }
                 }
             ))
@@ -161,6 +165,10 @@ struct SharingSettingsView: View {
                     if newValue {
                         Task {
                             await shareAllBooks()
+                        }
+                    } else {
+                        Task {
+                            await unshareAllBooks()
                         }
                     }
                 }
@@ -342,6 +350,80 @@ struct SharingSettingsView: View {
                 showingAlert = true
             }
         }
+    }
+    
+    private func unshareAllRecipes() async {
+        isSharing = true
+        sharingStatus = "Unsharing all recipes..."
+        
+        // Get all active shared recipes
+        let activeSharedRecipes = sharedRecipes.filter { $0.isActive }
+        
+        var successful = 0
+        var failed = 0
+        
+        for sharedRecipe in activeSharedRecipes {
+            guard let cloudRecordID = sharedRecipe.cloudRecordID else {
+                // Mark as inactive if no cloud record ID
+                sharedRecipe.isActive = false
+                successful += 1
+                continue
+            }
+            
+            do {
+                try await sharingService.unshareRecipe(cloudRecordID: cloudRecordID, modelContext: modelContext)
+                successful += 1
+            } catch {
+                logError("Failed to unshare recipe '\(sharedRecipe.recipeTitle)': \(error)", category: "sharing")
+                failed += 1
+            }
+        }
+        
+        isSharing = false
+        
+        if failed == 0 {
+            alertMessage = "Unshared \(successful) recipes"
+        } else {
+            alertMessage = "Unshared \(successful) recipes. \(failed) failed."
+        }
+        showingAlert = true
+    }
+    
+    private func unshareAllBooks() async {
+        isSharing = true
+        sharingStatus = "Unsharing all books..."
+        
+        // Get all active shared books
+        let activeSharedBooks = sharedBooks.filter { $0.isActive }
+        
+        var successful = 0
+        var failed = 0
+        
+        for sharedBook in activeSharedBooks {
+            guard let cloudRecordID = sharedBook.cloudRecordID else {
+                // Mark as inactive if no cloud record ID
+                sharedBook.isActive = false
+                successful += 1
+                continue
+            }
+            
+            do {
+                try await sharingService.unshareRecipeBook(cloudRecordID: cloudRecordID, modelContext: modelContext)
+                successful += 1
+            } catch {
+                logError("Failed to unshare book '\(sharedBook.bookName)': \(error)", category: "sharing")
+                failed += 1
+            }
+        }
+        
+        isSharing = false
+        
+        if failed == 0 {
+            alertMessage = "Unshared \(successful) books"
+        } else {
+            alertMessage = "Unshared \(successful) books. \(failed) failed."
+        }
+        showingAlert = true
     }
 }
 
@@ -557,12 +639,151 @@ struct BookSelectorView: View {
     }
 }
 
-// MARK: - Placeholder Views
+// MARK: - Manage Shared Content View
 
 struct ManageSharedContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var sharingService = CloudKitSharingService.shared
+    
+    @Query(filter: #Predicate<SharedRecipe> { $0.isActive == true })
+    private var activeSharedRecipes: [SharedRecipe]
+    
+    @Query(filter: #Predicate<SharedRecipeBook> { $0.isActive == true })
+    private var activeSharedBooks: [SharedRecipeBook]
+    
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    @State private var itemToUnshare: (id: String, type: UnshareType)?
+    
+    enum UnshareType {
+        case recipe
+        case book
+    }
+    
     var body: some View {
-        Text("Manage your shared content here")
-            .navigationTitle("My Shared Content")
+        List {
+            if !activeSharedRecipes.isEmpty {
+                Section("Shared Recipes") {
+                    ForEach(activeSharedRecipes) { sharedRecipe in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(sharedRecipe.recipeTitle)
+                                    .font(.headline)
+                                
+                                Text("Shared \(sharedRecipe.sharedDate, style: .date)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(role: .destructive) {
+                                if let cloudRecordID = sharedRecipe.cloudRecordID {
+                                    itemToUnshare = (cloudRecordID, .recipe)
+                                }
+                            } label: {
+                                Label("Unshare", systemImage: "xmark.circle.fill")
+                                    .labelStyle(.iconOnly)
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            
+            if !activeSharedBooks.isEmpty {
+                Section("Shared Recipe Books") {
+                    ForEach(activeSharedBooks) { sharedBook in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(sharedBook.bookName)
+                                    .font(.headline)
+                                
+                                if let description = sharedBook.bookDescription {
+                                    Text(description)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                
+                                Text("Shared \(sharedBook.sharedDate, style: .date)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(role: .destructive) {
+                                if let cloudRecordID = sharedBook.cloudRecordID {
+                                    itemToUnshare = (cloudRecordID, .book)
+                                }
+                            } label: {
+                                Label("Unshare", systemImage: "xmark.circle.fill")
+                                    .labelStyle(.iconOnly)
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            
+            if activeSharedRecipes.isEmpty && activeSharedBooks.isEmpty {
+                ContentUnavailableView {
+                    Label("No Shared Content", systemImage: "tray.fill")
+                } description: {
+                    Text("You haven't shared any recipes or books yet.")
+                } actions: {
+                    NavigationLink("Share Content") {
+                        SharingSettingsView()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
+        .navigationTitle("My Shared Content")
+        .alert("Unshare Content", isPresented: Binding(
+            get: { itemToUnshare != nil },
+            set: { if !$0 { itemToUnshare = nil } }
+        )) {
+            Button("Cancel", role: .cancel) {
+                itemToUnshare = nil
+            }
+            Button("Unshare", role: .destructive) {
+                if let item = itemToUnshare {
+                    Task {
+                        await unshareItem(cloudRecordID: item.id, type: item.type)
+                    }
+                }
+            }
+        } message: {
+            Text("This will remove the item from the community. You can share it again later.")
+        }
+        .alert("Status", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    private func unshareItem(cloudRecordID: String, type: UnshareType) async {
+        do {
+            switch type {
+            case .recipe:
+                try await sharingService.unshareRecipe(cloudRecordID: cloudRecordID, modelContext: modelContext)
+                alertMessage = "Recipe unshared successfully"
+            case .book:
+                try await sharingService.unshareRecipeBook(cloudRecordID: cloudRecordID, modelContext: modelContext)
+                alertMessage = "Recipe book unshared successfully"
+            }
+            itemToUnshare = nil
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to unshare: \(error.localizedDescription)"
+            itemToUnshare = nil
+            showingAlert = true
+        }
     }
 }
 

@@ -61,19 +61,22 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "🐛 Fixed: FODMAP analyzer incorrectly flagging apple cider vinegar as high FODMAP (was confusing it with apples)",
-                "⚡️ Enhanced: FODMAP ingredient matching now uses word boundaries to prevent false positives",
-                "🔧 Added: Exception list for compound ingredients (vinegars, plant milks) to ensure accurate FODMAP detection",
-                "✅ Improved: FODMAP analysis now correctly recognizes coconut milk, almond milk, and other low-FODMAP alternatives",
-                "📚 Added: Comprehensive Community Sharing Help section in CloudKit Setup & Diagnostics",
-                "💡 Added: Expandable help guide with troubleshooting steps, common fixes, and reporting instructions"
+                "✅ Improved: Community sharing and management are now more secure and user-friendly",
+                "☁️ Added: Help for first time users on Community Sharing"
+
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.1.85
+        //"🐛 Fixed: FODMAP analyzer incorrectly flagging apple cider vinegar as high FODMAP (was confusing it with apples)",
+        //"⚡️ Enhanced: FODMAP ingredient matching now uses word boundaries to prevent false positives",
+        //"🔧 Added: Exception list for compound ingredients (vinegars, plant milks) to ensure accurate FODMAP detection",
+        //"✅ Improved: FODMAP analysis now correctly recognizes coconut milk, almond milk, and other low-FODMAP alternatives",
+        //"📚 Added: Comprehensive Community Sharing Help section in CloudKit Setup & Diagnostics",
+        //"💡 Added: Expandable help guide with troubleshooting steps, common fixes, and reporting instructions"
         // 14.2.81
-        
         // Community Sharing Features
 //        "✨ Added: Community Sharing - share recipes and recipe books with all app users via CloudKit Public Database",
 //        "👥 Added: Browse and import recipes shared by other users in the community",
