@@ -24,24 +24,18 @@ class ModelContainerManager: ObservableObject {
     private nonisolated(unsafe) var accountStatusObserver: NSObjectProtocol?
     
     private init() {
-        // IMPORTANT: Start with local-only container to avoid blocking initialization
-        // We'll check CloudKit asynchronously and upgrade if available
+        // IMPORTANT: Try CloudKit first for community sharing features
+        // Only fall back to local-only if CloudKit is genuinely unavailable
         logInfo("🚀 ModelContainerManager initializing...", category: "storage")
-        logInfo("   Starting with local-only container for instant app launch", category: "storage")
-        logInfo("   Will check CloudKit availability in background and upgrade if available", category: "storage")
+        logInfo("   Attempting CloudKit container first (required for community sharing)", category: "storage")
+        logInfo("   Will fall back to local-only if CloudKit unavailable", category: "storage")
         
-        let (container, cloudKitEnabled) = Self.createModelContainer(forceCloudKit: false)
+        let (container, cloudKitEnabled) = Self.createModelContainer(forceCloudKit: true)
         self.container = container
         self.isCloudKitEnabled = cloudKitEnabled
         
         // Monitor CloudKit account changes
         setupAccountMonitoring()
-        
-        // Check CloudKit status after initialization and upgrade if available
-        // This happens in the background and won't block the UI
-        Task {
-            await checkAndUpgradeToCloudKitIfAvailable()
-        }
     }
     
     deinit {
@@ -158,19 +152,33 @@ class ModelContainerManager: ObservableObject {
     }
     
     private func checkAndUpgradeToCloudKitIfAvailable() async {
-        // Check if CloudKit is available immediately (no artificial delay)
-        let cloudKitAvailable = await checkCurrentCloudKitStatus()
+        // Try multiple times with increasing delays to handle initialization race conditions
+        let retryDelays: [UInt64] = [
+            0,                      // Immediate first check
+            2_000_000_000,          // 2 seconds
+            5_000_000_000,          // 5 seconds
+            10_000_000_000          // 10 seconds
+        ]
         
-        logInfo("🔍 Post-initialization CloudKit check:", category: "storage")
-        logInfo("   CloudKit available: \(cloudKitAvailable)", category: "storage")
-        
-        // If CloudKit is available, upgrade the container
-        if cloudKitAvailable {
-            logInfo("✅ CloudKit is available - upgrading container to enable sync...", category: "storage")
-            await recreateContainer(withCloudKitEnabled: true)
-        } else {
-            logInfo("ℹ️ CloudKit not available - continuing with local-only storage", category: "storage")
+        for (attempt, delay) in retryDelays.enumerated() {
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            
+            let cloudKitAvailable = await checkCurrentCloudKitStatus()
+            
+            logInfo("🔍 CloudKit check attempt \(attempt + 1)/\(retryDelays.count):", category: "storage")
+            logInfo("   CloudKit available: \(cloudKitAvailable)", category: "storage")
+            
+            // If CloudKit is available, upgrade the container
+            if cloudKitAvailable {
+                logInfo("✅ CloudKit is available - upgrading container to enable sync...", category: "storage")
+                await recreateContainer(withCloudKitEnabled: true)
+                return // Success, exit retry loop
+            }
         }
+        
+        logInfo("ℹ️ CloudKit not available after \(retryDelays.count) checks - continuing with local-only storage", category: "storage")
     }
     
     private func handleAccountChange() {
