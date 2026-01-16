@@ -42,7 +42,7 @@ class CloudKitOnboardingService: ObservableObject {
         case restricted                 // CloudKit restricted (parental controls, etc.)
         case failed(Error)              // Something went wrong
         
-        static func == (lhs: OnboardingState, rhs: OnboardingState) -> Bool {
+        nonisolated static func == (lhs: OnboardingState, rhs: OnboardingState) -> Bool {
             switch (lhs, rhs) {
             case (.checking, .checking),
                  (.ready, .ready),
@@ -72,7 +72,7 @@ class CloudKitOnboardingService: ObservableObject {
     
     // MARK: - Diagnostics
     
-    struct CloudKitDiagnostics: Codable {
+    struct CloudKitDiagnostics: Codable, Sendable {
         var timestamp: Date
         var accountStatus: String
         var containerAccessible: Bool

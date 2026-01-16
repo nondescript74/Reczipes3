@@ -18,6 +18,7 @@ import SwiftData
 struct TestFlightTesterExperienceTests {
     
     @Suite("First Launch Experience")
+    @MainActor
     struct FirstLaunchTests {
         
         @Test("Onboarding triggers on first check")
@@ -28,11 +29,13 @@ struct TestFlightTesterExperienceTests {
             await service.runComprehensiveDiagnostics()
             
             // State should be determined
-            #expect(service.onboardingState != .checking,
-                   "After diagnostics, state should be determined")
+            let sobj = service.onboardingState
+            #expect(sobj != .checking,
+                    "After diagnostics, state should be determined")
             
             // Diagnostics should exist
-            #expect(service.diagnostics != nil,
+            let sdia = service.diagnostics
+            #expect(sdia != nil,
                    "Diagnostics should be available after first check")
         }
         
@@ -88,7 +91,8 @@ struct TestFlightTesterExperienceTests {
                 break
             case .failed(let error):
                 // Should have error details
-                #expect(service.errorDetails != nil || error.localizedDescription.count > 0,
+                let ser = service.errorDetails
+                #expect(ser != nil || error.localizedDescription.count > 0,
                        "Failure state should provide error information")
             case .checking:
                 Issue.record("Should not still be checking after diagnostics complete")
@@ -97,6 +101,7 @@ struct TestFlightTesterExperienceTests {
     }
     
     @Suite("Setup & Diagnostics Screen")
+    @MainActor
     struct SetupDiagnosticsTests {
         
         @Test("All diagnostic checks are clearly labeled")
@@ -171,7 +176,8 @@ struct TestFlightTesterExperienceTests {
             await service.attemptRepair()
             
             // After repair, diagnostics should be updated
-            #expect(service.diagnostics != nil,
+            let sdia = service.diagnostics
+            #expect(sdia != nil,
                    "Diagnostics should be available after repair attempt")
         }
         
@@ -183,12 +189,14 @@ struct TestFlightTesterExperienceTests {
             await service.initializePublicDatabaseSchema()
             
             // After initialization, diagnostics should be updated
-            #expect(service.diagnostics != nil,
+            let sdia = service.diagnostics
+            #expect(sdia != nil,
                    "Diagnostics should be available after schema initialization")
         }
     }
     
     @Suite("Sharing Flow from Tester Perspective")
+    @MainActor
     struct TesterSharingFlowTests {
         
         private func createTestModelContainer() throws -> ModelContainer {
@@ -207,7 +215,7 @@ struct TestFlightTesterExperienceTests {
             let service = CloudKitSharingService.shared
             
             // Tester should be able to check availability
-            let isAvailable = service.isCloudKitAvailable
+            _ = service.isCloudKitAvailable
             
             // Property should be set (true or false)
             // We don't require it to be true in tests
@@ -231,7 +239,7 @@ struct TestFlightTesterExperienceTests {
         func clearErrorMessagesOnFailure() {
             let errors: [SharingError] = [
                 .notAuthenticated,
-                .cloudKitUnavailable,
+                .cloudKitUnavailable(),
                 .recipeNotFound,
                 .bookNotFound
             ]
@@ -253,6 +261,7 @@ struct TestFlightTesterExperienceTests {
     }
     
     @Suite("Browsing Shared Content")
+    @MainActor
     struct BrowsingSharedContentTests {
         
         @Test("Shared recipes can be fetched")
@@ -306,6 +315,7 @@ struct TestFlightTesterExperienceTests {
     }
     
     @Suite("Common Tester Issues")
+    @MainActor
     struct CommonTesterIssuesTests {
         
         @Test("Handles 'not signed into iCloud' scenario")
@@ -364,7 +374,7 @@ struct TestFlightTesterExperienceTests {
             }
             
             // Diagnostics should show environment
-            let isProduction = diagnostics.isProductionEnvironment
+            _ = diagnostics.isProductionEnvironment
             
             // In TestFlight, this should be true
             // In Xcode development, this should be false
@@ -388,6 +398,7 @@ struct TestFlightTesterExperienceTests {
     }
     
     @Suite("Tester Feedback Scenarios")
+    @MainActor
     struct TesterFeedbackScenariosTests {
         
         @Test("Tester can export diagnostics for feedback")
@@ -446,57 +457,82 @@ struct TestFlightTesterExperienceTests {
     }
     
     @Suite("Onboarding Never Completes Scenarios")
+    @MainActor
     struct OnboardingNeverCompletesTests {
         
         @Test("Onboarding times out appropriately")
         func onboardingTimesOut() async {
-            let service = CloudKitOnboardingService.shared
-            
             // Run diagnostics with timeout
-            await withTimeout(seconds: 30) {
-                await service.runComprehensiveDiagnostics()
-            }
-            
-            // Should not hang forever
-            // Should complete with some state
-            #expect(service.onboardingState != .checking,
-                   "Onboarding should complete, not hang in checking state")
+            await Task { @MainActor in
+                let service = CloudKitOnboardingService.shared
+                
+                await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await service.runComprehensiveDiagnostics()
+                    }
+                    
+                    group.addTask {
+                        try await Task.sleep(for: .seconds(30))
+                        throw TimeoutError()
+                    }
+                    
+                    // Wait for first to complete
+                    do {
+                        try await group.next()
+                    } catch {
+                        // Timeout or completion - either is fine
+                    }
+                    
+                    // Cancel remaining
+                    group.cancelAll()
+                }
+                
+                // Should not hang forever
+                // Should complete with some state
+                let sobs = service.onboardingState
+                #expect(sobs != .checking,
+                       "Onboarding should complete, not hang in checking state")
+            }.value
         }
         
         @Test("Network issues don't cause indefinite hang")
         func networkIssuesDontCauseHang() async {
-            let service = CloudKitOnboardingService.shared
-            
             // Even with network issues, should complete
-            await withTimeout(seconds: 30) {
-                await service.runComprehensiveDiagnostics()
-            }
-            
-            // Should have diagnostics even if network failed
-            #expect(service.diagnostics != nil,
-                   "Should generate diagnostics even with network issues")
+            await Task { @MainActor in
+                let service = CloudKitOnboardingService.shared
+                
+                await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await service.runComprehensiveDiagnostics()
+                    }
+                    
+                    group.addTask {
+                        try await Task.sleep(for: .seconds(30))
+                        throw TimeoutError()
+                    }
+                    
+                    // Wait for first to complete
+                    do {
+                        try await group.next()
+                    } catch {
+                        // Timeout or completion - either is fine
+                    }
+                    
+                    // Cancel remaining
+                    group.cancelAll()
+                }
+                
+                // Should have diagnostics even if network failed
+                #expect(service.diagnostics != nil,
+                       "Should generate diagnostics even with network issues")
+            }.value
         }
         
-        private func withTimeout(seconds: TimeInterval, operation: @escaping () async -> Void) async {
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    await operation()
-                }
-                
-                group.addTask {
-                    try? await Task.sleep(for: .seconds(seconds))
-                }
-                
-                // Wait for first to complete
-                await group.next()
-                
-                // Cancel the other
-                group.cancelAll()
-            }
-        }
+        private struct TimeoutError: Error {}
     }
     
     @Suite("Success Metrics Validation")
+    @MainActor
     struct SuccessMetricsTests {
         
         @Test("Can track onboarding completion")
@@ -522,7 +558,7 @@ struct TestFlightTesterExperienceTests {
             // When share fails, throws error
             // This allows tracking success rate
             
-            let service = CloudKitSharingService.shared
+            _ = CloudKitSharingService.shared
             
             // The share methods return String on success or throw on failure
             // This makes success tracking straightforward
@@ -539,7 +575,7 @@ struct TestFlightTesterExperienceTests {
             }
             
             // Error messages are tracked
-            let errors = diagnostics.errorMessages
+            _ = diagnostics.errorMessages
             
             // These can be logged/analyzed to find common patterns
             // e.g., "Cannot access CloudKit container" appears 50% of the time
@@ -557,16 +593,16 @@ struct TestFlightTesterExperienceTests {
             
             // Can measure:
             // - Is account available?
-            let accountAvailable = diagnostics.accountStatus == "available"
+            _ = diagnostics.accountStatus == "available"
             
             // - Can access container?
-            let containerAccessible = diagnostics.containerAccessible
+            _ = diagnostics.containerAccessible
             
             // - Can share publicly?
-            let canShare = diagnostics.canShareToPublic
+            _ = diagnostics.canShareToPublic
             
             // - Is fully functional?
-            let fullyFunctional = diagnostics.isFullyFunctional
+            _ = diagnostics.isFullyFunctional
             
             // All of these are measurable metrics
         }

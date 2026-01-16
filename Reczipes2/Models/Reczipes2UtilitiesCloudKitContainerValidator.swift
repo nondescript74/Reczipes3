@@ -196,7 +196,7 @@ actor CloudKitContainerValidator {
 
 // MARK: - Supporting Types
 
-struct ValidationResult {
+struct ValidationResult: Sendable {
     let containerIdentifier: String
     var bundleID: String = "Unknown"
     
@@ -272,7 +272,7 @@ struct ValidationResult {
     }
 }
 
-struct EntitlementsCheck {
+struct EntitlementsCheck: Sendable {
     var hasICloudServices: Bool = false
     var iCloudServices: [String] = []
     var hasCloudKit: Bool = false
@@ -283,7 +283,7 @@ struct EntitlementsCheck {
     var runtimeCheckNote: String?
 }
 
-struct Diagnosis {
+struct Diagnosis: Sendable {
     let emoji: String
     let summary: String
     let issues: [String]

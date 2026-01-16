@@ -18,6 +18,7 @@ import SwiftData
 struct TestFlightEmergencyScenarioTests {
     
     @Suite("Graceful Degradation")
+    @MainActor
     struct GracefulDegradationTests {
         
         @Test("App functions when CloudKit is completely unavailable")
@@ -28,9 +29,10 @@ struct TestFlightEmergencyScenarioTests {
             let sharingService = CloudKitSharingService.shared
             let onboardingService = CloudKitOnboardingService.shared
             
-            // Services should exist but may report unavailable
-            #expect(sharingService != nil)
-            #expect(onboardingService != nil)
+            // Services should always exist (they're singletons)
+            // Test that they can be accessed without crashing
+            _ = sharingService.isCloudKitAvailable
+            _ = onboardingService.onboardingState
             
             // When CloudKit is unavailable:
             // - Share buttons should be disabled or show "unavailable"
@@ -47,10 +49,7 @@ struct TestFlightEmergencyScenarioTests {
             let recipe = Recipe(
                 title: "Test Recipe",
                 headerNotes: nil,
-                yield: nil,
-                ingredientSections: [],
-                instructionSections: [],
-                notes: [],
+                recipeYield: nil,
                 reference: nil,
                 imageName: nil,
                 additionalImageNames: nil
@@ -124,6 +123,7 @@ struct TestFlightEmergencyScenarioTests {
     }
     
     @Suite("Feature Disabling Scenarios")
+    @MainActor
     struct FeatureDisablingTests {
         
         @Test("CloudKit unavailable state is detectable")
@@ -283,6 +283,7 @@ struct TestFlightEmergencyScenarioTests {
     }
     
     @Suite("Network Failure Handling")
+    @MainActor
     struct NetworkFailureTests {
         
         @Test("Network timeouts don't crash app")
@@ -333,6 +334,7 @@ struct TestFlightEmergencyScenarioTests {
     }
     
     @Suite("Emergency Update Scenarios")
+    @MainActor
     struct EmergencyUpdateTests {
         
         @Test("All sharing UI is removable without breaking app")
@@ -392,6 +394,7 @@ struct TestFlightEmergencyScenarioTests {
     }
     
     @Suite("CloudKit Quota and Limits")
+    @MainActor
     struct QuotaAndLimitsTests {
         
         @Test("Large recipes are within CloudKit limits")
@@ -405,22 +408,22 @@ struct TestFlightEmergencyScenarioTests {
                 yield: "100",
                 ingredientSections: (0..<20).map { section in
                     IngredientSection(
-                        heading: "Section \(section)",
+                        title: "Section \(section)",
                         ingredients: (0..<30).map { i in
-                            Ingredient(text: "Ingredient \(i)", isChecked: false)
+                            Ingredient(name: "Ingredient \(i)")
                         }
                     )
                 },
                 instructionSections: (0..<10).map { section in
                     InstructionSection(
-                        heading: "Instructions \(section)",
-                        instructions: (0..<20).map { i in
-                            Instruction(text: String(repeating: "Step. ", count: 20), isCompleted: false)
+                        title: "Instructions \(section)",
+                        steps: (0..<20).map { i in
+                            InstructionStep(text: String(repeating: "Step. ", count: 20))
                         }
                     )
                 },
                 notes: (0..<100).map { i in
-                    RecipeNote(text: "Note \(i)", timestamp: Date())
+                    RecipeNote(type: .general, text: "Note \(i)")
                 },
                 reference: nil,
                 imageName: nil,
@@ -456,7 +459,7 @@ struct TestFlightEmergencyScenarioTests {
             // CloudKit has operation limits
             // When sharing many items, should batch them
             
-            let service = CloudKitSharingService.shared
+            _ = CloudKitSharingService.shared
             
             // If sharing 100+ recipes, should be done in chunks
             // Not all at once (would hit CloudKit limits)
@@ -477,6 +480,7 @@ struct TestFlightEmergencyScenarioTests {
     }
     
     @Suite("Account Status Changes")
+    @MainActor
     struct AccountStatusChangeTests {
         
         @Test("Handles user signing out of iCloud")
@@ -518,7 +522,7 @@ struct TestFlightEmergencyScenarioTests {
                 return
             }
             
-            if let userID = diagnostics.userRecordID {
+            if diagnostics.userRecordID != nil {
                 // This is the current user's ID
                 // If it changes, previously shared items may appear to be from "someone else"
                 // This is expected behavior
@@ -560,10 +564,7 @@ struct TestFlightEmergencyScenarioTests {
             let recipe = Recipe(
                 title: "Local Recipe",
                 headerNotes: nil,
-                yield: nil,
-                ingredientSections: [],
-                instructionSections: [],
-                notes: [],
+                recipeYield: nil,
                 reference: nil,
                 imageName: nil,
                 additionalImageNames: nil

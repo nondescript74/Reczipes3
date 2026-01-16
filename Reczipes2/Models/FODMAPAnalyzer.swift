@@ -157,8 +157,37 @@ struct FODMAPFoodData {
     /// Get FODMAP data for a specific ingredient
     static func getFODMAPData(for ingredient: String) -> FODMAPFoodData? {
         let lowercased = ingredient.lowercased()
+        
+        // First, check for exceptions - ingredients that should NOT match
+        let exceptions: [String: [String]] = [
+            "apple": ["apple cider vinegar", "apple cider", "cider vinegar", "vinegar"],
+            "pear": ["pear vinegar"],
+            "cherry": ["cherry tomato"],
+            "milk": ["coconut milk", "almond milk", "oat milk", "rice milk", "soy milk"]
+        ]
+        
         return highFODMAPFoods.first { food in
-            lowercased.contains(food.name.lowercased())
+            let foodName = food.name.lowercased()
+            
+            // Check if this ingredient is in the exception list for this food
+            if let foodExceptions = exceptions[foodName] {
+                for exception in foodExceptions {
+                    if lowercased.contains(exception) {
+                        return false // Don't match exceptions
+                    }
+                }
+            }
+            
+            // Use word boundary matching to avoid partial matches
+            // This ensures "apple" matches "apple" or "apples" but not "pineapple"
+            let pattern = "\\b\(NSRegularExpression.escapedPattern(for: foodName))s?\\b"
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                let range = NSRange(lowercased.startIndex..., in: lowercased)
+                return regex.firstMatch(in: lowercased, range: range) != nil
+            }
+            
+            // Fallback to contains if regex fails
+            return lowercased.contains(foodName)
         }
     }
 }

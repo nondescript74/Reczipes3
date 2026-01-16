@@ -61,29 +61,12 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "If you're new to community sharing, the app will guide you through",
-                "a quick setup the first time you try to share. This ensures CloudKit",
-                "is properly configured on your device.",
-                "Existing users: Your sharing should continue to work normally.",
-                "If you experience issues:",
-                "1. Go to Settings → Community Sharing",
-                "2. Tap Setup & Diagnostics",
-                "3. Follow the on-screen instructions",
-                
-                "A. **Please:**",
-                   "- Open Settings → Community Sharing",
-                   "- Tap Setup & Diagnostics",
-                   "- Screenshot the checklist",
-                   "- OR export diagnostics JSON",
-                "B. **Common fixes:**",
-                   "- Not signed into iCloud → Guide to Settings",
-                   "- Container not accessible → Run Request Access",
-                   "- Public DB not initialized → Run Initialize Database",
-                   "- Restricted → Check Screen Time settings",
-                ". **If diagnostics show ready but still failing:**",
-                   "- Check CloudKit Dashboard for schema deployment",
-                   "- Verify Production environment has record types",
-                   "- Check for quota limits (rare)",
+                "🐛 Fixed: FODMAP analyzer incorrectly flagging apple cider vinegar as high FODMAP (was confusing it with apples)",
+                "⚡️ Enhanced: FODMAP ingredient matching now uses word boundaries to prevent false positives",
+                "🔧 Added: Exception list for compound ingredients (vinegars, plant milks) to ensure accurate FODMAP detection",
+                "✅ Improved: FODMAP analysis now correctly recognizes coconut milk, almond milk, and other low-FODMAP alternatives",
+                "📚 Added: Comprehensive Community Sharing Help section in CloudKit Setup & Diagnostics",
+                "💡 Added: Expandable help guide with troubleshooting steps, common fixes, and reporting instructions"
             ]
         ))
         

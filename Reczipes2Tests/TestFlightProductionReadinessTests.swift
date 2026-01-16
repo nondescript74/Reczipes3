@@ -32,6 +32,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Recipe can be converted to CloudKit format")
+        @MainActor
         func recipeConvertsToCloudKitFormat() throws {
             let recipe = RecipeModel(
                 id: UUID(),
@@ -40,21 +41,21 @@ struct TestFlightProductionReadinessTests {
                 yield: "4 servings",
                 ingredientSections: [
                     IngredientSection(
-                        heading: "Main",
+                        title: "Main",
                         ingredients: [
-                            Ingredient(text: "1 cup flour", isChecked: false)
+                            Ingredient(quantity: "1", unit: "cup", name: "flour")
                         ]
                     )
                 ],
                 instructionSections: [
                     InstructionSection(
-                        heading: "Instructions",
-                        instructions: [
-                            Instruction(text: "Mix ingredients", isCompleted: false)
+                        title: "Instructions",
+                        steps: [
+                            InstructionStep(stepNumber: 1, text: "Mix ingredients")
                         ]
                     )
                 ],
-                notes: [RecipeNote(text: "Test note", timestamp: Date())],
+                notes: [RecipeNote(type: .general, text: "Test note")],
                 reference: "https://example.com",
                 imageName: nil,
                 additionalImageNames: nil
@@ -86,14 +87,15 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("RecipeBook can be converted to CloudKit format")
+        @MainActor
         func recipeBookConvertsToCloudKitFormat() throws {
             let book = RecipeBook(
                 name: "Test Book",
                 bookDescription: "A test book",
                 coverImageName: nil,
-                recipeIDs: [UUID(), UUID(), UUID()],
                 dateCreated: Date(),
                 dateModified: Date(),
+                recipeIDs: [UUID(), UUID(), UUID()],
                 color: "#FF5733"
             )
             
@@ -117,6 +119,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("CloudKitRecipe can be encoded to JSON")
+        @MainActor
         func cloudKitRecipeEncodesToJSON() throws {
             let cloudRecipe = CloudKitRecipe(
                 id: UUID(),
@@ -148,6 +151,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("CloudKitRecipeBook can be encoded to JSON")
+        @MainActor
         func cloudKitRecipeBookEncodesToJSON() throws {
             let cloudBook = CloudKitRecipeBook(
                 id: UUID(),
@@ -175,6 +179,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Sharing service tracks CloudKit availability")
+        @MainActor
         func sharingServiceTracksAvailability() async throws {
             let service = CloudKitSharingService.shared
             
@@ -194,28 +199,27 @@ struct TestFlightProductionReadinessTests {
     struct GracefulDegradationTests {
         
         @Test("App handles unavailable CloudKit gracefully")
+        @MainActor
         func handlesUnavailableCloudKitGracefully() async {
             // When CloudKit is not available, the app should not crash
             // It should show appropriate UI and error messages
             
             let service = CloudKitSharingService.shared
             
-            // Even if not available, service should exist
-            #expect(service != nil)
-            
-            // Service should track availability status
+            // Service should track availability status without crashing
+            // (singleton always exists, so just accessing it verifies it doesn't crash)
             let _ = service.isCloudKitAvailable
         }
         
         @Test("Onboarding handles all failure modes")
+        @MainActor
         func onboardingHandlesAllFailureModes() async {
             let service = CloudKitOnboardingService.shared
             
             await service.runComprehensiveDiagnostics()
             
-            // After diagnostics, service should be in a valid state
-            // (not crashed)
-            #expect(service != nil)
+            // After diagnostics, service should be in a valid state (not crashed)
+            // The service is a singleton, so it will always exist
             
             // State should be determined
             switch service.onboardingState {
@@ -236,11 +240,12 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Error messages are user-friendly")
+        @MainActor
         func errorMessagesAreUserFriendly() {
             // All error messages should be helpful, not technical jargon
             let errors: [SharingError] = [
                 .notAuthenticated,
-                .cloudKitUnavailable,
+                .cloudKitUnavailable(message: nil),
                 .recipeNotFound,
                 .bookNotFound
             ]
@@ -259,6 +264,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Diagnostics provide actionable information")
+        @MainActor
         func diagnosticsProvideActionableInfo() async {
             let service = CloudKitOnboardingService.shared
             
@@ -295,6 +301,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Shared recipe tracking maintains referential integrity")
+        @MainActor
         func sharedRecipeTrackingMaintainsIntegrity() throws {
             let container = try createTestModelContainer()
             let context = ModelContext(container)
@@ -323,6 +330,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Shared recipe can be deactivated without deletion")
+        @MainActor
         func sharedRecipeCanBeDeactivated() throws {
             let container = try createTestModelContainer()
             let context = ModelContext(container)
@@ -349,6 +357,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Multiple shares of same recipe can be tracked")
+        @MainActor
         func multipleSharesCanBeTracked() throws {
             let container = try createTestModelContainer()
             let context = ModelContext(container)
@@ -396,6 +405,7 @@ struct TestFlightProductionReadinessTests {
     struct PerformanceTests {
         
         @Test("Can handle multiple recipes in one batch")
+        @MainActor
         func handlesMultipleRecipes() throws {
             // Create many recipes
             let recipes = (0..<100).map { index in
@@ -436,6 +446,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Large recipe data can be encoded")
+        @MainActor
         func largeRecipeCanBeEncoded() throws {
             // Create a recipe with lots of data
             let largeRecipe = RecipeModel(
@@ -445,30 +456,29 @@ struct TestFlightProductionReadinessTests {
                 yield: "100 servings",
                 ingredientSections: (0..<10).map { sectionIndex in
                     IngredientSection(
-                        heading: "Section \(sectionIndex)",
+                        title: "Section \(sectionIndex)",
                         ingredients: (0..<20).map { ingredientIndex in
                             Ingredient(
-                                text: "Ingredient \(ingredientIndex) in section \(sectionIndex)",
-                                isChecked: false
+                                name: "Ingredient \(ingredientIndex) in section \(sectionIndex)"
                             )
                         }
                     )
                 },
                 instructionSections: (0..<5).map { sectionIndex in
                     InstructionSection(
-                        heading: "Instructions \(sectionIndex)",
-                        instructions: (0..<10).map { instrIndex in
-                            Instruction(
-                                text: String(repeating: "Instruction \(instrIndex). ", count: 10),
-                                isCompleted: false
+                        title: "Instructions \(sectionIndex)",
+                        steps: (0..<10).map { instrIndex in
+                            InstructionStep(
+                                stepNumber: instrIndex + 1,
+                                text: String(repeating: "Instruction \(instrIndex). ", count: 10)
                             )
                         }
                     )
                 },
                 notes: (0..<50).map { noteIndex in
                     RecipeNote(
-                        text: "Note \(noteIndex): " + String(repeating: "content ", count: 20),
-                        timestamp: Date()
+                        type: .general,
+                        text: "Note \(noteIndex): " + String(repeating: "content ", count: 20)
                     )
                 },
                 reference: "https://example.com/very/long/url/path",
@@ -511,6 +521,7 @@ struct TestFlightProductionReadinessTests {
     struct SupportTests {
         
         @Test("Diagnostics can be exported for support tickets")
+        @MainActor
         func diagnosticsCanBeExportedForSupport() async {
             let service = CloudKitOnboardingService.shared
             
@@ -529,6 +540,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Container validator provides detailed report")
+        @MainActor
         func containerValidatorProvidesDetailedReport() async {
             let result = await CloudKitContainerValidator.validateContainer(
                 identifier: "iCloud.com.headydiscy.reczipes"
@@ -547,6 +559,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("All diagnostic fields are accessible")
+        @MainActor
         func allDiagnosticFieldsAccessible() async {
             let service = CloudKitOnboardingService.shared
             
@@ -578,6 +591,7 @@ struct TestFlightProductionReadinessTests {
     struct MonitoringReadinessTests {
         
         @Test("Onboarding state is observable")
+        @MainActor
         func onboardingStateIsObservable() {
             let service = CloudKitOnboardingService.shared
             
@@ -590,6 +604,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Sharing service state is observable")
+        @MainActor
         func sharingServiceStateIsObservable() {
             let service = CloudKitSharingService.shared
             
@@ -600,6 +615,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Sharing result enum handles all outcomes")
+        @MainActor
         func sharingResultHandlesAllOutcomes() {
             let results: [SharingResult] = [
                 .success(recordID: "test-id"),
@@ -615,19 +631,21 @@ struct TestFlightProductionReadinessTests {
     struct AppStoreReadinessTests {
         
         @Test("No debug-only code in production paths")
+        @MainActor
         func noDebugOnlyCodeInProductionPaths() {
             // Verify that the app can build and run in Release mode
             // This is more of a build-time check, but we can verify
             // that services don't have debug-only requirements
             
-            let sharingService = CloudKitSharingService.shared
-            let onboardingService = CloudKitOnboardingService.shared
+            // Services should be accessible (they're singletons)
+            let _ = CloudKitSharingService.shared
+            let _ = CloudKitOnboardingService.shared
             
-            #expect(sharingService != nil)
-            #expect(onboardingService != nil)
+            // If we get here without crashing, the services are accessible
         }
         
         @Test("All models conform to required protocols")
+        @MainActor
         func modelsConformToRequiredProtocols() {
             // SharedRecipe should be persistable
             let sharedRecipe = SharedRecipe(
@@ -636,8 +654,8 @@ struct TestFlightProductionReadinessTests {
                 recipeTitle: "Test"
             )
             
-            // Should have an ID
-            #expect(sharedRecipe.id != nil)
+            // Should have an ID (non-optional UUID)
+            _ = sharedRecipe.id
             
             // CloudKitRecipe should be Codable
             let cloudRecipe = CloudKitRecipe(
@@ -662,6 +680,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Privacy-sensitive data is handled correctly")
+        @MainActor
         func privacySensitiveDataHandledCorrectly() async {
             // User names should be optional (privacy)
             let cloudRecipe = CloudKitRecipe(
@@ -684,6 +703,7 @@ struct TestFlightProductionReadinessTests {
         }
         
         @Test("Network failures are handled gracefully")
+        @MainActor
         func networkFailuresHandledGracefully() async {
             // The onboarding service should handle network errors
             let service = CloudKitOnboardingService.shared

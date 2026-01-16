@@ -21,11 +21,13 @@ struct TestFlightReleaseTests {
     // MARK: - Pre-Release Checklist Tests
     
     @Suite("CloudKit Dashboard Setup")
+    @MainActor
     struct CloudKitDashboardTests {
         
         @Test("Container identifier is correct")
+        @MainActor
         func containerIdentifierIsCorrect() async throws {
-            let expectedIdentifier = "iCloud.com.headydiscy.reczipes"
+            _ = "iCloud.com.headydiscy.reczipes"
             let service = CloudKitSharingService.shared
             
             // Verify the service is using the correct container
@@ -65,6 +67,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("OnboardingTest record type exists for diagnostics")
+        @MainActor
         func onboardingTestRecordTypeExists() async throws {
             // This test verifies the onboarding service uses the diagnostic record type
             let service = CloudKitOnboardingService.shared
@@ -77,6 +80,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("Schema includes all required fields for SharedRecipe")
+        @MainActor
         func sharedRecipeSchemaComplete() async throws {
             // Create a test recipe to share
             let testRecipe = RecipeModel(
@@ -114,18 +118,19 @@ struct TestFlightReleaseTests {
             #expect(cloudRecipe.title == testRecipe.title)
             #expect(cloudRecipe.sharedByUserID == "test-user")
             #expect(cloudRecipe.sharedByUserName == "Test User")
-            #expect(cloudRecipe.sharedDate != nil)
+            //#expect(cloudRecipe.sharedDate != nil)
         }
         
         @Test("Schema includes all required fields for SharedRecipeBook")
+        @MainActor
         func sharedRecipeBookSchemaComplete() async throws {
             let testBook = RecipeBook(
                 name: "Test Book",
                 bookDescription: "Test description",
                 coverImageName: nil,
-                recipeIDs: [UUID(), UUID()],
                 dateCreated: Date(),
                 dateModified: Date(),
+                recipeIDs: [UUID(), UUID()],
                 color: "#FF5733"
             )
             
@@ -147,7 +152,7 @@ struct TestFlightReleaseTests {
             #expect(cloudBook.name == testBook.name)
             #expect(cloudBook.recipeIDs == testBook.recipeIDs)
             #expect(cloudBook.sharedByUserID == "test-user")
-            #expect(cloudBook.sharedDate != nil)
+            //#expect(cloudBook.sharedDate != nil)
         }
     }
     
@@ -164,44 +169,47 @@ struct TestFlightReleaseTests {
         }
         
         @Test("CloudKit capability is configured")
+        @MainActor
         func cloudKitCapabilityConfigured() async throws {
             // Test that we can instantiate the CloudKit services
-            let sharingService = CloudKitSharingService.shared
-            let onboardingService = CloudKitOnboardingService.shared
+            _ = CloudKitSharingService.shared
+            _ = CloudKitOnboardingService.shared
             
-            #expect(sharingService != nil)
-            #expect(onboardingService != nil)
+            //#expect(sharingService != nil)
+            //#expect(onboardingService != nil)
         }
         
         @Test("CloudKitOnboardingService is added to project")
+        @MainActor
         func onboardingServiceExists() {
-            let service = CloudKitOnboardingService.shared
-            #expect(service != nil, "CloudKitOnboardingService should exist")
+            _ = CloudKitOnboardingService.shared
+            //#expect(service != nil, "CloudKitOnboardingService should exist")
         }
         
         @Test("CloudKitSharingService is added to project")
+        @MainActor
         func sharingServiceExists() {
-            let service = CloudKitSharingService.shared
-            #expect(service != nil, "CloudKitSharingService should exist")
+            _ = CloudKitSharingService.shared
+            //#expect(service != nil, "CloudKitSharingService should exist")
         }
         
         @Test("SharedContentModels are defined")
         func sharedContentModelsDefined() throws {
             // Verify model types exist by creating instances
-            let sharedRecipe = SharedRecipe(
+            _ = SharedRecipe(
                 recipeID: UUID(),
                 sharedByUserID: "test",
                 recipeTitle: "Test"
             )
             
-            let sharedBook = SharedRecipeBook(
+            _ = SharedRecipeBook(
                 bookID: UUID(),
                 sharedByUserID: "test",
                 bookName: "Test Book"
             )
             
-            #expect(sharedRecipe.id != nil)
-            #expect(sharedBook.id != nil)
+            //#expect(sharedRecipe.id != nil)
+            //#expect(sharedBook.id != nil)
         }
     }
     
@@ -209,6 +217,7 @@ struct TestFlightReleaseTests {
     struct PreTestFlightTests {
         
         @Test("Onboarding service runs diagnostics")
+        @MainActor
         func onboardingServiceRunsDiagnostics() async throws {
             let service = CloudKitOnboardingService.shared
             
@@ -220,11 +229,12 @@ struct TestFlightReleaseTests {
             
             // Verify diagnostics contain expected information
             let diagnostics = try #require(service.diagnostics)
-            #expect(diagnostics.timestamp != nil)
+            //#expect(diagnostics.timestamp != nil)
             #expect(!diagnostics.accountStatus.isEmpty)
         }
         
         @Test("Onboarding state is determinable")
+        @MainActor
         func onboardingStateIsDeterminable() async throws {
             let service = CloudKitOnboardingService.shared
             
@@ -236,6 +246,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("Diagnostics can be exported as JSON")
+        @MainActor
         func diagnosticsCanBeExported() async throws {
             let service = CloudKitOnboardingService.shared
             
@@ -249,6 +260,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("Diagnostics include readable description")
+        @MainActor
         func diagnosticsIncludeReadableDescription() async throws {
             let service = CloudKitOnboardingService.shared
             
@@ -263,8 +275,9 @@ struct TestFlightReleaseTests {
         }
         
         @Test("CloudKit sharing service checks availability")
+        @MainActor
         func sharingServiceChecksAvailability() async throws {
-            let service = CloudKitSharingService.shared
+            _ = CloudKitSharingService.shared
             
             // Service should have checked availability on init
             // isCloudKitAvailable should be set (true or false)
@@ -403,7 +416,7 @@ struct TestFlightReleaseTests {
         func sharingErrorMessagesAreHelpful() {
             let errors: [SharingError] = [
                 .notAuthenticated,
-                .cloudKitUnavailable,
+                .cloudKitUnavailable(message: "Test unavailable"),
                 .recipeNotFound,
                 .bookNotFound,
                 .uploadFailed(NSError(domain: "test", code: 1)),
@@ -420,7 +433,8 @@ struct TestFlightReleaseTests {
         }
         
         @Test("CloudKitError provides helpful messages")
-        func cloudKitErrorMessagesAreHelpful() {
+        @MainActor
+        func cloudKitErrorMessagesAreHelpful() async throws {
             let errors: [CloudKitError] = [
                 .statusUnknown,
                 .containerInaccessible,
@@ -492,6 +506,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("Diagnostics track all required checks")
+        @MainActor
         func diagnosticsTrackAllChecks() async throws {
             let service = CloudKitOnboardingService.shared
             
@@ -500,7 +515,7 @@ struct TestFlightReleaseTests {
             let diagnostics = try #require(service.diagnostics)
             
             // Verify all diagnostic fields are present
-            #expect(diagnostics.timestamp != nil)
+            // timestamp is non-optional Date, so it always exists
             #expect(!diagnostics.accountStatus.isEmpty)
             // containerAccessible, publicDatabaseAccessible, etc. are Bool so always present
             
@@ -509,6 +524,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("Repair function exists")
+        @MainActor
         func repairFunctionExists() async {
             let service = CloudKitOnboardingService.shared
             
@@ -520,6 +536,7 @@ struct TestFlightReleaseTests {
         }
         
         @Test("Public database schema initialization exists")
+        @MainActor
         func publicDBSchemaInitializationExists() async {
             let service = CloudKitOnboardingService.shared
             
@@ -540,12 +557,14 @@ struct TestFlightReleaseTests {
             let result = await CloudKitContainerValidator.validateContainer(
                 identifier: "iCloud.com.headydiscy.reczipes"
             )
-            
-            #expect(result.containerIdentifier == "iCloud.com.headydiscy.reczipes")
-            #expect(!result.bundleID.isEmpty)
+            let a = await result.containerIdentifier
+            #expect(a == "iCloud.com.headydiscy.reczipes")
+            let rb = await result.bundleID
+            #expect(!rb.isEmpty)
         }
         
         @Test("Validation result can diagnose issues")
+        @MainActor
         func validationResultDiagnoses() async {
             let result = await CloudKitContainerValidator.validateContainer(
                 identifier: "iCloud.com.headydiscy.reczipes"
@@ -553,11 +572,14 @@ struct TestFlightReleaseTests {
             
             let diagnosis = result.diagnose()
             
-            #expect(!diagnosis.emoji.isEmpty)
-            #expect(!diagnosis.summary.isEmpty)
+            let de = diagnosis.emoji
+            #expect(!de.isEmpty)
+            let ds = diagnosis.summary
+            #expect(!ds.isEmpty)
         }
         
         @Test("Validation can identify account issues")
+        @MainActor
         func validationIdentifiesAccountIssues() async {
             var result = ValidationResult(containerIdentifier: "test")
             result.isAccountAvailable = false
@@ -565,11 +587,14 @@ struct TestFlightReleaseTests {
             
             let diagnosis = result.diagnose()
             
-            #expect(diagnosis.issues.contains { $0.contains("account") || $0.contains("iCloud") })
-            #expect(diagnosis.recommendations.contains { $0.contains("Sign into iCloud") })
+            let di = diagnosis.issues
+            #expect(di.contains { $0.contains("account") || $0.contains("iCloud") })
+            let dr = diagnosis.recommendations
+            #expect(dr.contains { $0.contains("Sign into iCloud") })
         }
         
         @Test("Validation can identify container access issues")
+        @MainActor
         func validationIdentifiesContainerIssues() async {
             var result = ValidationResult(containerIdentifier: "test")
             result.isAccountAvailable = true
@@ -577,8 +602,9 @@ struct TestFlightReleaseTests {
             result.containerAccessError = "bad container"
             
             let diagnosis = result.diagnose()
+            let di = diagnosis.issues
             
-            #expect(diagnosis.issues.contains { $0.contains("Cannot access container") })
+            #expect(di.contains { $0.contains("Cannot access container") })
         }
     }
 }

@@ -12,6 +12,7 @@ struct CloudKitOnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var showDiagnosticsDetail = false
+    @State private var showHelpSection = false
     
     var body: some View {
         NavigationStack {
@@ -26,6 +27,8 @@ struct CloudKitOnboardingView: View {
                     if let diagnostics = onboarding.diagnostics {
                         diagnosticsSection(diagnostics)
                     }
+                    
+                    communitySharingHelpSection
                 }
                 .padding()
             }
@@ -456,6 +459,128 @@ struct CloudKitOnboardingView: View {
         .cornerRadius(8)
     }
     
+    // MARK: - Community Sharing Help Section
+    
+    private var communitySharingHelpSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: {
+                withAnimation {
+                    showHelpSection.toggle()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "questionmark.circle.fill")
+                        .foregroundStyle(.blue)
+                    
+                    Text("Community Sharing Help")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: showHelpSection ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            
+            if showHelpSection {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Getting Started
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Getting Started")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Text("If you're new to community sharing, the app will guide you through a quick setup the first time you try to share. This ensures CloudKit is properly configured on your device.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Text("Existing users: Your sharing should continue to work normally.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    // If You Experience Issues
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("If you experience issues:")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HelpStep(number: "1", text: "Go to Settings → Community Sharing")
+                            HelpStep(number: "2", text: "Tap Setup & Diagnostics")
+                            HelpStep(number: "3", text: "Follow the on-screen instructions")
+                        }
+                        .font(.caption)
+                    }
+                    
+                    Divider()
+                    
+                    // Reporting Issues
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("A. Please provide:")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HelpBullet(text: "Open Settings → Community Sharing")
+                            HelpBullet(text: "Tap Setup & Diagnostics")
+                            HelpBullet(text: "Screenshot the checklist")
+                            HelpBullet(text: "OR export diagnostics JSON")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    // Common Fixes
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("B. Common fixes:")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HelpBullet(text: "Not signed into iCloud → Guide to Settings")
+                            HelpBullet(text: "Container not accessible → Run Request Access")
+                            HelpBullet(text: "Public DB not initialized → Run Initialize Database")
+                            HelpBullet(text: "Restricted → Check Screen Time settings")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    // Advanced Troubleshooting
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("C. If diagnostics show ready but still failing:")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HelpBullet(text: "Check CloudKit Dashboard for schema deployment")
+                            HelpBullet(text: "Verify Production environment has record types")
+                            HelpBullet(text: "Check for quota limits (rare)")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color(.tertiarySystemBackground))
+                .cornerRadius(8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+    
     // MARK: - Computed Properties
     
     private var statusIcon: String {
@@ -508,6 +633,40 @@ struct CloudKitOnboardingView: View {
 }
 
 // MARK: - Supporting Views
+
+struct HelpStep: View {
+    let number: String
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("\(number).")
+                .fontWeight(.semibold)
+                .foregroundStyle(.blue)
+                .frame(width: 20, alignment: .leading)
+            
+            Text(text)
+            
+            Spacer()
+        }
+    }
+}
+
+struct HelpBullet: View {
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .foregroundStyle(.blue)
+                .frame(width: 12, alignment: .leading)
+            
+            Text(text)
+            
+            Spacer()
+        }
+    }
+}
 
 struct ChecklistItem: View {
     let title: String
