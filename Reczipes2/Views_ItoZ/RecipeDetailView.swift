@@ -23,8 +23,11 @@ struct RecipeDetailView: View {
     
     @StateObject private var fodmapSettings = UserFODMAPSettings.shared
     @StateObject private var diabeticSettings = UserDiabeticSettings.shared
+    @StateObject private var onboarding = CloudKitOnboardingService.shared
     
     @State private var showingEditor = false
+    @State private var showCloudKitWarning = false
+    @State private var showCloudKitOnboarding = false
     @State private var showingRemindersAlert = false
     @State private var remindersAlertMessage = ""
     @State private var isExportingToReminders = false
@@ -770,9 +773,23 @@ struct RecipeDetailView: View {
                 }
             }
             
-            // Share button
+            // Share button (for email, text, etc.)
             ToolbarItem(placement: .primaryAction) {
                 RecipeShareButton(recipe: recipe)
+            }
+            
+            // Community Share button (CloudKit required)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    // Check CloudKit before community sharing
+                    if case .ready = onboarding.onboardingState {
+                        shareToCloudKitCommunity()
+                    } else {
+                        showCloudKitWarning = true
+                    }
+                } label: {
+                    Label("Share to Community", systemImage: "person.2.fill")
+                }
             }
             
             // Export to Reminders button
@@ -852,6 +869,18 @@ struct RecipeDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(remindersAlertMessage)
+        }
+        .alert("Community Sharing Not Available", isPresented: $showCloudKitWarning) {
+            Button("Set Up Now") {
+                showCloudKitOnboarding = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("CloudKit needs to be set up before you can share to the community. This enables recipe syncing across your devices and sharing with others.")
+        }
+        .sheet(isPresented: $showCloudKitOnboarding) {
+            CloudKitOnboardingView()
+                .environmentObject(onboarding)
         }
         .onAppear {
             checkForPendingAnalysis()
@@ -1163,6 +1192,18 @@ struct RecipeDetailView: View {
         case .timing: return .purple
         case .general: return .gray
         }
+    }
+    
+    // MARK: - CloudKit Community Sharing
+    
+    private func shareToCloudKitCommunity() {
+        // TODO: Implement CloudKit community sharing
+        // This will create a SharedRecipe entity and share it via CloudKit
+        logInfo("Community sharing initiated for recipe: \(recipe.title)", category: "cloudkit")
+        
+        // For now, show a coming soon alert
+        remindersAlertMessage = "Community sharing is coming soon! Once enabled, you'll be able to share your recipes with other users and discover new recipes from the community."
+        showingRemindersAlert = true
     }
 }
 

@@ -61,7 +61,29 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-
+                "If you're new to community sharing, the app will guide you through",
+                "a quick setup the first time you try to share. This ensures CloudKit",
+                "is properly configured on your device.",
+                "Existing users: Your sharing should continue to work normally.",
+                "If you experience issues:",
+                "1. Go to Settings → Community Sharing",
+                "2. Tap Setup & Diagnostics",
+                "3. Follow the on-screen instructions",
+                
+                "A. **Please:**",
+                   "- Open Settings → Community Sharing",
+                   "- Tap Setup & Diagnostics",
+                   "- Screenshot the checklist",
+                   "- OR export diagnostics JSON",
+                "B. **Common fixes:**",
+                   "- Not signed into iCloud → Guide to Settings",
+                   "- Container not accessible → Run Request Access",
+                   "- Public DB not initialized → Run Initialize Database",
+                   "- Restricted → Check Screen Time settings",
+                ". **If diagnostics show ready but still failing:**",
+                   "- Check CloudKit Dashboard for schema deployment",
+                   "- Verify Production environment has record types",
+                   "- Check for quota limits (rare)",
             ]
         ))
         

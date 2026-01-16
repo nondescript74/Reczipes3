@@ -24,6 +24,8 @@ struct SharingSettingsView: View {
     @State private var sharingStatus = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var showingOnboarding = false
+    @State private var currentSharingError: SharingError?
     
     private var preferences: SharingPreferences {
         if let existing = sharingPreferences.first {
@@ -78,6 +80,27 @@ struct SharingSettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage)
+        }
+        .alert("Sharing Failed", isPresented: Binding(
+            get: { currentSharingError != nil },
+            set: { if !$0 { currentSharingError = nil } }
+        )) {
+            if let error = currentSharingError, error.canOpenOnboarding {
+                Button("Open Setup & Diagnostics") {
+                    showingOnboarding = true
+                    currentSharingError = nil
+                }
+            }
+            Button("OK", role: .cancel) {
+                currentSharingError = nil
+            }
+        } message: {
+            if let error = currentSharingError {
+                Text(error.localizedDescription)
+            }
+        }
+        .sheet(isPresented: $showingOnboarding) {
+            CloudKitOnboardingView()
         }
         .task {
             await sharingService.checkCloudKitAvailability()
@@ -239,8 +262,12 @@ struct SharingSettingsView: View {
             alertMessage = "Shared \(successful) recipes. \(failed) failed."
             showingAlert = true
         case .failure(let error):
-            alertMessage = "Failed to share recipes: \(error.localizedDescription)"
-            showingAlert = true
+            if let sharingError = error as? SharingError {
+                currentSharingError = sharingError
+            } else {
+                alertMessage = "Failed to share recipes: \(error.localizedDescription)"
+                showingAlert = true
+            }
         }
     }
     
@@ -262,8 +289,12 @@ struct SharingSettingsView: View {
             alertMessage = "Shared \(successful) books. \(failed) failed."
             showingAlert = true
         case .failure(let error):
-            alertMessage = "Failed to share books: \(error.localizedDescription)"
-            showingAlert = true
+            if let sharingError = error as? SharingError {
+                currentSharingError = sharingError
+            } else {
+                alertMessage = "Failed to share books: \(error.localizedDescription)"
+                showingAlert = true
+            }
         }
     }
     
@@ -282,8 +313,12 @@ struct SharingSettingsView: View {
             alertMessage = "Shared \(successful) recipes. \(failed) failed."
             showingAlert = true
         case .failure(let error):
-            alertMessage = "Failed to share recipes: \(error.localizedDescription)"
-            showingAlert = true
+            if let sharingError = error as? SharingError {
+                currentSharingError = sharingError
+            } else {
+                alertMessage = "Failed to share recipes: \(error.localizedDescription)"
+                showingAlert = true
+            }
         }
     }
     
@@ -300,8 +335,12 @@ struct SharingSettingsView: View {
             alertMessage = "Shared \(successful) books. \(failed) failed."
             showingAlert = true
         case .failure(let error):
-            alertMessage = "Failed to share books: \(error.localizedDescription)"
-            showingAlert = true
+            if let sharingError = error as? SharingError {
+                currentSharingError = sharingError
+            } else {
+                alertMessage = "Failed to share books: \(error.localizedDescription)"
+                showingAlert = true
+            }
         }
     }
 }
@@ -526,13 +565,6 @@ struct ManageSharedContentView: View {
             .navigationTitle("My Shared Content")
     }
 }
-
-//struct SharedRecipesBrowserView: View {
-//    var body: some View {
-//        Text("Browse community recipes here")
-//            .navigationTitle("Community Recipes")
-//    }
-//}
 
 struct SharedBooksBrowserView: View {
     var body: some View {

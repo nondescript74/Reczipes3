@@ -15,6 +15,10 @@ struct Reczipes2App: App {
     @StateObject private var appState = AppStateManager.shared
     @StateObject private var taskRestoration = TaskRestorationCoordinator.shared
     @StateObject private var containerManager = ModelContainerManager.shared
+    @StateObject private var onboarding = CloudKitOnboardingService.shared
+    
+    @AppStorage("hasCompletedCloudKitOnboarding") private var hasCompletedOnboarding = false
+    @State private var showOnboardingSheet = false
     
     init() {
         // Suppress Auto Layout constraint warnings from UIKit internals
@@ -221,6 +225,28 @@ struct Reczipes2App: App {
                             
                             // Check for App Clip data
                             checkForAppClipData()
+                        }
+                        .task {
+                            // Run CloudKit diagnostics on first launch
+                            if !hasCompletedOnboarding {
+                                await onboarding.runComprehensiveDiagnostics()
+                                
+                                // Show onboarding if not ready
+                                if case .ready = onboarding.onboardingState {
+                                    hasCompletedOnboarding = true
+                                } else {
+                                    showOnboardingSheet = true
+                                }
+                            }
+                        }
+                        .sheet(isPresented: $showOnboardingSheet) {
+                            CloudKitOnboardingView()
+                                .environmentObject(onboarding)
+                                .onDisappear {
+                                    // Mark as completed when they dismiss
+                                    // (even if not fully set up, don't nag them)
+                                    hasCompletedOnboarding = true
+                                }
                         }
                     
                     // Launch screen overlay - shows briefly on every launch (after onboarding)

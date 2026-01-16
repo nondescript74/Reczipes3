@@ -18,6 +18,8 @@ struct SharedRecipesBrowserView: View {
     @State private var selectedRecipe: CloudKitRecipe?
     @State private var showingImportConfirmation = false
     @State private var searchText = ""
+    @State private var currentSharingError: SharingError?
+    @State private var showingOnboarding = false
     
     var filteredRecipes: [CloudKitRecipe] {
         if searchText.isEmpty {
@@ -62,6 +64,39 @@ struct SharedRecipesBrowserView: View {
                     await importRecipe(recipeToImport)
                 }
             }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { errorMessage != nil && currentSharingError == nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                errorMessage = nil
+            }
+        } message: {
+            if let errorMessage {
+                Text(errorMessage)
+            }
+        }
+        .alert("Sharing Failed", isPresented: Binding(
+            get: { currentSharingError != nil },
+            set: { if !$0 { currentSharingError = nil } }
+        )) {
+            if let error = currentSharingError, error.canOpenOnboarding {
+                Button("Open Setup & Diagnostics") {
+                    showingOnboarding = true
+                    currentSharingError = nil
+                }
+            }
+            Button("OK", role: .cancel) {
+                currentSharingError = nil
+            }
+        } message: {
+            if let error = currentSharingError {
+                Text(error.errorDescription ?? "An unknown error occurred.")
+            }
+        }
+        .sheet(isPresented: $showingOnboarding) {
+            CloudKitOnboardingView()
         }
         .task {
             await loadSharedRecipes()
@@ -120,11 +155,17 @@ struct SharedRecipesBrowserView: View {
     private func loadSharedRecipes() async {
         isLoading = true
         errorMessage = nil
+        currentSharingError = nil
         
         do {
             let recipes = try await sharingService.fetchSharedRecipes(limit: 200)
             await MainActor.run {
                 self.sharedRecipes = recipes
+                self.isLoading = false
+            }
+        } catch let error as SharingError {
+            await MainActor.run {
+                self.currentSharingError = error
                 self.isLoading = false
             }
         } catch {

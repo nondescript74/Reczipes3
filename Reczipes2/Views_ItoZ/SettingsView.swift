@@ -13,11 +13,27 @@ struct SettingsView: View {
     @State private var showLicenseAgreement = false
     @State private var showHelpBrowser = false
     @State private var showDiagnosticLog = false
+    @StateObject private var onboarding = CloudKitOnboardingService.shared
+    @State private var showOnboarding = false
     
     private var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
         return "\(version) (\(build))"
+    }
+    
+    @ViewBuilder
+    private var statusIndicator: some View {
+        switch onboarding.onboardingState {
+        case .ready:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .checking:
+            ProgressView()
+        default:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+        }
     }
     
     var body: some View {
@@ -43,7 +59,12 @@ struct SettingsView: View {
                         Button("Manage API Key") {
                             showAPIKeyManager = true
                         }
-                        
+                        // Onboarding button
+                        Button(action: {
+                            showOnboarding = true
+                        }) {
+                            Label("Setup & Diagnostics", systemImage: "gear.circle")
+                        }
                         Toggle("Auto-Extract on Image Selection",
                                isOn: .constant(RecipeExtractorConfig.autoExtractOnImageSelection))
                         
@@ -311,6 +332,9 @@ struct SettingsView: View {
                 .sheet(isPresented: $showDiagnosticLog) {
                     DiagnosticLogView()
                 }
+                .sheet(isPresented: $showOnboarding) {
+                    CloudKitOnboardingView()
+                }
                 .onAppear {
                     // Refresh API key status when view appears
                     isAPIKeyConfigured = APIKeyHelper.isConfigured
@@ -348,6 +372,7 @@ struct LicenseDisplayView: View {
         }
     }
 }
+
 
 #Preview {
     SettingsView()

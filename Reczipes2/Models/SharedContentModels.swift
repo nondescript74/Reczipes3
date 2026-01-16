@@ -157,7 +157,7 @@ enum SharingResult {
 
 enum SharingError: LocalizedError {
     case notAuthenticated
-    case cloudKitUnavailable
+    case cloudKitUnavailable(message: String? = nil)
     case recipeNotFound
     case bookNotFound
     case uploadFailed(Error)
@@ -169,8 +169,8 @@ enum SharingError: LocalizedError {
         switch self {
         case .notAuthenticated:
             return "You must be signed in to iCloud to share content."
-        case .cloudKitUnavailable:
-            return "CloudKit is not available. Check your iCloud settings."
+        case .cloudKitUnavailable(let message):
+            return message ?? "CloudKit is not available. Check your iCloud settings."
         case .recipeNotFound:
             return "The recipe you're trying to share was not found."
         case .bookNotFound:
@@ -183,6 +183,15 @@ enum SharingError: LocalizedError {
             return "The shared content contains invalid data."
         case .imageUploadFailed(let error):
             return "Failed to upload image: \(error.localizedDescription)"
+        }
+    }
+    
+    var canOpenOnboarding: Bool {
+        switch self {
+        case .cloudKitUnavailable, .notAuthenticated:
+            return true
+        default:
+            return false
         }
     }
 }

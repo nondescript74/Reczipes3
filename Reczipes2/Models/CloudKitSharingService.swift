@@ -88,11 +88,12 @@ class CloudKitSharingService: ObservableObject {
         }
     }
     
+    
     // MARK: - Share Recipe
     
     func shareRecipe(_ recipe: RecipeModel, modelContext: ModelContext) async throws -> String {
         guard isCloudKitAvailable else {
-            throw SharingError.cloudKitUnavailable
+            throw SharingError.cloudKitUnavailable()
         }
         
         guard let userID = currentUserID else {
@@ -151,6 +152,7 @@ class CloudKitSharingService: ObservableObject {
         try modelContext.save()
         
         logInfo("Shared recipe: \(recipe.title)", category: "sharing")
+        logInfo("Community share successful", category: "analytics")
         
         return savedRecord.recordID.recordName
     }
@@ -159,7 +161,7 @@ class CloudKitSharingService: ObservableObject {
     
     func shareRecipeBook(_ book: RecipeBook, modelContext: ModelContext) async throws -> String {
         guard isCloudKitAvailable else {
-            throw SharingError.cloudKitUnavailable
+            throw SharingError.cloudKitUnavailable()
         }
         
         guard let userID = currentUserID else {
@@ -215,6 +217,7 @@ class CloudKitSharingService: ObservableObject {
         try modelContext.save()
         
         logInfo("Shared recipe book: \(book.name)", category: "sharing")
+        logInfo("Community share successful", category: "analytics")
         
         return savedRecord.recordID.recordName
     }
@@ -231,6 +234,7 @@ class CloudKitSharingService: ObservableObject {
                 successful += 1
             } catch {
                 logError("Failed to share recipe '\(recipe.title)': \(error)", category: "sharing")
+                logError("Community share failed: \(error)", category: "analytics")
                 failed += 1
             }
         }
@@ -252,6 +256,7 @@ class CloudKitSharingService: ObservableObject {
                 successful += 1
             } catch {
                 logError("Failed to share book '\(book.name)': \(error)", category: "sharing")
+                logError("Community share failed: \(error)", category: "analytics")
                 failed += 1
             }
         }
@@ -267,7 +272,7 @@ class CloudKitSharingService: ObservableObject {
     
     func fetchSharedRecipes(limit: Int = 100) async throws -> [CloudKitRecipe] {
         guard isCloudKitAvailable else {
-            throw SharingError.cloudKitUnavailable
+            throw SharingError.cloudKitUnavailable()
         }
         
         let query = CKQuery(recordType: CloudKitRecordType.sharedRecipe, predicate: NSPredicate(value: true))
@@ -298,7 +303,7 @@ class CloudKitSharingService: ObservableObject {
     
     func fetchSharedRecipeBooks(limit: Int = 100) async throws -> [CloudKitRecipeBook] {
         guard isCloudKitAvailable else {
-            throw SharingError.cloudKitUnavailable
+            throw SharingError.cloudKitUnavailable()
         }
         
         let query = CKQuery(recordType: CloudKitRecordType.sharedRecipeBook, predicate: NSPredicate(value: true))
@@ -331,7 +336,7 @@ class CloudKitSharingService: ObservableObject {
     
     func unshareRecipe(cloudRecordID: String, modelContext: ModelContext) async throws {
         guard isCloudKitAvailable else {
-            throw SharingError.cloudKitUnavailable
+            throw SharingError.cloudKitUnavailable()
         }
         
         let recordID = CKRecord.ID(recordName: cloudRecordID)
@@ -352,7 +357,7 @@ class CloudKitSharingService: ObservableObject {
     
     func unshareRecipeBook(cloudRecordID: String, modelContext: ModelContext) async throws {
         guard isCloudKitAvailable else {
-            throw SharingError.cloudKitUnavailable
+            throw SharingError.cloudKitUnavailable()
         }
         
         let recordID = CKRecord.ID(recordName: cloudRecordID)
