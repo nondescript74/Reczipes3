@@ -156,9 +156,11 @@ class CloudKitOnboardingService: ObservableObject {
         var canShareToPublic = false
         var canReadFromPublic = false
         
-        // Step 1: Check iCloud account status
+        // Step 1: Check iCloud account status with timeout
         do {
-            let status = try await container.accountStatus()
+            let status = try await withTimeout(seconds: 10) {
+                try await self.container.accountStatus()
+            }
             accountStatusString = status.description
             
             logInfo("   Account Status: \(accountStatusString)", category: "onboarding")
@@ -204,6 +206,24 @@ class CloudKitOnboardingService: ObservableObject {
                 return
             }
             
+        } catch is TimeoutError {
+            // Timeout indicates iCloud might not be configured or is slow to respond
+            errors.append("iCloud status check timed out - iCloud may not be configured on this device")
+            accountStatusString = "timeout"
+            onboardingState = .needsiCloudSignIn
+            logWarning("   ⏱️ Account check timed out - likely not configured", category: "onboarding")
+            createDiagnostics(
+                accountStatus: accountStatusString,
+                containerAccessible: false,
+                publicDBAccessible: false,
+                privateDBAccessible: false,
+                userRecordID: nil,
+                userDiscoverable: false,
+                canShareToPublic: false,
+                canReadFromPublic: false,
+                errors: errors
+            )
+            return
         } catch {
             errors.append("Failed to check account status: \(error.localizedDescription)")
             onboardingState = .failed(error)
@@ -222,15 +242,21 @@ class CloudKitOnboardingService: ObservableObject {
             return
         }
         
-        // Step 2: Check container accessibility
+        // Step 2: Check container accessibility with timeout
         currentStep = .requestingPermissions
         
         do {
             // Try to fetch user record ID (this validates container access)
-            let recordID = try await container.userRecordID()
+            let recordID = try await withTimeout(seconds: 10) {
+                try await self.container.userRecordID()
+            }
             userRecordID = recordID.recordName
             containerAccessible = true
             logInfo("   ✅ Container accessible, User ID: \(recordID.recordName)", category: "onboarding")
+        } catch is TimeoutError {
+            errors.append("Container access check timed out - iCloud may not be fully initialized")
+            containerAccessible = false
+            logWarning("   ⏱️ Container access timed out", category: "onboarding")
         } catch {
             errors.append("Cannot access CloudKit container: \(error.localizedDescription)")
             containerAccessible = false
@@ -326,10 +352,16 @@ class CloudKitOnboardingService: ObservableObject {
     
     private func testPublicDatabaseRead() async -> Bool {
         do {
-            // Try a simple query
-            let query = CKQuery(recordType: "SharedRecipe", predicate: NSPredicate(value: true))
-            _ = try await publicDatabase.records(matching: query, desiredKeys: nil, resultsLimit: 1)
+            // Try a simple query with timeout
+            let result = try await withTimeout(seconds: 10) {
+                let query = CKQuery(recordType: "SharedRecipe", predicate: NSPredicate(value: true))
+                return try await self.publicDatabase.records(matching: query, desiredKeys: nil, resultsLimit: 1)
+            }
+            _ = result
             return true
+        } catch is TimeoutError {
+            logWarning("Public DB read test timed out", category: "onboarding")
+            return false
         } catch let error as CKError {
             // Some errors are expected if no data exists yet
             switch error.code {
@@ -348,18 +380,24 @@ class CloudKitOnboardingService: ObservableObject {
     
     private func testPublicDatabaseWrite() async -> Bool {
         do {
-            // Create a test record
-            let testRecord = CKRecord(recordType: "OnboardingTest")
-            testRecord["testField"] = "onboarding_\(UUID().uuidString)" as CKRecordValue
-            testRecord["timestamp"] = Date() as CKRecordValue
-            
-            // Try to save it
-            let savedRecord = try await publicDatabase.save(testRecord)
-            
-            // Clean up - delete the test record
-            _ = try? await publicDatabase.deleteRecord(withID: savedRecord.recordID)
+            // Create and save a test record with timeout
+            try await withTimeout(seconds: 10) {
+                // Create a test record
+                let testRecord = CKRecord(recordType: "OnboardingTest")
+                testRecord["testField"] = "onboarding_\(UUID().uuidString)" as CKRecordValue
+                testRecord["timestamp"] = Date() as CKRecordValue
+                
+                // Try to save it
+                let savedRecord = try await self.publicDatabase.save(testRecord)
+                
+                // Clean up - delete the test record
+                _ = try? await self.publicDatabase.deleteRecord(withID: savedRecord.recordID)
+            }
             
             return true
+        } catch is TimeoutError {
+            logWarning("Public DB write test timed out", category: "onboarding")
+            return false
         } catch {
             logError("Public DB write test failed: \(error)", category: "onboarding")
             return false
@@ -368,10 +406,16 @@ class CloudKitOnboardingService: ObservableObject {
     
     private func testPrivateDatabaseAccess() async -> Bool {
         do {
-            // Try a simple query
-            let query = CKQuery(recordType: "Recipe", predicate: NSPredicate(value: true))
-            _ = try await privateDatabase.records(matching: query, desiredKeys: nil, resultsLimit: 1)
+            // Try a simple query with timeout
+            let result = try await withTimeout(seconds: 10) {
+                let query = CKQuery(recordType: "Recipe", predicate: NSPredicate(value: true))
+                return try await self.privateDatabase.records(matching: query, desiredKeys: nil, resultsLimit: 1)
+            }
+            _ = result
             return true
+        } catch is TimeoutError {
+            logWarning("Private DB test timed out", category: "onboarding")
+            return false
         } catch let error as CKError {
             // Some errors are expected
             switch error.code {
@@ -490,6 +534,34 @@ class CloudKitOnboardingService: ObservableObject {
         
         return jsonString
     }
+    
+    // MARK: - Timeout Helper
+    
+    /// Execute an async operation with a timeout
+    private func withTimeout<T: Sendable>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            // Add the main operation
+            group.addTask {
+                try await operation()
+            }
+            
+            // Add timeout task
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw TimeoutError()
+            }
+            
+            // Wait for first to complete
+            guard let result = try await group.next() else {
+                throw TimeoutError()
+            }
+            
+            // Cancel remaining tasks
+            group.cancelAll()
+            
+            return result
+        }
+    }
 }
 
 // MARK: - Extensions
@@ -508,6 +580,12 @@ extension CKAccountStatus {
 }
 
 // MARK: - Errors
+
+struct TimeoutError: Error, LocalizedError {
+    var errorDescription: String? {
+        "Operation timed out"
+    }
+}
 
 enum CloudKitError: LocalizedError {
     case statusUnknown

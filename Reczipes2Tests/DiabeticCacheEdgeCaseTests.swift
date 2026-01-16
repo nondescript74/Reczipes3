@@ -75,24 +75,22 @@ struct DiabeticCacheEdgeCaseTests {
     // MARK: - Large Data Tests
     
     @Test("Very large ingredient list")
-    nonisolated func largeIngredientList() async throws {
+    @MainActor
+    func largeIngredientList() async throws {
         logger.info("🧪 Testing large ingredient list (1000 ingredients)")
         
         let startTime = Date()
         
         // Create 1000 ingredients
-        var ingredients: [Ingredient] = []
-        for i in 1...1000 {
-            await ingredients.append(
-                Ingredient(
-                    quantity: "\(i)",
-                    unit: "unit\(i)",
-                    name: "ingredient\(i)"
-                )
+        let ingredients: [Ingredient] = (1...1000).map { i in
+            Ingredient(
+                quantity: "\(i)",
+                unit: "unit\(i)",
+                name: "ingredient\(i)"
             )
         }
         
-        let sections = await [IngredientSection(ingredients: ingredients)]
+        let sections = [IngredientSection(ingredients: ingredients)]
         
         let encoder = JSONEncoder()
         let data = try encoder.encode(sections)
@@ -112,33 +110,30 @@ struct DiabeticCacheEdgeCaseTests {
     }
     
     @Test("Many small sections vs one large section")
-    nonisolated func multipleSectionsVsOne() async throws {
+    @MainActor
+    func multipleSectionsVsOne() async throws {
         logger.info("🧪 Testing multiple sections vs single section")
         
         let encoder = JSONEncoder()
         
         // Create ingredients in many small sections
-        var manySections: [IngredientSection] = []
-        for i in 1...100 {
-            let ingredient = await Ingredient(quantity: "1", unit: "cup", name: "ingredient\(i)")
-            let section = await IngredientSection(
+        let manySections: [IngredientSection] = (1...100).map { i in
+            let ingredient = Ingredient(quantity: "1", unit: "cup", name: "ingredient\(i)")
+            return IngredientSection(
                 title: "Section \(i)",
                 ingredients: [ingredient]
             )
-            manySections.append(section)
         }
         
         let manyData = try encoder.encode(manySections)
         let manyHash = Recipe.calculateIngredientsHash(from: manyData)
         
         // Create same ingredients in one large section
-        var allIngredients: [Ingredient] = []
-        for i in 1...100 {
-            let ingredient = await Ingredient(quantity: "1", unit: "cup", name: "ingredient\(i)")
-            allIngredients.append(ingredient)
+        let allIngredients: [Ingredient] = (1...100).map { i in
+            Ingredient(quantity: "1", unit: "cup", name: "ingredient\(i)")
         }
         
-        let oneSection = await [
+        let oneSection = [
             IngredientSection(
                 title: "All Ingredients",
                 ingredients: allIngredients

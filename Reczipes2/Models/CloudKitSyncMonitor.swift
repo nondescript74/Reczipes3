@@ -48,7 +48,10 @@ class CloudKitSyncMonitor: ObservableObject {
         defer { isCheckingStatus = false }
         
         do {
-            let status = try await container.accountStatus()
+            // Check account status with timeout to prevent hanging on unconfigured simulators
+            let status = try await withTimeout(seconds: 10) {
+                try await self.container.accountStatus()
+            }
             accountStatus = status
             
             switch status {
@@ -106,6 +109,15 @@ class CloudKitSyncMonitor: ObservableObject {
                     hasWarnedAboutStatus.insert("unknown")
                 }
             }
+        } catch is TimeoutError {
+            // Timeout likely means iCloud is not configured or not responding
+            isSyncEnabled = false
+            accountStatus = .couldNotDetermine
+            lastSyncError = "iCloud status check timed out. Please ensure iCloud is configured in Settings."
+            if !hasWarnedAboutStatus.contains("timeout") {
+                logWarning("⏱️ iCloud status check timed out - likely not configured", category: "storage")
+                hasWarnedAboutStatus.insert("timeout")
+            }
         } catch {
             isSyncEnabled = false
             lastSyncError = "Error checking iCloud status: \(error.localizedDescription)"
@@ -124,6 +136,34 @@ class CloudKitSyncMonitor: ObservableObject {
             // Notify the container manager to potentially recreate the container
             // The manager will decide if recreation is actually needed
             await ModelContainerManager.shared.recreateContainer()
+        }
+    }
+    
+    // MARK: - Timeout Helper
+    
+    /// Execute an async operation with a timeout
+    private func withTimeout<T: Sendable>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            // Add the main operation
+            group.addTask {
+                try await operation()
+            }
+            
+            // Add timeout task
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw TimeoutError()
+            }
+            
+            // Wait for first to complete
+            guard let result = try await group.next() else {
+                throw TimeoutError()
+            }
+            
+            // Cancel remaining tasks
+            group.cancelAll()
+            
+            return result
         }
     }
     
@@ -177,6 +217,14 @@ class CloudKitSyncMonitor: ObservableObject {
             return .orange
         @unknown default:
             return .gray
+        }
+    }
+    
+    // MARK: - Errors
+    
+    private struct TimeoutError: Error, LocalizedError {
+        var errorDescription: String? {
+            "Operation timed out"
         }
     }
 }
@@ -299,3 +347,4 @@ struct CloudKitSyncBadge: View {
         }
     }
 }
+

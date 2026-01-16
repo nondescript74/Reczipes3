@@ -311,15 +311,26 @@ struct RecipeExportImportRestoreTests {
         let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
         let fileName = backupURL.lastPathComponent
         
-        print("Created backup: \(fileName)")
+        // Set up cleanup to happen no matter what
+        defer {
+            try? FileManager.default.removeItem(at: backupURL)
+            print("🗑️ Cleaned up backup: \(fileName)")
+        }
+        
+        print("Created backup: \(fileName) at: \(backupURL.path)")
         
         // Verify file exists immediately
-        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
-                "Backup should exist immediately after creation")
+        let existsImmediately = FileManager.default.fileExists(atPath: backupURL.path)
+        print("File exists immediately: \(existsImmediately)")
+        #expect(existsImmediately, 
+                "Backup should exist immediately after creation at: \(backupURL.path)")
         
         // Verify it appears in the list immediately
         var availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
         var foundBackup = availableBackups.first { $0.fileName == fileName }
+        
+        print("Found in list immediately: \(foundBackup != nil)")
+        print("Available backups: \(availableBackups.map { $0.fileName })")
         
         #expect(foundBackup != nil, 
                 "Backup should be in available backups list immediately")
@@ -328,20 +339,21 @@ struct RecipeExportImportRestoreTests {
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         // Verify file still exists after waiting
-        #expect(FileManager.default.fileExists(atPath: backupURL.path), 
-                "Backup should still exist after waiting")
+        let existsAfterWait = FileManager.default.fileExists(atPath: backupURL.path)
+        print("File exists after waiting: \(existsAfterWait)")
+        #expect(existsAfterWait, 
+                "Backup should still exist after waiting at: \(backupURL.path)")
         
         // Verify it's still in the list after waiting
         availableBackups = try RecipeBackupManager.shared.listAvailableBackups()
         foundBackup = availableBackups.first { $0.fileName == fileName }
         
+        print("Found in list after waiting: \(foundBackup != nil)")
+        
         #expect(foundBackup != nil, 
                 "Backup should still be in available backups list after waiting")
         
         print("✓ Backup persists across simulated app sessions")
-        
-        // Cleanup
-        try? FileManager.default.removeItem(at: backupURL)
     }
     
     @Test("Multiple sequential backups all persist")

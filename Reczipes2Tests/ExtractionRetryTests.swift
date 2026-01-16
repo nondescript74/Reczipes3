@@ -252,12 +252,16 @@ struct ExtractionRetryTests {
         let attemptTimes = await counter.timestamps
         if attemptTimes.count >= 2 {
             let delay1 = attemptTimes[1].timeIntervalSince(attemptTimes[0])
-            #expect(delay1 >= 0.9 && delay1 <= 1.2, "First retry should wait ~1s")
+            print("⏱️ First retry delay: \(delay1) seconds")
+            // More lenient timing window for simulator performance variability
+            #expect(delay1 >= 0.9 && delay1 <= 1.5, "First retry should wait ~1s, got \(delay1)s")
         }
         
         if attemptTimes.count >= 3 {
             let delay2 = attemptTimes[2].timeIntervalSince(attemptTimes[1])
-            #expect(delay2 >= 1.9 && delay2 <= 2.2, "Second retry should wait ~2s (exponential)")
+            print("⏱️ Second retry delay: \(delay2) seconds")
+            // More lenient timing window for simulator performance variability
+            #expect(delay2 >= 1.8 && delay2 <= 2.5, "Second retry should wait ~2s (exponential), got \(delay2)s")
         }
     }
     

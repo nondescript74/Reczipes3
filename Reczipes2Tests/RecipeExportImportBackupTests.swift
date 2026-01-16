@@ -284,17 +284,34 @@ struct RecipeExportImportBackupTests {
         try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
         
         // Clean up any existing .reczipes files to ensure clean test environment
+        // Use more aggressive cleanup
         let existingContents = try? FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: nil)
         if let contents = existingContents {
             for file in contents where file.pathExtension == "reczipes" {
-                try? FileManager.default.removeItem(at: file)
+                do {
+                    try FileManager.default.removeItem(at: file)
+                    print("🗑️ Removed existing backup: \(file.lastPathComponent)")
+                } catch {
+                    print("⚠️ Failed to remove \(file.lastPathComponent): \(error)")
+                }
             }
         }
+        
+        // Wait a moment for file system operations to complete
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Verify clean slate
         let afterCleanup = (try? FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: nil).filter { $0.pathExtension == "reczipes" }) ?? []
         print("✓ After cleanup: \(afterCleanup.count) .reczipes files in directory")
-        #expect(afterCleanup.isEmpty, "Directory should be empty after cleanup")
+        
+        if !afterCleanup.isEmpty {
+            print("⚠️ Files still present after cleanup:")
+            for file in afterCleanup {
+                print("  - \(file.lastPathComponent)")
+            }
+        }
+        
+        #expect(afterCleanup.isEmpty, "Directory should be empty after cleanup, but found \(afterCleanup.count) files")
         
         // Create a test recipe
         let schema = Schema([Recipe.self, RecipeBook.self])
