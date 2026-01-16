@@ -101,8 +101,11 @@ class CloudKitSharingService: ObservableObject {
         }
         
         // Check if this recipe is already shared and active
+        let recipeIDToFind = recipe.id
         let existingDescriptor = FetchDescriptor<SharedRecipe>(
-            predicate: #Predicate { $0.recipeID == recipe.id && $0.isActive == true }
+            predicate: #Predicate<SharedRecipe> { sharedRecipe in
+                sharedRecipe.recipeID == recipeIDToFind && sharedRecipe.isActive == true
+            }
         )
         
         if let existingShared = try? modelContext.fetch(existingDescriptor).first {
@@ -179,8 +182,11 @@ class CloudKitSharingService: ObservableObject {
         }
         
         // Check if this book is already shared and active
+        let bookIDToFind = book.id
         let existingDescriptor = FetchDescriptor<SharedRecipeBook>(
-            predicate: #Predicate { $0.bookID == book.id && $0.isActive == true }
+            predicate: #Predicate<SharedRecipeBook> { sharedBook in
+                sharedBook.bookID == bookIDToFind && sharedBook.isActive == true
+            }
         )
         
         if let existingShared = try? modelContext.fetch(existingDescriptor).first {
@@ -363,8 +369,11 @@ class CloudKitSharingService: ObservableObject {
         try await publicDatabase.deleteRecord(withID: recordID)
         
         // Remove from local tracking
+        let recordIDToFind = cloudRecordID
         let descriptor = FetchDescriptor<SharedRecipe>(
-            predicate: #Predicate { $0.cloudRecordID == cloudRecordID }
+            predicate: #Predicate<SharedRecipe> { sharedRecipe in
+                sharedRecipe.cloudRecordID == recordIDToFind
+            }
         )
         
         if let sharedRecipe = try modelContext.fetch(descriptor).first {
@@ -384,8 +393,11 @@ class CloudKitSharingService: ObservableObject {
         try await publicDatabase.deleteRecord(withID: recordID)
         
         // Remove from local tracking
+        let recordIDToFind = cloudRecordID
         let descriptor = FetchDescriptor<SharedRecipeBook>(
-            predicate: #Predicate { $0.cloudRecordID == cloudRecordID }
+            predicate: #Predicate<SharedRecipeBook> { sharedBook in
+                sharedBook.cloudRecordID == recordIDToFind
+            }
         )
         
         if let sharedBook = try modelContext.fetch(descriptor).first {
