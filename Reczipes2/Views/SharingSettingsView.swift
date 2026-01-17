@@ -356,17 +356,23 @@ struct SharingSettingsView: View {
         isSharing = true
         sharingStatus = "Unsharing all recipes..."
         
-        // Get all active shared recipes
-        let activeSharedRecipes = sharedRecipes.filter { $0.isActive }
+        // Get all shared recipes (both active and inactive to ensure cleanup)
+        let allSharedRecipes = sharedRecipes
         
         var successful = 0
         var failed = 0
         
-        for sharedRecipe in activeSharedRecipes {
+        for sharedRecipe in allSharedRecipes {
+            // If already inactive, skip it
+            if !sharedRecipe.isActive {
+                continue
+            }
+            
             guard let cloudRecordID = sharedRecipe.cloudRecordID else {
-                // Mark as inactive if no cloud record ID
+                // Mark as inactive if no cloud record ID (shouldn't happen, but handle gracefully)
                 sharedRecipe.isActive = false
                 successful += 1
+                logError("Recipe '\(sharedRecipe.recipeTitle)' had no cloudRecordID, marked as inactive", category: "sharing")
                 continue
             }
             
@@ -379,12 +385,17 @@ struct SharingSettingsView: View {
             }
         }
         
+        // Save changes to SwiftData
+        try? modelContext.save()
+        
         isSharing = false
         
-        if failed == 0 {
-            alertMessage = "Unshared \(successful) recipes"
+        if allSharedRecipes.isEmpty {
+            alertMessage = "No recipes to unshare"
+        } else if failed == 0 {
+            alertMessage = "Successfully unshared all \(successful) recipes"
         } else {
-            alertMessage = "Unshared \(successful) recipes. \(failed) failed."
+            alertMessage = "Unshared \(successful) of \(allSharedRecipes.count) recipes. \(failed) failed."
         }
         showingAlert = true
     }
@@ -393,17 +404,23 @@ struct SharingSettingsView: View {
         isSharing = true
         sharingStatus = "Unsharing all books..."
         
-        // Get all active shared books
-        let activeSharedBooks = sharedBooks.filter { $0.isActive }
+        // Get all shared books (both active and inactive to ensure cleanup)
+        let allSharedBooks = sharedBooks
         
         var successful = 0
         var failed = 0
         
-        for sharedBook in activeSharedBooks {
+        for sharedBook in allSharedBooks {
+            // If already inactive, skip it
+            if !sharedBook.isActive {
+                continue
+            }
+            
             guard let cloudRecordID = sharedBook.cloudRecordID else {
-                // Mark as inactive if no cloud record ID
+                // Mark as inactive if no cloud record ID (shouldn't happen, but handle gracefully)
                 sharedBook.isActive = false
                 successful += 1
+                logError("Book '\(sharedBook.bookName)' had no cloudRecordID, marked as inactive", category: "sharing")
                 continue
             }
             
@@ -416,12 +433,17 @@ struct SharingSettingsView: View {
             }
         }
         
+        // Save changes to SwiftData
+        try? modelContext.save()
+        
         isSharing = false
         
-        if failed == 0 {
-            alertMessage = "Unshared \(successful) books"
+        if allSharedBooks.isEmpty {
+            alertMessage = "No books to unshare"
+        } else if failed == 0 {
+            alertMessage = "Successfully unshared all \(successful) books"
         } else {
-            alertMessage = "Unshared \(successful) books. \(failed) failed."
+            alertMessage = "Unshared \(successful) of \(allSharedBooks.count) books. \(failed) failed."
         }
         showingAlert = true
     }

@@ -155,7 +155,7 @@ enum SharingResult {
 
 // MARK: - Sharing Error
 
-enum SharingError: LocalizedError {
+enum SharingError: LocalizedError, Equatable {
     case notAuthenticated
     case cloudKitUnavailable(message: String? = nil)
     case recipeNotFound
@@ -164,6 +164,20 @@ enum SharingError: LocalizedError {
     case downloadFailed(Error)
     case invalidData
     case imageUploadFailed(Error)
+    
+    static func == (lhs: SharingError, rhs: SharingError) -> Bool {
+        switch (lhs, rhs) {
+        case (.notAuthenticated, .notAuthenticated),
+             (.recipeNotFound, .recipeNotFound),
+             (.bookNotFound, .bookNotFound),
+             (.invalidData, .invalidData):
+            return true
+        case (.cloudKitUnavailable(let lhsMsg), .cloudKitUnavailable(let rhsMsg)):
+            return lhsMsg == rhsMsg
+        default:
+            return false
+        }
+    }
     
     var errorDescription: String? {
         switch self {

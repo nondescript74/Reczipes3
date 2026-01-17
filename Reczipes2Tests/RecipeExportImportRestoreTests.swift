@@ -412,9 +412,24 @@ struct RecipeExportImportRestoreTests {
         
         print("✓ All \(backupURLs.count) sequential backups persisted successfully")
         
-        // Cleanup
+        // Cleanup - with retry logic
         for url in backupURLs {
-            try? FileManager.default.removeItem(at: url)
+            do {
+                try FileManager.default.removeItem(at: url)
+                print("🗑️ Cleaned up: \(url.lastPathComponent)")
+            } catch {
+                print("⚠️ Failed to clean up \(url.lastPathComponent): \(error)")
+                // Try again after brief delay
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        
+        // Final verification of cleanup
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        let remainingFiles = backupURLs.filter { FileManager.default.fileExists(atPath: $0.path) }
+        if !remainingFiles.isEmpty {
+            print("⚠️ Warning: \(remainingFiles.count) backup file(s) could not be deleted")
         }
     }
 }

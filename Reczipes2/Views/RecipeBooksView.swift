@@ -12,6 +12,7 @@ struct RecipeBooksView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \RecipeBook.dateModified, order: .reverse) private var books: [RecipeBook]
     @Query private var savedRecipes: [Recipe]
+    @Query private var sharedBooks: [SharedRecipeBook]
     
     @State private var showingEditor = false
     @State private var selectedBook: RecipeBook?
@@ -19,30 +20,70 @@ struct RecipeBooksView: View {
     @State private var searchText = ""
     @State private var showingImport = false
     @State private var refreshID = UUID()
+    @State private var contentFilter: ContentFilterMode = .all
     
     // Grid layout
     private let columns = [
         GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
     ]
     
+    /// Returns the SharedRecipeBook entry for a book if it exists
+    private func sharedBookEntry(for book: RecipeBook) -> SharedRecipeBook? {
+        sharedBooks.first { $0.bookID == book.id && $0.isActive }
+    }
+    
     private var filteredBooks: [RecipeBook] {
-        if searchText.isEmpty {
-            return books
-        } else {
-            return books.filter { book in
+        var result = books
+        
+        // Apply content filter (mine/shared/all)
+        switch contentFilter {
+        case .mine:
+            // Only show books that are NOT in the shared list
+            let sharedBookIDs = Set(sharedBooks.filter { $0.isActive }.map { $0.bookID })
+            result = result.filter { !sharedBookIDs.contains($0.id) }
+            
+        case .shared:
+            // Only show books from the shared list (shared by others)
+            let sharedBookIDs = Set(sharedBooks.filter { $0.isActive }.map { $0.bookID })
+            result = result.filter { sharedBookIDs.contains($0.id) }
+            
+        case .all:
+            // Show all books
+            break
+        }
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            result = result.filter { book in
                 book.name.localizedCaseInsensitiveContains(searchText) ||
                 book.bookDescription?.localizedCaseInsensitiveContains(searchText) == true
             }
         }
+        
+        return result
     }
     
     var body: some View {
         NavigationStack {
-            Group {
-                if books.isEmpty {
-                    emptyStateView
-                } else {
-                    bookGridView
+            VStack(spacing: 0) {
+                // Content filter picker (Mine/Shared/All)
+                ContentFilterPicker(
+                    selectedFilter: $contentFilter,
+                    contentType: "Books"
+                )
+                
+                // Main content
+                Group {
+                    if filteredBooks.isEmpty {
+                        if books.isEmpty {
+                            emptyStateView
+                        } else {
+                            // Books exist but none match the filter
+                            emptyFilterStateView
+                        }
+                    } else {
+                        bookGridView
+                    }
                 }
             }
             .navigationTitle("Recipe Books")
@@ -100,13 +141,48 @@ struct RecipeBooksView: View {
         }
     }
     
+    private var emptyFilterStateView: some View {
+        ContentUnavailableView {
+            Label("No Books Found", systemImage: "books.vertical")
+        } description: {
+            Text(emptyFilterDescription)
+        } actions: {
+            Button {
+                contentFilter = .all
+            } label: {
+                Label("Show All Books", systemImage: "square.grid.2x2.fill")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+    
+    private var emptyFilterDescription: String {
+        if !searchText.isEmpty {
+            return "No books match your search"
+        }
+        
+        switch contentFilter {
+        case .mine:
+            return "You don't have any personal books yet"
+        case .shared:
+            return "No books have been shared with you"
+        case .all:
+            return "No books found"
+        }
+    }
+    
     // MARK: - Book Grid View
     
     private var bookGridView: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(filteredBooks) { book in
-                    BookCardView(book: book, savedRecipes: savedRecipes)
+                    BookCardView(
+                        book: book,
+                        savedRecipes: savedRecipes,
+                        sharedEntry: sharedBookEntry(for: book),
+                        showSharedInfo: contentFilter != .mine
+                    )
                         .id("\(book.id)-\(refreshID)")
                         .onTapGesture {
                             selectedBook = book
@@ -155,6 +231,8 @@ struct RecipeBooksView: View {
 struct BookCardView: View {
     let book: RecipeBook
     let savedRecipes: [Recipe]
+    let sharedEntry: SharedRecipeBook?
+    let showSharedInfo: Bool
     
     // Use computed properties to ensure we get fresh data
     private var coverImageName: String? {
@@ -240,6 +318,18 @@ struct BookCardView: View {
                     .font(.headline)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+            }
+            
+            // Show who shared this book if it's shared
+            if showSharedInfo, let sharedEntry = sharedEntry {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                    Text("Shared by \(sharedEntry.sharedByUserName ?? "Someone")")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             
             // Description

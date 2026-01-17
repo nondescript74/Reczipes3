@@ -35,6 +35,10 @@ struct ContentView: View {
     @State private var cachedCombinedScores: [UUID: CombinedRecipeScore] = [:]
     @State private var cachedNutritionalScores: [UUID: NutritionalScore] = [:]
     
+    // Content filter for showing mine/shared/all
+    @State private var contentFilter: ContentFilterMode = .all
+    @Query private var sharedRecipes: [SharedRecipe]
+    
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
         allergenProfiles.first { $0.isActive == true }
@@ -57,10 +61,28 @@ struct ContentView: View {
     
     // Filtered recipes based on filter settings (now uses cached results)
     private var availableRecipes: [RecipeModel] {
-        if filterMode != .none {
-            return cachedFilteredRecipes
-        } else {
-            return cachedAllRecipes
+        let baseRecipes = filterMode != .none ? cachedFilteredRecipes : cachedAllRecipes
+        
+        // Apply content filter (mine/shared/all)
+        return applyContentFilter(to: baseRecipes)
+    }
+    
+    /// Applies the content filter (mine/shared/all) to recipes
+    private func applyContentFilter(to recipes: [RecipeModel]) -> [RecipeModel] {
+        switch contentFilter {
+        case .mine:
+            // Only show recipes that are NOT in the shared list
+            let sharedRecipeIDs = Set(sharedRecipes.filter { $0.isActive }.map { $0.recipeID })
+            return recipes.filter { !sharedRecipeIDs.contains($0.id) }
+            
+        case .shared:
+            // Only show recipes from the shared list (shared by others)
+            let sharedRecipeIDs = Set(sharedRecipes.filter { $0.isActive }.map { $0.recipeID })
+            return recipes.filter { sharedRecipeIDs.contains($0.id) }
+            
+        case .all:
+            // Show all recipes
+            return recipes
         }
     }
     
@@ -293,6 +315,12 @@ struct ContentView: View {
     
     private var recipeListView: some View {
         VStack(spacing: 0) {
+            // Content filter picker (Mine/Shared/All)
+            ContentFilterPicker(
+                selectedFilter: $contentFilter,
+                contentType: "Recipes"
+            )
+            
             // Filter bar with 4-state selector
             RecipeFilterBar(
                 filterMode: $filterMode,
@@ -516,6 +544,11 @@ struct ContentView: View {
     
     // MARK: - Recipe Row
     
+    /// Returns the SharedRecipe entry for a recipe if it exists
+    private func sharedRecipeEntry(for recipe: RecipeModel) -> SharedRecipe? {
+        sharedRecipes.first { $0.recipeID == recipe.id && $0.isActive }
+    }
+    
     private func recipeRow(recipe: RecipeModel) -> some View {
         HStack(spacing: 12) {
             // Thumbnail or placeholder
@@ -548,6 +581,18 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                }
+                
+                // Show who shared this recipe if it's shared
+                if contentFilter != .mine, let sharedEntry = sharedRecipeEntry(for: recipe) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
+                        Text("Shared by \(sharedEntry.sharedByUserName ?? "Someone")")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 
                 // Show books this recipe is in

@@ -61,6 +61,12 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
+                "✨ Added: Three-way content filter (Mine/Shared/All) for Recipes and Books tabs",
+                "👥 Added: User attribution showing who shared each recipe and book",
+                "🔍 Added: Smart filtering to view your content, community content, or everything combined",
+                "🎨 Added: Segmented picker with contextual descriptions for each filter mode",
+                "⚡️ Enhanced: Filter integrates seamlessly with search and allergen/diabetes filters",
+                "📱 Added: Smart empty states that explain what's being filtered",
                 "✅ Improved: Community sharing and management are now more secure and user-friendly",
                 "☁️ Added: Help for first time users on Community Sharing"
 
