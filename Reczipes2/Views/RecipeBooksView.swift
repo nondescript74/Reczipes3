@@ -66,24 +66,22 @@ struct RecipeBooksView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Content filter picker (Mine/Shared/All)
+                // Content filter picker (Mine/Shared/All) - ALWAYS visible
                 ContentFilterPicker(
                     selectedFilter: $contentFilter,
                     contentType: "Books"
                 )
                 
                 // Main content
-                Group {
-                    if filteredBooks.isEmpty {
-                        if books.isEmpty {
-                            emptyStateView
-                        } else {
-                            // Books exist but none match the filter
-                            emptyFilterStateView
-                        }
+                if filteredBooks.isEmpty {
+                    if books.isEmpty {
+                        emptyStateView
                     } else {
-                        bookGridView
+                        // Books exist but none match the filter
+                        emptyFilterStateView
                     }
+                } else {
+                    bookGridView
                 }
             }
             .navigationTitle("Recipe Books")
@@ -127,32 +125,84 @@ struct RecipeBooksView: View {
     // MARK: - Empty State
     
     private var emptyStateView: some View {
-        ContentUnavailableView {
-            Label("No Recipe Books", systemImage: "books.vertical")
-        } description: {
-            Text("Create a book to organize your recipes")
-        } actions: {
-            Button {
-                showingEditor = true
-            } label: {
-                Label("Create Book", systemImage: "plus.circle.fill")
+        VStack {
+            Spacer()
+            
+            ContentUnavailableView {
+                Label(emptyStateTitle, systemImage: "books.vertical")
+            } description: {
+                Text(emptyStateDescriptionText)
+            } actions: {
+                if contentFilter != .mine {
+                    Button {
+                        contentFilter = .mine
+                    } label: {
+                        Label("Show My Books", systemImage: "person.fill")
+                    }
+                    .buttonStyle(BorderedProminentButtonStyle())
+                }
+                
+                if contentFilter != .mine {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        Label("Create Book", systemImage: "plus.circle.fill")
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        Label("Create Book", systemImage: "plus.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
-            .buttonStyle(.borderedProminent)
+            
+            Spacer()
+        }
+    }
+    
+    private var emptyStateTitle: String {
+        switch contentFilter {
+        case .mine:
+            return "No Recipe Books"
+        case .shared:
+            return "No Shared Books"
+        case .all:
+            return "No Books"
+        }
+    }
+    
+    private var emptyStateDescriptionText: String {
+        switch contentFilter {
+        case .mine:
+            return "Create a book to organize your recipes"
+        case .shared:
+            return "No books have been shared by the community yet. Check back later or create and share your own books!"
+        case .all:
+            return "Create your first book to get started"
         }
     }
     
     private var emptyFilterStateView: some View {
-        ContentUnavailableView {
-            Label("No Books Found", systemImage: "books.vertical")
-        } description: {
-            Text(emptyFilterDescription)
-        } actions: {
-            Button {
-                contentFilter = .all
-            } label: {
-                Label("Show All Books", systemImage: "square.grid.2x2.fill")
+        VStack {
+            Spacer()
+            
+            ContentUnavailableView {
+                Label("No Books Found", systemImage: "books.vertical")
+            } description: {
+                Text(emptyFilterDescription)
+            } actions: {
+                Button {
+                    contentFilter = .all
+                } label: {
+                    Label("Show All Books", systemImage: "square.grid.2x2.fill")
+                }
+                .buttonStyle(BorderedProminentButtonStyle())
             }
-            .buttonStyle(.borderedProminent)
+            
+            Spacer()
         }
     }
     

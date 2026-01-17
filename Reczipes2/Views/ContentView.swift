@@ -230,12 +230,20 @@ struct ContentView: View {
             BatchExtractionStatusBar(manager: BatchExtractionManager.shared)
             
             NavigationSplitView {
-                if availableRecipes.isEmpty {
-                    // Empty state when no recipes exist
-                    emptyStateView
-                } else {
-                    // Recipe list when recipes are available
-                    recipeListView
+                VStack(spacing: 0) {
+                    // Content filter picker (Mine/Shared/All) - ALWAYS visible
+                    ContentFilterPicker(
+                        selectedFilter: $contentFilter,
+                        contentType: "Recipes"
+                    )
+                    
+                    if availableRecipes.isEmpty {
+                        // Empty state when no recipes exist (but filter picker still visible above)
+                        emptyStateViewContent
+                    } else {
+                        // Recipe list when recipes are available
+                        recipeListContent
+                    }
                 }
             } detail: {
                 if let recipe = selectedRecipe {
@@ -292,18 +300,31 @@ struct ContentView: View {
     
     // MARK: - Empty State View
     
-    private var emptyStateView: some View {
-        ContentUnavailableView {
-            Label("No Recipes Yet", systemImage: "book.closed")
-        } description: {
-            Text("Extract recipes from text or images using the Claude API to get started")
-        } actions: {
-            Button {
-                showingRecipeExtractor = true
-            } label: {
-                Label("Extract Recipe", systemImage: "plus.circle.fill")
+    private var emptyStateViewContent: some View {
+        VStack {
+            Spacer()
+            
+            ContentUnavailableView {
+                Label(emptyStateTitle, systemImage: "book.closed")
+            } description: {
+                Text(emptyStateDescription)
+            } actions: {
+                if contentFilter != .mine {
+                    Button {
+                        contentFilter = .mine
+                    } label: {
+                        Label("Show My Recipes", systemImage: "person.fill")
+                    }
+                }
+                
+                Button {
+                    showingRecipeExtractor = true
+                } label: {
+                    Label("Extract Recipe", systemImage: "plus.circle.fill")
+                }
             }
-            .buttonStyle(.borderedProminent)
+            
+            Spacer()
         }
         .navigationTitle("Recipes")
         .sheet(isPresented: $showingRecipeExtractor) {
@@ -311,16 +332,32 @@ struct ContentView: View {
         }
     }
     
+    private var emptyStateTitle: String {
+        switch contentFilter {
+        case .mine:
+            return "No Recipes Yet"
+        case .shared:
+            return "No Shared Recipes"
+        case .all:
+            return "No Recipes"
+        }
+    }
+    
+    private var emptyStateDescription: String {
+        switch contentFilter {
+        case .mine:
+            return "Extract recipes from text or images using the Claude API to get started"
+        case .shared:
+            return "No recipes have been shared by the community yet. Check back later or create and share your own recipes!"
+        case .all:
+            return "No recipes found. Extract your first recipe to get started!"
+        }
+    }
+    
     // MARK: - Recipe List View
     
-    private var recipeListView: some View {
+    private var recipeListContent: some View {
         VStack(spacing: 0) {
-            // Content filter picker (Mine/Shared/All)
-            ContentFilterPicker(
-                selectedFilter: $contentFilter,
-                contentType: "Recipes"
-            )
-            
             // Filter bar with 4-state selector
             RecipeFilterBar(
                 filterMode: $filterMode,

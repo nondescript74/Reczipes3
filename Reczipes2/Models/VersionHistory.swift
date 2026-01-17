@@ -61,20 +61,24 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "✨ Added: Three-way content filter (Mine/Shared/All) for Recipes and Books tabs",
-                "👥 Added: User attribution showing who shared each recipe and book",
-                "🔍 Added: Smart filtering to view your content, community content, or everything combined",
-                "🎨 Added: Segmented picker with contextual descriptions for each filter mode",
-                "⚡️ Enhanced: Filter integrates seamlessly with search and allergen/diabetes filters",
-                "📱 Added: Smart empty states that explain what's being filtered",
-                "✅ Improved: Community sharing and management are now more secure and user-friendly",
-                "☁️ Added: Help for first time users on Community Sharing"
-
+                "🐛 Fixed: Button style compatibility issues in empty state views",
+                "⚡️ Enhanced: Recipe cache system eliminates redundant database queries for improved performance",
+                "🔧 Improved: Background filter processing with smart caching for allergen and diabetes analysis",
+                "📱 Optimized: ContentUnavailableView actions now use SwiftUI default styling for better compatibility"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.2.89
+//        "✨ Added: Three-way content filter (Mine/Shared/All) for Recipes and Books tabs",
+//        "👥 Added: User attribution showing who shared each recipe and book",
+//        "🔍 Added: Smart filtering to view your content, community content, or everything combined",
+//        "🎨 Added: Segmented picker with contextual descriptions for each filter mode",
+//        "⚡️ Enhanced: Filter integrates seamlessly with search and allergen/diabetes filters",
+//        "📱 Added: Smart empty states that explain what's being filtered",
+//        "✅ Improved: Community sharing and management are now more secure and user-friendly",
+//        "☁️ Added: Help for first time users on Community Sharing"
         // 15.1.85
         //"🐛 Fixed: FODMAP analyzer incorrectly flagging apple cider vinegar as high FODMAP (was confusing it with apples)",
         //"⚡️ Enhanced: FODMAP ingredient matching now uses word boundaries to prevent false positives",
