@@ -126,6 +126,16 @@ struct SettingsView: View {
                         NavigationLink(destination: SharedRecipesBrowserView()) {
                             Label("Browse Community Recipes", systemImage: "tray.full.fill")
                         }
+                        
+                        NavigationLink(destination: CommunitySharingCleanupView()) {
+                            HStack {
+                                Label("Fix Sharing Issues", systemImage: "wrench.and.screwdriver.fill")
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                            }
+                        }
                     }
                     
                     Section {
@@ -171,6 +181,18 @@ struct SettingsView: View {
                         }
                         
                         NavigationLink {
+                            DatabaseDuplicateCleanupView()
+                        } label: {
+                            HStack {
+                                Label("Remove Duplicate Recipes", systemImage: "trash.circle.fill")
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                            }
+                        }
+                        
+                        NavigationLink {
                             DatabaseRecoveryView()
                         } label: {
                             Label("Database Recovery", systemImage: "externaldrive.badge.exclamationmark")
@@ -178,7 +200,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Developer Tools")
                     } footer: {
-                        Text("Database Investigation shows all database files and their contents. Use this if recipes are missing after an update.")
+                        Text("Use 'Remove Duplicate Recipes' if you have 421 recipes but only 208 are unique. Database Investigation shows all database files and their contents.")
                             .font(.caption)
                     }
 

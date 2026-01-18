@@ -61,15 +61,31 @@ class VersionHistoryManager {
                 // ADD NEW CHANGES HERE as you commit
                 // Use emoji prefixes from the guide at the bottom of this file
                 // Example: "✨ Added: New feature description"
-                "🐛 Fixed: Button style compatibility issues in empty state views",
-                "⚡️ Enhanced: Recipe cache system eliminates redundant database queries for improved performance",
-                "🔧 Improved: Background filter processing with smart caching for allergen and diabetes analysis",
-                "📱 Optimized: ContentUnavailableView actions now use SwiftUI default styling for better compatibility"
+                "✨ Added: 'Remove Duplicate Recipes' tool in Developer Tools to clean up duplicate database records",
+                "🔧 Fixed: Database Investigation now uses SQLite3 directly (bypasses migration issues)",
+                "✅ Fixed: Can now read 12.9 MB databases that were showing 0 recipes",
+                "🗑️ Enhanced: Duplicate removal keeps newest version of each recipe, deletes older copies",
+                "📊 Added: Shows duplicate statistics before cleanup (total/unique/duplicates to remove)",
+                "🚨 Added: Local database duplicate detection in CloudKit cleanup",
+                "⚡️ Enhanced: SQLite queries try multiple table names for compatibility",
+                "🧹 Added: Comprehensive CloudKit cleanup to remove duplicate shared recipes",
+                "🎨 Added: 'Fix Sharing Issues' UI in Settings → Community",
+                "🔄 Enhanced: Share deduplication prevents duplicate CloudKit records",
+                "🐛 Fixed: Community sharing now fetches all recipes (not just first 100)",
+                "⚡️ Enhanced: Cursor-based pagination for CloudKit queries",
+                "🔧 Added: Detailed batch logging for CloudKit operations",
+                "🔍 Added: Diagnostic function to analyze sharing by user",
+                "📊 Enhanced: Better error reporting with record IDs"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.2.90
+//        "🐛 Fixed: Button style compatibility issues in empty state views",
+//        "⚡️ Enhanced: Recipe cache system eliminates redundant database queries for improved performance",
+//        "🔧 Improved: Background filter processing with smart caching for allergen and diabetes analysis",
+//        "📱 Optimized: ContentUnavailableView actions now use SwiftUI default styling for better compatibility"
         // 15.2.89
 //        "✨ Added: Three-way content filter (Mine/Shared/All) for Recipes and Books tabs",
 //        "👥 Added: User attribution showing who shared each recipe and book",

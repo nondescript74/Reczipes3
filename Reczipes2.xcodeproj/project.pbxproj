@@ -140,6 +140,7 @@
 				CLOUDKIT_SYNC_GUIDE.md,
 				CLOUDKIT_VALIDATOR_FIX.md,
 				CLOUDKIT_VALIDATOR_UPDATES.md,
+				COMMUNITY_SHARING_CLEANUP_GUIDE.md,
 				COMMUNITY_SHARING_FIXES.md,
 				COMPLETE_APP_HELP_GUIDE.md,
 				COMPLETE_SUMMARY_11_5_47.md,
@@ -164,6 +165,7 @@
 				DIABETIC_INTEGRATION_GUIDE.md,
 				DIABETIC_QUICKSTART.md,
 				DOCUMENTATION_UPDATE_SUMMARY.md,
+				DUPLICATE_REMOVAL_GUIDE.md,
 				DYNAMIC_VERSION_HISTORY_ARCHITECTURE.md,
 				DYNAMIC_VERSION_HISTORY_SUMMARY.md,
 				FILE_INVENTORY.txt,
@@ -276,6 +278,7 @@
 				TROUBLESHOOTING_VERSION_DISPLAY.md,
 				UI_TESTING_SETUP.md,
 				UNZIP_AND_INTEGRATE.md,
+				URGENT_421_RECIPE_FIX.md,
 				URL_FIXER_GUIDE.md,
 				USER_CONTENT_BACKUP_UPDATE.md,
 				VERSION_HISTORY_GUIDE.md,
@@ -677,7 +680,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 90;
+				CURRENT_PROJECT_VERSION = 91;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -701,8 +704,7 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -734,7 +736,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 90;
+				CURRENT_PROJECT_VERSION = 91;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -758,8 +760,7 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";

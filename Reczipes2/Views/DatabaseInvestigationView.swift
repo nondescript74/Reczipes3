@@ -8,6 +8,7 @@
 
 import SwiftUI
 import SwiftData
+import SQLite3
 
 struct DatabaseInvestigationView: View {
     @Environment(\.dismiss) private var dismiss
@@ -435,25 +436,54 @@ class DatabaseInvestigationService {
     }
     
     private static func readRecipeCount(from url: URL) async throws -> Int {
-        // Create a temporary container to read this database
-        let config = ModelConfiguration(url: url)
-        
-        let container = try ModelContainer(
-            for: Recipe.self,
-            RecipeImageAssignment.self,
-            UserAllergenProfile.self,
-            CachedDiabeticAnalysis.self,
-            SavedLink.self,
-            RecipeBook.self,
-            CookingSession.self,
-            migrationPlan: Reczipes2MigrationPlan.self,
-            configurations: config
-        )
-        
-        let context = container.mainContext
-        let count = try context.fetchCount(FetchDescriptor<Recipe>())
-        
-        return count
+        // Use SQLite directly to avoid migration issues
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    // Import SQLite3
+                    var db: OpaquePointer?
+                    
+                    // Open database in read-only mode
+                    let result = sqlite3_open_v2(
+                        url.path,
+                        &db,
+                        SQLITE_OPEN_READONLY,
+                        nil
+                    )
+                    
+                    guard result == SQLITE_OK, let db = db else {
+                        throw InvestigationError.cannotOpenDatabase(url.lastPathComponent)
+                    }
+                    
+                    defer {
+                        sqlite3_close(db)
+                    }
+                    
+                    // Try different table names that Recipe might use
+                    let possibleTableNames = ["ZRECIPE", "Recipe", "Z_Recipe"]
+                    var count = 0
+                    
+                    for tableName in possibleTableNames {
+                        var statement: OpaquePointer?
+                        let query = "SELECT COUNT(*) FROM \(tableName)"
+                        
+                        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+                            defer { sqlite3_finalize(statement) }
+                            
+                            if sqlite3_step(statement) == SQLITE_ROW {
+                                count = Int(sqlite3_column_int(statement, 0))
+                                print("      ✅ Found \(count) recipes in table \(tableName)")
+                                break
+                            }
+                        }
+                    }
+                    
+                    continuation.resume(returning: count)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     static func readRecipesFromDatabase(url: URL) async throws -> [RecipeInfo] {
@@ -608,11 +638,14 @@ struct RawFileInfo {
 
 enum InvestigationError: LocalizedError {
     case currentDatabaseNotFound
+    case cannotOpenDatabase(String)
     
     var errorDescription: String? {
         switch self {
         case .currentDatabaseNotFound:
             return "Current database file not found"
+        case .cannotOpenDatabase(let name):
+            return "Cannot open database: \(name)"
         }
     }
 }
