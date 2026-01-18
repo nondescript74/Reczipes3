@@ -69,19 +69,30 @@ struct ContentView: View {
     
     /// Applies the content filter (mine/shared/all) to recipes
     private func applyContentFilter(to recipes: [RecipeModel]) -> [RecipeModel] {
+        let currentUserID = CloudKitSharingService.shared.currentUserID
+        
         switch contentFilter {
         case .mine:
-            // Only show recipes that are NOT in the shared list
-            let sharedRecipeIDs = Set(sharedRecipes.filter { $0.isActive }.map { $0.recipeID })
-            return recipes.filter { !sharedRecipeIDs.contains($0.id) }
+            // Show ALL user's own recipes (including ones they've shared)
+            // Filter OUT recipes shared by OTHER users
+            let sharedByOthersIDs = Set(
+                sharedRecipes
+                    .filter { $0.isActive && $0.sharedByUserID != currentUserID }
+                    .compactMap { $0.recipeID }
+            )
+            return recipes.filter { !sharedByOthersIDs.contains($0.id) }
             
         case .shared:
-            // Only show recipes from the shared list (shared by others)
-            let sharedRecipeIDs = Set(sharedRecipes.filter { $0.isActive }.map { $0.recipeID })
-            return recipes.filter { sharedRecipeIDs.contains($0.id) }
+            // Only show recipes shared by OTHER users
+            let sharedByOthersIDs = Set(
+                sharedRecipes
+                    .filter { $0.isActive && $0.sharedByUserID != currentUserID }
+                    .compactMap { $0.recipeID }
+            )
+            return recipes.filter { sharedByOthersIDs.contains($0.id) }
             
         case .all:
-            // Show all recipes
+            // Show all recipes (user's own + shared by others)
             return recipes
         }
     }

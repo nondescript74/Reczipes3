@@ -142,11 +142,36 @@ struct SharedRecipesBrowserView: View {
     
     private var recipeListView: some View {
         List(filteredRecipes) { recipe in
-            SharedRecipeRow(recipe: recipe)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectedRecipe = recipe
+            VStack(alignment: .leading, spacing: 8) {
+                Text(recipe.title)
+                    .font(.headline)
+                
+                HStack {
+                    if let userName = recipe.sharedByUserName {
+                        Label(userName, systemImage: "person.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(recipe.sharedDate, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                
+                if let notes = recipe.headerNotes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                selectedRecipe = recipe
+            }
         }
     }
     
@@ -183,41 +208,6 @@ struct SharedRecipesBrowserView: View {
         } catch {
             errorMessage = "Failed to import: \(error.localizedDescription)"
         }
-    }
-}
-
-// MARK: - Shared Recipe Row
-
-struct SharedRecipeRow: View {
-    let recipe: CloudKitRecipe
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(recipe.title)
-                .font(.headline)
-            
-            HStack {
-                if let userName = recipe.sharedByUserName {
-                    Label(userName, systemImage: "person.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Text(recipe.sharedDate, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            
-            if let notes = recipe.headerNotes, !notes.isEmpty {
-                Text(notes)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-        }
-        .padding(.vertical, 4)
     }
 }
 
@@ -445,10 +435,6 @@ struct SharedRecipeDetailView: View {
         }
     }
 }
-
-// MARK: - Identifiable Conformance
-
-extension CloudKitRecipe: Identifiable {}
 
 #Preview {
     NavigationStack {

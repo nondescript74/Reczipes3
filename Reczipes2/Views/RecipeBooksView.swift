@@ -34,21 +34,31 @@ struct RecipeBooksView: View {
     
     private var filteredBooks: [RecipeBook] {
         var result = books
+        let currentUserID = CloudKitSharingService.shared.currentUserID
         
         // Apply content filter (mine/shared/all)
         switch contentFilter {
         case .mine:
-            // Only show books that are NOT in the shared list
-            let sharedBookIDs = Set(sharedBooks.filter { $0.isActive }.map { $0.bookID })
-            result = result.filter { !sharedBookIDs.contains($0.id) }
+            // Show ALL user's own books (including ones they've shared)
+            // Filter OUT books shared by OTHER users
+            let sharedByOthersIDs = Set(
+                sharedBooks
+                    .filter { $0.isActive && $0.sharedByUserID != currentUserID }
+                    .compactMap { $0.bookID }
+            )
+            result = result.filter { !sharedByOthersIDs.contains($0.id) }
             
         case .shared:
-            // Only show books from the shared list (shared by others)
-            let sharedBookIDs = Set(sharedBooks.filter { $0.isActive }.map { $0.bookID })
-            result = result.filter { sharedBookIDs.contains($0.id) }
+            // Only show books shared by OTHER users
+            let sharedByOthersIDs = Set(
+                sharedBooks
+                    .filter { $0.isActive && $0.sharedByUserID != currentUserID }
+                    .compactMap { $0.bookID }
+            )
+            result = result.filter { sharedByOthersIDs.contains($0.id) }
             
         case .all:
-            // Show all books
+            // Show all books (user's own + shared by others)
             break
         }
         

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import CloudKit
+import SwiftUI
 
 // MARK: - Shared Content Tracking
 
@@ -112,7 +113,7 @@ enum CloudKitRecordType {
 // MARK: - Codable Representations for CloudKit
 
 /// CloudKit-friendly representation of a recipe for sharing
-struct CloudKitRecipe: Codable {
+struct CloudKitRecipe: Codable, Identifiable {
     let id: UUID
     let title: String
     let headerNotes: String?
@@ -131,7 +132,7 @@ struct CloudKitRecipe: Codable {
 }
 
 /// CloudKit-friendly representation of a recipe book for sharing
-struct CloudKitRecipeBook: Codable {
+struct CloudKitRecipeBook: Codable, Identifiable {
     let id: UUID
     let name: String
     let bookDescription: String?
@@ -209,3 +210,114 @@ enum SharingError: LocalizedError, Equatable {
         }
     }
 }
+
+// MARK: - CloudKit Manager Data Structures
+
+/// Status of a recipe in CloudKit
+struct CloudKitRecipeStatus: Identifiable {
+    let id = UUID()
+    let recipe: CloudKitRecipe
+    let cloudRecordID: String
+    let sharedDate: Date
+    let localTrackingRecord: SharedRecipe?
+    
+    var isTracked: Bool {
+        localTrackingRecord != nil
+    }
+    
+    var isOrphaned: Bool {
+        !isTracked
+    }
+    
+    var statusIcon: String {
+        isTracked ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+    }
+    
+    var statusColor: Color {
+        isTracked ? .green : .orange
+    }
+    
+    var statusDescription: String {
+        isTracked ? "Tracked" : "Orphaned (not tracked locally)"
+    }
+}
+
+/// Data for CloudKit Recipe Manager View
+struct CloudKitRecipeManagerData {
+    let recipes: [CloudKitRecipeStatus]
+    
+    var trackedRecipes: [CloudKitRecipeStatus] {
+        recipes.filter { $0.isTracked }
+    }
+    
+    var orphanedRecipes: [CloudKitRecipeStatus] {
+        recipes.filter { $0.isOrphaned }
+    }
+    
+    var trackedCount: Int {
+        trackedRecipes.count
+    }
+    
+    var orphanedCount: Int {
+        orphanedRecipes.count
+    }
+    
+    var totalCount: Int {
+        recipes.count
+    }
+}
+
+/// Status of a recipe book in CloudKit
+struct CloudKitRecipeBookStatus: Identifiable {
+    let id = UUID()
+    let book: CloudKitRecipeBook
+    let cloudRecordID: String
+    let sharedDate: Date
+    let localTrackingRecord: SharedRecipeBook?
+    
+    var isTracked: Bool {
+        localTrackingRecord != nil
+    }
+    
+    var isOrphaned: Bool {
+        !isTracked
+    }
+    
+    var statusIcon: String {
+        isTracked ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+    }
+    
+    var statusColor: Color {
+        isTracked ? .green : .orange
+    }
+    
+    var statusDescription: String {
+        isTracked ? "Tracked" : "Orphaned (not tracked locally)"
+    }
+}
+
+/// Data for CloudKit Recipe Book Manager View
+struct CloudKitRecipeBookManagerData {
+    let books: [CloudKitRecipeBookStatus]
+    
+    var trackedBooks: [CloudKitRecipeBookStatus] {
+        books.filter { $0.isTracked }
+    }
+    
+    var orphanedBooks: [CloudKitRecipeBookStatus] {
+        books.filter { $0.isOrphaned }
+    }
+    
+    var trackedCount: Int {
+        trackedBooks.count
+    }
+    
+    var orphanedCount: Int {
+        orphanedBooks.count
+    }
+    
+    var totalCount: Int {
+        books.count
+    }
+}
+

@@ -41,6 +41,7 @@ struct SharingSettingsView: View {
         List {
             // CloudKit Status
             cloudKitStatusSection
+            cloudKitRecipeManagementSection
             
             // Sharing Preferences
             sharingPreferencesSection
@@ -110,7 +111,7 @@ struct SharingSettingsView: View {
     // MARK: - Sections
     
     private var cloudKitStatusSection: some View {
-        Section("CloudKit Status") {
+        Section {
             HStack {
                 Image(systemName: sharingService.isCloudKitAvailable ? "icloud.fill" : "icloud.slash.fill")
                     .foregroundStyle(sharingService.isCloudKitAvailable ? .green : .red)
@@ -130,8 +131,31 @@ struct SharingSettingsView: View {
                     }
                 }
             }
+        } header: {
+            Text("CloudKit Status")
         }
     }
+    
+    private var cloudKitRecipeManagementSection: some View {
+        Section {
+            NavigationLink {
+                CloudKitRecipeManagerView()
+            } label: {
+                Label("Manage CloudKit Recipes", systemImage: "cloud")
+            }
+            
+            NavigationLink {
+                CloudKitRecipeBookManagerView()
+            } label: {
+                Label("Manage CloudKit Recipe Books", systemImage: "books.vertical")
+            }
+        } header: {
+            Text("CloudKit Management")
+        } footer: {
+            Text("View and manage all your content stored in CloudKit, including orphaned items that aren't tracked locally.")
+        }
+    }
+
     
     private var sharingPreferencesSection: some View {
         Section {
@@ -193,7 +217,7 @@ struct SharingSettingsView: View {
     }
     
     private var mySharedContentSection: some View {
-        Section("My Shared Content") {
+        Section {
             HStack {
                 Label("\(sharedRecipes.filter { $0.isActive }.count) Recipes", systemImage: "book.fill")
                 Spacer()
@@ -211,11 +235,13 @@ struct SharingSettingsView: View {
             NavigationLink("Manage Shared Content") {
                 ManageSharedContentView()
             }
+        } header: {
+            Text("My Shared Content")
         }
     }
     
     private var quickActionsSection: some View {
-        Section("Quick Actions") {
+        Section {
             Button {
                 showingRecipeSelector = true
             } label: {
@@ -229,11 +255,34 @@ struct SharingSettingsView: View {
                 Label("Share Specific Books", systemImage: "square.and.arrow.up.on.square")
             }
             .disabled(!sharingService.isCloudKitAvailable)
+            
+            // Diagnostic & Cleanup Tools
+            Button {
+                Task {
+                    await cleanupGhostRecipes()
+                }
+            } label: {
+                Label("Clean Up Ghost Recipes", systemImage: "sparkles")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            Button {
+                Task {
+                    await syncLocalTracking()
+                }
+            } label: {
+                Label("Sync Sharing Status", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+        } header: {
+            Text("Quick Actions")
+        } footer: {
+            Text("Use 'Clean Up Ghost Recipes' if you see recipes in Browse Shared Recipes that you've already unshared. Use 'Sync Sharing Status' to fix tracking mismatches.")
         }
     }
     
     private var communitySection: some View {
-        Section("Community") {
+        Section {
             NavigationLink {
                 SharedRecipesBrowserView()
             } label: {
@@ -247,6 +296,8 @@ struct SharingSettingsView: View {
                 Label("Browse Shared Recipe Books", systemImage: "books.vertical.circle.fill")
             }
             .disabled(!sharingService.isCloudKitAvailable)
+        } header: {
+            Text("Community")
         }
     }
     
@@ -446,6 +497,40 @@ struct SharingSettingsView: View {
             alertMessage = "Unshared \(successful) of \(allSharedBooks.count) books. \(failed) failed."
         }
         showingAlert = true
+    }
+    
+    // MARK: - Cleanup & Sync Actions
+    
+    private func cleanupGhostRecipes() async {
+        isSharing = true
+        sharingStatus = "Cleaning up ghost recipes..."
+        
+        do {
+            try await sharingService.cleanupGhostRecipes(modelContext: modelContext)
+            alertMessage = "✅ Ghost recipe cleanup complete! Check Console logs for details."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to clean up ghost recipes: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    private func syncLocalTracking() async {
+        isSharing = true
+        sharingStatus = "Syncing sharing status..."
+        
+        do {
+            try await sharingService.syncLocalTrackingWithCloudKit(modelContext: modelContext)
+            alertMessage = "✅ Sharing status synced! Check Console logs for details."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to sync: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
     }
 }
 
@@ -683,84 +768,104 @@ struct ManageSharedContentView: View {
     }
     
     var body: some View {
-        List {
-            if !activeSharedRecipes.isEmpty {
-                Section("Shared Recipes") {
-                    ForEach(activeSharedRecipes) { sharedRecipe in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(sharedRecipe.recipeTitle)
-                                    .font(.headline)
-                                
-                                Text("Shared \(sharedRecipe.sharedDate, style: .date)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(role: .destructive) {
-                                if let cloudRecordID = sharedRecipe.cloudRecordID {
-                                    itemToUnshare = (cloudRecordID, .recipe)
-                                }
-                            } label: {
-                                Label("Unshare", systemImage: "xmark.circle.fill")
-                                    .labelStyle(.iconOnly)
-                                    .foregroundStyle(.red)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            
-            if !activeSharedBooks.isEmpty {
-                Section("Shared Recipe Books") {
-                    ForEach(activeSharedBooks) { sharedBook in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(sharedBook.bookName)
-                                    .font(.headline)
-                                
-                                if let description = sharedBook.bookDescription {
-                                    Text(description)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                
-                                Text("Shared \(sharedBook.sharedDate, style: .date)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(role: .destructive) {
-                                if let cloudRecordID = sharedBook.cloudRecordID {
-                                    itemToUnshare = (cloudRecordID, .book)
-                                }
-                            } label: {
-                                Label("Unshare", systemImage: "xmark.circle.fill")
-                                    .labelStyle(.iconOnly)
-                                    .foregroundStyle(.red)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            
+        Group {
             if activeSharedRecipes.isEmpty && activeSharedBooks.isEmpty {
-                ContentUnavailableView {
-                    Label("No Shared Content", systemImage: "tray.fill")
-                } description: {
+                VStack(spacing: 20) {
+                    Spacer()
+                    
+                    Image(systemName: "tray.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("No Shared Content")
+                        .font(.headline)
+                    
                     Text("You haven't shared any recipes or books yet.")
-                } actions: {
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
                     NavigationLink("Share Content") {
                         SharingSettingsView()
                     }
                     .buttonStyle(.borderedProminent)
+                    
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    if !activeSharedRecipes.isEmpty {
+                        Section {
+                            ForEach(activeSharedRecipes) { sharedRecipe in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(sharedRecipe.recipeTitle)
+                                            .font(.headline)
+                                        
+                                        Text("Shared \(sharedRecipe.sharedDate, style: .date)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Button(role: .destructive) {
+                                        if let cloudRecordID = sharedRecipe.cloudRecordID {
+                                            itemToUnshare = (cloudRecordID, .recipe)
+                                        }
+                                    } label: {
+                                        Label("Unshare", systemImage: "xmark.circle.fill")
+                                            .labelStyle(.iconOnly)
+                                            .foregroundStyle(.red)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        } header: {
+                            Text("Shared Recipes")
+                        }
+                    }
+                    
+                    if !activeSharedBooks.isEmpty {
+                        Section {
+                            ForEach(activeSharedBooks) { sharedBook in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(sharedBook.bookName)
+                                            .font(.headline)
+                                        
+                                        if let description = sharedBook.bookDescription {
+                                            Text(description)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                        
+                                        Text("Shared \(sharedBook.sharedDate, style: .date)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Button(role: .destructive) {
+                                        if let cloudRecordID = sharedBook.cloudRecordID {
+                                            itemToUnshare = (cloudRecordID, .book)
+                                        }
+                                    } label: {
+                                        Label("Unshare", systemImage: "xmark.circle.fill")
+                                            .labelStyle(.iconOnly)
+                                            .foregroundStyle(.red)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        } header: {
+                            Text("Shared Recipe Books")
+                        }
+                    }
                 }
             }
         }
@@ -809,10 +914,212 @@ struct ManageSharedContentView: View {
     }
 }
 
+// MARK: - Shared Books Browser
+
 struct SharedBooksBrowserView: View {
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var sharingService = CloudKitSharingService.shared
+    
+    @State private var sharedBooks: [CloudKitRecipeBook] = []
+    @State private var isLoading = false
+    @State private var searchText = ""
+    @State private var errorMessage: String?
+    @State private var showingBookDetail: CloudKitRecipeBook?
+    
+    var filteredBooks: [CloudKitRecipeBook] {
+        if searchText.isEmpty {
+            return sharedBooks
+        }
+        return sharedBooks.filter { book in
+            book.name.localizedCaseInsensitiveContains(searchText) ||
+            (book.sharedByUserName?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+            (book.bookDescription?.localizedCaseInsensitiveContains(searchText) ?? false)
+        }
+    }
+    
     var body: some View {
-        Text("Browse community recipe books here")
-            .navigationTitle("Community Books")
+        Group {
+            if isLoading && sharedBooks.isEmpty {
+                ProgressView("Loading community recipe books...")
+            } else if sharedBooks.isEmpty {
+                ContentUnavailableView(
+                    "No Community Recipe Books",
+                    systemImage: "books.vertical.fill",
+                    description: Text("No recipe books have been shared by the community yet. Be the first to share!")
+                )
+            } else {
+                List(filteredBooks) { book in
+                    SharedBookRow(book: book) {
+                        showingBookDetail = book
+                    }
+                }
+                .searchable(text: $searchText, prompt: "Search books or authors")
+            }
+        }
+        .navigationTitle("Browse Community Books")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isLoading {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ProgressView()
+                }
+            } else {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task { await loadBooks() }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                }
+            }
+        }
+        .task {
+            await loadBooks()
+        }
+        .refreshable {
+            await loadBooks()
+        }
+        .sheet(item: $showingBookDetail) { book in
+            SharedBookDetailView(book: book)
+        }
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            if let error = errorMessage {
+                Text(error)
+            }
+        }
+    }
+    
+    private func loadBooks() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let books = try await sharingService.fetchSharedRecipeBooks(excludeCurrentUser: true)
+            await MainActor.run {
+                sharedBooks = books
+                logInfo("📚 Loaded \(books.count) shared books from CloudKit", category: "sharing")
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load recipe books: \(error.localizedDescription)"
+                logError("Failed to load shared books: \(error)", category: "sharing")
+            }
+        }
+        
+        isLoading = false
+    }
+}
+
+struct SharedBookRow: View {
+    let book: CloudKitRecipeBook
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button {
+            onTap()
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(book.name)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        
+                        if let userName = book.sharedByUserName {
+                            Label(userName, systemImage: "person.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Label("\(book.recipeIDs.count) recipes", systemImage: "book.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            
+                            Text("Shared \(book.sharedDate, style: .date)")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                
+                if let description = book.bookDescription, !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct SharedBookDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    let book: CloudKitRecipeBook
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if let description = book.bookDescription {
+                        Text(description)
+                            .font(.body)
+                    }
+                    
+                    if let userName = book.sharedByUserName {
+                        LabeledContent("Shared by") {
+                            Text(userName)
+                        }
+                    }
+                    
+                    LabeledContent("Shared on") {
+                        Text(book.sharedDate, style: .date)
+                    }
+                    
+                    LabeledContent("Recipes") {
+                        Text("\(book.recipeIDs.count)")
+                    }
+                } header: {
+                    Text("Book Information")
+                }
+                
+                Section {
+                    Text("Recipe IDs:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    ForEach(book.recipeIDs, id: \.self) { recipeID in
+                        Text(recipeID.uuidString)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Recipes in This Book (\(book.recipeIDs.count))")
+                } footer: {
+                    Text("To view these recipes, you'll need to import them individually from Browse Community Recipes.")
+                }
+            }
+            .navigationTitle(book.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

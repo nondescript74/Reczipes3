@@ -12,9 +12,12 @@ struct CommunitySharingCleanupView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var isRunningDiagnostic = false
     @State private var isRunningCleanup = false
+    @State private var isRunningOrphanCleanup = false
     @State private var diagnosticResults: String = ""
     @State private var cleanupResults: String = ""
+    @State private var orphanCleanupResults: String = ""
     @State private var showCleanupConfirmation = false
+    @State private var showOrphanCleanupConfirmation = false
     
     var body: some View {
         Form {
@@ -123,6 +126,44 @@ struct CommunitySharingCleanupView: View {
                 Label("2. Cleanup & Resync", systemImage: "2.circle.fill")
             }
             
+            // MARK: - Orphan Cleanup Section
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("🗑️ Remove recipes from CloudKit that don't belong to any user (orphaned records). Use this if you see recipes from unknown users.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    
+                    Button(action: {
+                        showOrphanCleanupConfirmation = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash.fill")
+                            Text("Remove Orphaned Recipes")
+                            Spacer()
+                            if isRunningOrphanCleanup {
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isRunningOrphanCleanup)
+                    .tint(.red)
+                    
+                    if !orphanCleanupResults.isEmpty {
+                        ScrollView {
+                            Text(orphanCleanupResults)
+                                .font(.system(.caption, design: .monospaced))
+                                .padding(8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                        }
+                        .frame(maxHeight: 200)
+                    }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Label("3. Remove Orphans", systemImage: "3.circle.fill")
+            }
+            
             // MARK: - Expected Results
             Section {
                 VStack(alignment: .leading, spacing: 8) {
@@ -174,6 +215,14 @@ struct CommunitySharingCleanupView: View {
                     Divider()
                     
                     helpItem(
+                        icon: "trash.circle",
+                        title: "When to use Remove Orphans",
+                        description: "Use when seeing recipes from unknown users or recipes with no owner."
+                    )
+                    
+                    Divider()
+                    
+                    helpItem(
                         icon: "info.circle",
                         title: "What happens during cleanup",
                         description: "1. Removes local tracking\n2. Fetches CloudKit records\n3. Deletes duplicates\n4. Rebuilds clean tracking"
@@ -196,6 +245,18 @@ struct CommunitySharingCleanupView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will delete duplicate CloudKit records and rebuild your local sharing data. This operation cannot be undone.\n\nOnly proceed if you're experiencing incorrect recipe counts.")
+        }
+        .confirmationDialog(
+            "Remove Orphaned Recipes",
+            isPresented: $showOrphanCleanupConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Orphans", role: .destructive) {
+                runOrphanCleanup()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all recipes in CloudKit that don't have a valid owner (sharedByUserID). This operation cannot be undone.\n\nOnly proceed if you're seeing recipes from unknown users.")
         }
     }
     
@@ -274,6 +335,53 @@ struct CommunitySharingCleanupView: View {
                     Try running the diagnostic first to identify the issue.
                     """
                     isRunningCleanup = false
+                }
+            }
+        }
+    }
+    
+    private func runOrphanCleanup() {
+        isRunningOrphanCleanup = true
+        orphanCleanupResults = "Starting orphan cleanup...\n"
+        
+        Task {
+            do {
+                let startTime = Date()
+                
+                try await CloudKitSharingService.shared.removeOrphanedRecipes()
+                
+                await MainActor.run {
+                    orphanCleanupResults = """
+                    ✅ Orphan cleanup complete!
+                    
+                    Orphaned recipes have been removed from CloudKit.
+                    
+                    Check the logs for details:
+                    • Number of orphans found
+                    • Records deleted
+                    • Valid users remaining
+                    
+                    Go to the Shared tab to verify the orphaned recipes are gone.
+                    
+                    Completed in \(String(format: "%.1f", Date().timeIntervalSince(startTime)))s
+                    """
+                    isRunningOrphanCleanup = false
+                }
+            } catch {
+                await MainActor.run {
+                    orphanCleanupResults = """
+                    ❌ Orphan cleanup failed
+                    
+                    Error: \(error.localizedDescription)
+                    
+                    Please check:
+                    • You're signed into iCloud
+                    • You have internet connection
+                    • CloudKit is available
+                    
+                    Try running the diagnostic first to identify the issue.
+                    """
+                    isRunningOrphanCleanup = false
                 }
             }
         }
