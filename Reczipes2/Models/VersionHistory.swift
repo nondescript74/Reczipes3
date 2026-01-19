@@ -72,6 +72,12 @@ class VersionHistoryManager {
                 "🔒 Added: Safety mechanism prevents data loss for CloudKit-enabled users during recovery",
                 "📝 Added: Extensive documentation explaining pre-migration database handling and recovery strategy",
                 
+                // Diagnostic Logging Enhancements
+                "📊 Added: Comprehensive diagnostic logging to BatchImageExtractorView for better troubleshooting",
+                "🔍 Enhanced: User actions, extraction progress, and image operations now fully logged",
+                "🐛 Improved: Batch extraction debugging with detailed logs for cropping, pausing, and error handling",
+                "📝 Added: Logging for photo picker interactions and image selection workflow",
+                
                 // Key Learnings Documented
                 "📚 Documented: Why retroactive schema versions fail (duplicate checksums from identical structures)",
                 "💡 Documented: SwiftData migration plan limitations and best practices for future releases",
@@ -83,6 +89,34 @@ class VersionHistoryManager {
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        //15.3.96
+        // Database Recovery & Migration Improvements (January 2026)
+//        "💾 Fixed: 'Unknown model version' error (code 134504) causing app crashes on databases created before migration plan",
+//        "🔧 Added: Automatic database cleanup detects and recovers from incompatible pre-V1.0.0 databases",
+//        "⚡️ Enhanced: Recovery system automatically deletes old database files and creates fresh V4 schema",
+//        "☁️ Added: CloudKit users' data syncs back automatically after database recovery",
+//        "🔧 Fixed: 'Duplicate version checksums' error by abandoning SchemaV0 approach (identical schemas not allowed)",
+//        
+//        // Technical Implementation Details
+//        "🛠️ Enhanced: ModelContainerManager now includes error detection for schema migration failures",
+//        "📊 Added: Comprehensive logging for database recovery operations with detailed diagnostics",
+//        "⚡️ Improved: Database cleanup happens instantly during container creation with no user intervention",
+//        "🔒 Added: Safety mechanism prevents data loss for CloudKit-enabled users during recovery",
+//        "📝 Added: Extensive documentation explaining pre-migration database handling and recovery strategy",
+//        
+//        // Diagnostic Logging Enhancements
+//        "📊 Added: Comprehensive diagnostic logging to BatchImageExtractorView for better troubleshooting",
+//        "🔍 Enhanced: User actions, extraction progress, and image operations now fully logged",
+//        "🐛 Improved: Batch extraction debugging with detailed logs for cropping, pausing, and error handling",
+//        "📝 Added: Logging for photo picker interactions and image selection workflow",
+//        
+//        // Key Learnings Documented
+//        "📚 Documented: Why retroactive schema versions fail (duplicate checksums from identical structures)",
+//        "💡 Documented: SwiftData migration plan limitations and best practices for future releases",
+//        "🔍 Documented: CloudKit data recovery capabilities and sync behavior after database recreation",
+//        "⚠️ Documented: Local-only users may lose data during recovery (unavoidable for incompatible databases)",
+//        "✅ Documented: Simulator CloudKit limitations showing 'temporarily unavailable' status"
+//        
         //15.2.95
 //        "🐛 Fixed: CloudKit recipe book manager runtime crash during pagination",
 //        "⚡️ Improved: Replaced recursive closure pattern with clean async/await loop for fetching CloudKit records",

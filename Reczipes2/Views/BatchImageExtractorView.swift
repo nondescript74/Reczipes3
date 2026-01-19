@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Photos
+import OSLog
 
 /// UI for batch extracting recipes from tagged Photos library images
 struct BatchImageExtractorView: View {
@@ -29,6 +30,7 @@ struct BatchImageExtractorView: View {
             apiKey: apiKey,
             modelContext: modelContext
         ))
+        logInfo("BatchImageExtractorView initialized", category: "ui")
     }
     
     var body: some View {
@@ -48,7 +50,10 @@ struct BatchImageExtractorView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
                         if viewModel.isExtracting {
+                            logInfo("User stopped extraction and closed view", category: "extraction")
                             viewModel.stop()
+                        } else {
+                            logInfo("User closed BatchImageExtractorView", category: "ui")
                         }
                         dismiss()
                     }
@@ -58,6 +63,7 @@ struct BatchImageExtractorView: View {
                 // ADD THIS NEW ITEM:
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        logDebug("User tapped help button for batch extraction", category: "ui")
                         showingHelp = true
                     } label: {
                         Image(systemName: "questionmark.circle")
@@ -67,6 +73,7 @@ struct BatchImageExtractorView: View {
                 if !selectedAssets.isEmpty && !viewModel.isExtracting {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Add More") {
+                            logInfo("User tapped 'Add More' to add additional images to selection", category: "ui")
                             showingImagePicker = true
                         }
                     }
@@ -88,9 +95,11 @@ struct BatchImageExtractorView: View {
             }
             .alert("Batch Extraction Complete", isPresented: $showingCompletionAlert) {
                 Button("View Recipes") {
+                    logInfo("User chose to view recipes after batch extraction", category: "ui")
                     dismiss()
                 }
                 Button("OK", role: .cancel) {
+                    logInfo("User dismissed completion alert and reset batch extractor", category: "ui")
                     viewModel.reset()
                     selectedAssets = []
                 }
@@ -98,12 +107,15 @@ struct BatchImageExtractorView: View {
                 Text("Extracted \(viewModel.successCount) recipe\(viewModel.successCount == 1 ? "" : "s") successfully\(viewModel.failureCount > 0 ? " with \(viewModel.failureCount) failure\(viewModel.failureCount == 1 ? "" : "s")" : "").")
             }
             .onAppear {
+                logDebug("BatchImageExtractorView appeared", category: "ui")
                 Task {
                     await photoManager.requestPermission()
+                    logInfo("Photo library permission requested", category: "image")
                 }
             }
             .onChange(of: viewModel.isExtracting) { _, isExtracting in
                 if !isExtracting && viewModel.currentProgress > 0 {
+                    logInfo("Batch extraction completed. Success: \(viewModel.successCount), Failures: \(viewModel.failureCount)", category: "extraction")
                     showingCompletionAlert = true
                 }
             }
@@ -112,9 +124,15 @@ struct BatchImageExtractorView: View {
                     ImageCropView(
                         image: image,
                         onCrop: { croppedImage in
+                            if croppedImage != nil {
+                                logDebug("User completed cropping image in batch workflow", category: "image")
+                            } else {
+                                logDebug("User cancelled cropping in batch workflow", category: "image")
+                            }
                             viewModel.handleCroppedImage(croppedImage)
                         },
                         onCancel: {
+                            logDebug("User cancelled crop view in batch workflow", category: "image")
                             viewModel.handleCroppedImage(nil)
                         }
                     )
@@ -142,6 +160,7 @@ struct BatchImageExtractorView: View {
                 .padding(.horizontal)
             
             Button {
+                logInfo("User tapped 'Select Photos' in empty state", category: "ui")
                 showingImagePicker = true
             } label: {
                 Label("Select Photos", systemImage: "photo.on.rectangle.angled")
@@ -197,6 +216,7 @@ struct BatchImageExtractorView: View {
                 Spacer()
                 
                 Button {
+                    logInfo("User tapped add more images from selection summary", category: "ui")
                     showingImagePicker = true
                 } label: {
                     Image(systemName: "plus.circle.fill")
@@ -232,6 +252,9 @@ struct BatchImageExtractorView: View {
                 }
             }
             .tint(.blue)
+            .onChange(of: shouldCropImages) { oldValue, newValue in
+                logDebug("User toggled crop option: \(newValue)", category: "ui")
+            }
             
             if !shouldCropImages {
                 HStack {
@@ -252,6 +275,7 @@ struct BatchImageExtractorView: View {
     
     private var startExtractionButton: some View {
         Button {
+            logInfo("Starting batch extraction with \(selectedAssets.count) images, cropping: \(shouldCropImages)", category: "extraction")
             if shouldCropImages {
                 // Start with cropping workflow
                 viewModel.startBatchExtraction(
@@ -460,6 +484,7 @@ struct BatchImageExtractorView: View {
             
             HStack(spacing: 12) {
                 Button {
+                    logDebug("User chose to skip cropping for current image", category: "image")
                     viewModel.skipCropping()
                 } label: {
                     HStack {
@@ -476,6 +501,7 @@ struct BatchImageExtractorView: View {
                 .buttonStyle(.plain)
                 
                 Button {
+                    logDebug("User chose to crop current image", category: "image")
                     viewModel.showCropping()
                 } label: {
                     HStack {
@@ -502,8 +528,10 @@ struct BatchImageExtractorView: View {
         HStack(spacing: 12) {
             Button {
                 if viewModel.isPaused {
+                    logInfo("User resumed batch extraction", category: "extraction")
                     viewModel.resume()
                 } else {
+                    logInfo("User paused batch extraction", category: "extraction")
                     viewModel.pause()
                 }
             } label: {
@@ -521,6 +549,7 @@ struct BatchImageExtractorView: View {
             .buttonStyle(.plain)
             
             Button {
+                logWarning("User stopped batch extraction at \(viewModel.currentProgress)/\(viewModel.totalToExtract)", category: "extraction")
                 viewModel.stop()
             } label: {
                 HStack {
@@ -634,6 +663,7 @@ struct BatchImageExtractorView: View {
                     Button {
                         shouldCropImages = true
                         showingCropOptions = false
+                        logInfo("User chose to crop each image in batch", category: "extraction")
                         viewModel.startBatchExtraction(
                             assets: selectedAssets,
                             photoManager: photoManager,
@@ -656,6 +686,7 @@ struct BatchImageExtractorView: View {
                     Button {
                         shouldCropImages = false
                         showingCropOptions = false
+                        logInfo("User chose to skip cropping for batch extraction", category: "extraction")
                         viewModel.startBatchExtraction(
                             assets: selectedAssets,
                             photoManager: photoManager,
@@ -722,6 +753,7 @@ struct SelectedAssetThumbnail: View {
             
             // Remove button
             Button {
+                logDebug("User removed image \(index + 1) from selection", category: "ui")
                 onRemove()
             } label: {
                 Image(systemName: "xmark.circle.fill")
@@ -828,6 +860,7 @@ struct PhotosPickerSheet: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add (\(tempSelectedAssets.count))") {
+                        logInfo("User added \(tempSelectedAssets.count) images to batch selection (total: \(selectedAssets.count + tempSelectedAssets.count))", category: "ui")
                         selectedAssets.append(contentsOf: tempSelectedAssets)
                         dismiss()
                     }
@@ -843,8 +876,10 @@ struct PhotosPickerSheet: View {
     private func toggleSelection(_ asset: PHAsset) {
         if let index = tempSelectedAssets.firstIndex(where: { $0.localIdentifier == asset.localIdentifier }) {
             tempSelectedAssets.remove(at: index)
+            logDebug("Deselected asset in photo picker", category: "ui")
         } else {
             tempSelectedAssets.append(asset)
+            logDebug("Selected asset in photo picker (temp count: \(tempSelectedAssets.count))", category: "ui")
         }
     }
 }
