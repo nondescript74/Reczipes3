@@ -1295,93 +1295,102 @@ class CloudKitSharingService: ObservableObject {
     }
     
     /// Fetch all CloudKit records of a given type (with pagination)
+    /// 
+    /// ⚠️ IMPORTANT: CloudKit Schema Configuration Required
+    /// If you get "Field 'recordName' is not marked queryable" errors:
+    /// 1. Go to CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
+    /// 2. Select your container: iCloud.com.headydiscy.reczipes
+    /// 3. Go to Schema → Indexes
+    /// 4. For each Record Type (SharedRecipe, SharedRecipeBook):
+    ///    - Add QUERYABLE index on "recordName" field
+    ///    - Add SORTABLE index on "sharedDate" field  
+    ///    - Deploy to Production
     private func fetchAllCloudKitRecords(type: String) async throws -> [CKRecord] {
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = CKQuery(recordType: type, predicate: NSPredicate(value: true))
+        logInfo("📦 Fetching all '\(type)' records from CloudKit Public Database...", category: "sharing")
+        
+        var allRecords: [CKRecord] = []
+        
+        // Create the most basic query - no sort, no filters
+        let predicate = NSPredicate(value: true)
+        let query = CKQuery(recordType: type, predicate: predicate)
+        
+        // Fetch initial batch
+        var currentCursor: CKQueryOperation.Cursor?
+        let batchSize = 100
+        var batchNumber = 1
+        
+        do {
+            // Initial query
+            let results = try await publicDatabase.records(matching: query, desiredKeys: nil, resultsLimit: batchSize)
             
-            var allRecords: [CKRecord] = []
-            
-            let operation = CKQueryOperation(query: query)
-            operation.resultsLimit = CKQueryOperation.maximumResults
-            
-            operation.recordMatchedBlock = { recordID, result in
+            // Process initial batch
+            for (_, result) in results.matchResults {
                 switch result {
                 case .success(let record):
                     allRecords.append(record)
                 case .failure(let error):
-                    logError("Failed to fetch record \(recordID): \(error)", category: "sharing")
+                    logError("❌ Error fetching record: \(error)", category: "sharing")
                 }
             }
             
-            operation.queryResultBlock = { result in
-                switch result {
-                case .success(let cursor):
-                    if let cursor = cursor {
-                        // More results available - fetch next batch
-                        self.fetchRemainingRecords(cursor: cursor, existingRecords: allRecords) { result in
-                            switch result {
-                            case .success(let finalRecords):
-                                // Sort in memory by sharedDate (most recent first)
-                                let sortedRecords = finalRecords.sorted { record1, record2 in
-                                    let date1 = record1["sharedDate"] as? Date ?? Date.distantPast
-                                    let date2 = record2["sharedDate"] as? Date ?? Date.distantPast
-                                    return date1 > date2
-                                }
-                                continuation.resume(returning: sortedRecords)
-                            case .failure(let error):
-                                continuation.resume(throwing: error)
-                            }
-                        }
-                    } else {
-                        // No more results - we're done
-                        let sortedRecords = allRecords.sorted { record1, record2 in
-                            let date1 = record1["sharedDate"] as? Date ?? Date.distantPast
-                            let date2 = record2["sharedDate"] as? Date ?? Date.distantPast
-                            return date1 > date2
-                        }
-                        continuation.resume(returning: sortedRecords)
+            currentCursor = results.queryCursor
+            logInfo("📦 Batch #\(batchNumber): Fetched \(results.matchResults.count) records, total: \(allRecords.count)", category: "sharing")
+            
+            // Continue with cursor if available
+            while let cursor = currentCursor {
+                batchNumber += 1
+                
+                let nextResults = try await publicDatabase.records(
+                    continuingMatchFrom: cursor,
+                    desiredKeys: nil,
+                    resultsLimit: batchSize
+                )
+                
+                // Process batch
+                for (_, result) in nextResults.matchResults {
+                    switch result {
+                    case .success(let record):
+                        allRecords.append(record)
+                    case .failure(let error):
+                        logError("❌ Error fetching record: \(error)", category: "sharing")
                     }
-                case .failure(let error):
-                    continuation.resume(throwing: error)
+                }
+                
+                currentCursor = nextResults.queryCursor
+                logInfo("📦 Batch #\(batchNumber): Fetched \(nextResults.matchResults.count) records, total: \(allRecords.count)", category: "sharing")
+                
+                // Safety: prevent infinite loops
+                if batchNumber > 100 {
+                    logWarning("📦 Reached maximum batch limit (100), stopping pagination", category: "sharing")
+                    break
                 }
             }
             
-            publicDatabase.add(operation)
-        }
-    }
-    
-    /// Helper to fetch remaining records using cursor
-    private func fetchRemainingRecords(cursor: CKQueryOperation.Cursor, existingRecords: [CKRecord], completion: @escaping (Result<[CKRecord], Error>) -> Void) {
-        var allRecords = existingRecords
-        
-        let operation = CKQueryOperation(cursor: cursor)
-        operation.resultsLimit = CKQueryOperation.maximumResults
-        
-        operation.recordMatchedBlock = { recordID, result in
-            switch result {
-            case .success(let record):
-                allRecords.append(record)
-            case .failure(let error):
-                logError("Failed to fetch record \(recordID): \(error)", category: "sharing")
+            // Sort in memory by date
+            let sorted = allRecords.sorted { r1, r2 in
+                let date1 = r1["sharedDate"] as? Date ?? .distantPast
+                let date2 = r2["sharedDate"] as? Date ?? .distantPast
+                return date1 > date2
             }
-        }
-        
-        operation.queryResultBlock = { result in
-            switch result {
-            case .success(let cursor):
-                if let cursor = cursor {
-                    // More results - continue recursively
-                    self.fetchRemainingRecords(cursor: cursor, existingRecords: allRecords, completion: completion)
-                } else {
-                    // Done
-                    completion(.success(allRecords))
+            
+            logInfo("✅ Fetched all \(sorted.count) '\(type)' records in \(batchNumber) batches", category: "sharing")
+            return sorted
+            
+        } catch let error as CKError {
+            logError("❌ CloudKit query failed for '\(type)': \(error)", category: "sharing")
+            
+            // Check if it's the "recordName not queryable" error
+            if error.code == .invalidArguments {
+                let errorMessage = error.localizedDescription
+                if errorMessage.contains("recordName") || errorMessage.contains("queryable") {
+                    throw SharingError.cloudKitUnavailable(
+                        message: "CloudKit schema not configured. Please add queryable indexes in CloudKit Dashboard for record type '\(type)'. See CloudKitSharingService.swift for instructions."
+                    )
                 }
-            case .failure(let error):
-                completion(.failure(error))
             }
+            
+            throw error
         }
-        
-        publicDatabase.add(operation)
     }
     
     /// Import a shared recipe into the user's local collection
