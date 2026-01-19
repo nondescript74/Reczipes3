@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import Photos
 import OSLog
+import UniformTypeIdentifiers
 
 /// UI for batch extracting recipes from tagged Photos library images
 struct BatchImageExtractorView: View {
@@ -19,11 +20,14 @@ struct BatchImageExtractorView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var showingImagePicker = false
+    @State private var showingDocumentPicker = false
     @State private var selectedAssets: [PHAsset] = []
+    @State private var selectedImages: [UIImage] = [] // For iCloud Drive images
     @State private var showingCropOptions = false
     @State private var showingCompletionAlert = false
     @State private var shouldCropImages = false
     @State private var showingHelp = false
+    @State private var showingSourcePicker = false
     
     init(apiKey: String, modelContext: ModelContext) {
         _viewModel = StateObject(wrappedValue: BatchImageExtractorViewModel(
@@ -36,7 +40,7 @@ struct BatchImageExtractorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if selectedAssets.isEmpty {
+                if selectedAssets.isEmpty && selectedImages.isEmpty {
                     emptyStateView
                 } else if viewModel.isExtracting {
                     extractionProgressView
@@ -72,9 +76,44 @@ struct BatchImageExtractorView: View {
                 
                 if !selectedAssets.isEmpty && !viewModel.isExtracting {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Add More") {
-                            logInfo("User tapped 'Add More' to add additional images to selection", category: "ui")
-                            showingImagePicker = true
+                        Menu {
+                            Button {
+                                logInfo("User tapped 'Add More from Photos' to add additional images", category: "ui")
+                                showingImagePicker = true
+                            } label: {
+                                Label("From Photos", systemImage: "photo.on.rectangle")
+                            }
+                            
+                            Button {
+                                logInfo("User tapped 'Add More from Files' to add additional images", category: "ui")
+                                showingDocumentPicker = true
+                            } label: {
+                                Label("From Files (iCloud Drive)", systemImage: "folder")
+                            }
+                        } label: {
+                            Label("Add More", systemImage: "plus")
+                        }
+                    }
+                }
+                
+                if !selectedImages.isEmpty && !viewModel.isExtracting {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Button {
+                                logInfo("User tapped 'Add More from Photos' to add additional images", category: "ui")
+                                showingImagePicker = true
+                            } label: {
+                                Label("From Photos", systemImage: "photo.on.rectangle")
+                            }
+                            
+                            Button {
+                                logInfo("User tapped 'Add More from Files' to add additional images", category: "ui")
+                                showingDocumentPicker = true
+                            } label: {
+                                Label("From Files (iCloud Drive)", systemImage: "folder")
+                            }
+                        } label: {
+                            Label("Add More", systemImage: "plus")
                         }
                     }
                 }
@@ -85,6 +124,12 @@ struct BatchImageExtractorView: View {
                     selectedAssets: $selectedAssets,
                     photoManager: photoManager
                 )
+            }
+            .sheet(isPresented: $showingDocumentPicker) {
+                DocumentPickerView(selectedImages: $selectedImages)
+            }
+            .sheet(isPresented: $showingSourcePicker) {
+                sourceSelectionSheet
             }
             .sheet(isPresented: $showingCropOptions) {
                 cropOptionsSheet
@@ -102,6 +147,7 @@ struct BatchImageExtractorView: View {
                     logInfo("User dismissed completion alert and reset batch extractor", category: "ui")
                     viewModel.reset()
                     selectedAssets = []
+                    selectedImages = []
                 }
             } message: {
                 Text("Extracted \(viewModel.successCount) recipe\(viewModel.successCount == 1 ? "" : "s") successfully\(viewModel.failureCount > 0 ? " with \(viewModel.failureCount) failure\(viewModel.failureCount == 1 ? "" : "s")" : "").")
@@ -119,16 +165,17 @@ struct BatchImageExtractorView: View {
                     showingCompletionAlert = true
                 }
             }
+            .onChange(of: selectedImages) { _, newImages in
+                if !newImages.isEmpty {
+                    logInfo("Loaded \(newImages.count) images from iCloud Drive/Files", category: "ui")
+                }
+            }
             .fullScreenCover(isPresented: $viewModel.showingCropForBatch) {
                 if let image = viewModel.imageToCropInBatch {
                     ImageCropView(
                         image: image,
                         onCrop: { croppedImage in
-                            if croppedImage != nil {
-                                logDebug("User completed cropping image in batch workflow", category: "image")
-                            } else {
-                                logDebug("User cancelled cropping in batch workflow", category: "image")
-                            }
+                            logDebug("User completed cropping image in batch workflow", category: "image")
                             viewModel.handleCroppedImage(croppedImage)
                         },
                         onCancel: {
@@ -153,25 +200,41 @@ struct BatchImageExtractorView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Choose multiple recipe images from your Photos library to extract recipes in batch")
+            Text("Choose multiple recipe images from Photos or Files to extract recipes in batch")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             
-            Button {
-                logInfo("User tapped 'Select Photos' in empty state", category: "ui")
-                showingImagePicker = true
-            } label: {
-                Label("Select Photos", systemImage: "photo.on.rectangle.angled")
-                    .font(.headline)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+            VStack(spacing: 12) {
+                Button {
+                    logInfo("User tapped 'Select from Photos' in empty state", category: "ui")
+                    showingImagePicker = true
+                } label: {
+                    Label("Select from Photos", systemImage: "photo.on.rectangle.angled")
+                        .font(.headline)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+                
+                Button {
+                    logInfo("User tapped 'Select from Files' in empty state", category: "ui")
+                    showingDocumentPicker = true
+                } label: {
+                    Label("Select from Files (iCloud Drive)", systemImage: "folder.fill")
+                        .font(.headline)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.purple)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.horizontal)
         }
         .padding()
@@ -208,22 +271,47 @@ struct BatchImageExtractorView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Images Selected")
                         .font(.headline)
-                    Text("\(selectedAssets.count) image\(selectedAssets.count == 1 ? "" : "s") ready for extraction")
+                    let totalCount = selectedAssets.count + selectedImages.count
+                    Text("\(totalCount) image\(totalCount == 1 ? "" : "s") ready for extraction")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                    
+                    if !selectedAssets.isEmpty && !selectedImages.isEmpty {
+                        Text("\(selectedAssets.count) from Photos • \(selectedImages.count) from Files")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    } else if !selectedAssets.isEmpty {
+                        Text("From Photos Library")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    } else if !selectedImages.isEmpty {
+                        Text("From Files/iCloud Drive")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 Spacer()
                 
-                Button {
-                    logInfo("User tapped add more images from selection summary", category: "ui")
-                    showingImagePicker = true
+                Menu {
+                    Button {
+                        logInfo("User tapped add more from Photos", category: "ui")
+                        showingImagePicker = true
+                    } label: {
+                        Label("From Photos", systemImage: "photo.on.rectangle")
+                    }
+                    
+                    Button {
+                        logInfo("User tapped add more from Files", category: "ui")
+                        showingDocumentPicker = true
+                    } label: {
+                        Label("From Files", systemImage: "folder")
+                    }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
                         .foregroundColor(.blue)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -275,21 +363,41 @@ struct BatchImageExtractorView: View {
     
     private var startExtractionButton: some View {
         Button {
-            logInfo("Starting batch extraction with \(selectedAssets.count) images, cropping: \(shouldCropImages)", category: "extraction")
+            let totalCount = selectedAssets.count + selectedImages.count
+            logInfo("Starting batch extraction with \(totalCount) images (\(selectedAssets.count) from Photos, \(selectedImages.count) from Files), cropping: \(shouldCropImages)", category: "extraction")
+            
             if shouldCropImages {
                 // Start with cropping workflow
-                viewModel.startBatchExtraction(
-                    assets: selectedAssets,
-                    photoManager: photoManager,
-                    shouldCrop: true
-                )
+                if !selectedImages.isEmpty {
+                    // Extract from UIImages (Files/iCloud Drive)
+                    viewModel.startBatchExtractionFromImages(
+                        images: selectedImages,
+                        shouldCrop: true
+                    )
+                } else {
+                    // Extract from PHAssets (Photos)
+                    viewModel.startBatchExtraction(
+                        assets: selectedAssets,
+                        photoManager: photoManager,
+                        shouldCrop: true
+                    )
+                }
             } else {
                 // Start without cropping
-                viewModel.startBatchExtraction(
-                    assets: selectedAssets,
-                    photoManager: photoManager,
-                    shouldCrop: false
-                )
+                if !selectedImages.isEmpty {
+                    // Extract from UIImages (Files/iCloud Drive)
+                    viewModel.startBatchExtractionFromImages(
+                        images: selectedImages,
+                        shouldCrop: false
+                    )
+                } else {
+                    // Extract from PHAssets (Photos)
+                    viewModel.startBatchExtraction(
+                        assets: selectedAssets,
+                        photoManager: photoManager,
+                        shouldCrop: false
+                    )
+                }
             }
         } label: {
             HStack {
@@ -316,6 +424,7 @@ struct BatchImageExtractorView: View {
                 GridItem(.flexible(), spacing: 12),
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
+                // First show PHAssets from Photos
                 ForEach(Array(selectedAssets.enumerated()), id: \.offset) { index, asset in
                     SelectedAssetThumbnail(
                         asset: asset,
@@ -323,6 +432,17 @@ struct BatchImageExtractorView: View {
                         photoManager: photoManager,
                         onRemove: {
                             selectedAssets.remove(at: index)
+                        }
+                    )
+                }
+                
+                // Then show UIImages from Files/iCloud Drive
+                ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                    SelectedImageThumbnail(
+                        image: image,
+                        index: selectedAssets.count + index,
+                        onRemove: {
+                            selectedImages.remove(at: index)
                         }
                     )
                 }
@@ -642,6 +762,85 @@ struct BatchImageExtractorView: View {
     
     // MARK: - Crop Options Sheet
     
+    private var sourceSelectionSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 60))
+                    .foregroundColor(.blue)
+                
+                Text("Select Image Source")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                
+                Text("Choose where to select your recipe images from")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                VStack(spacing: 12) {
+                    Button {
+                        showingSourcePicker = false
+                        showingImagePicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle")
+                            VStack(alignment: .leading) {
+                                Text("Photos Library")
+                                    .font(.headline)
+                                Text("Select from your device's photos")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        showingSourcePicker = false
+                        showingDocumentPicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "folder")
+                            VStack(alignment: .leading) {
+                                Text("Files (iCloud Drive)")
+                                    .font(.headline)
+                                Text("Select from Files app and iCloud Drive")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color.purple)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Select Source")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showingSourcePicker = false
+                    }
+                }
+            }
+        }
+    }
+    
     private var cropOptionsSheet: some View {
         NavigationStack {
             VStack(spacing: 24) {
@@ -720,6 +919,126 @@ struct BatchImageExtractorView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// MARK: - Document Picker for iCloud Drive
+
+struct DocumentPickerView: UIViewControllerRepresentable {
+    @Binding var selectedImages: [UIImage]
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.image], asCopy: true)
+        picker.allowsMultipleSelection = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: DocumentPickerView
+        
+        init(_ parent: DocumentPickerView) {
+            self.parent = parent
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            logInfo("User selected \(urls.count) images from Files/iCloud Drive", category: "ui")
+            
+            var loadedImages: [UIImage] = []
+            
+            for url in urls {
+                // Start accessing the security-scoped resource
+                guard url.startAccessingSecurityScopedResource() else {
+                    logWarning("Failed to access security-scoped resource: \(url)", category: "storage")
+                    continue
+                }
+                
+                defer { url.stopAccessingSecurityScopedResource() }
+                
+                // Load image data
+                do {
+                    let imageData = try Data(contentsOf: url)
+                    if let image = UIImage(data: imageData) {
+                        loadedImages.append(image)
+                        logDebug("Loaded image from \(url.lastPathComponent)", category: "image")
+                    } else {
+                        logWarning("Failed to create UIImage from \(url.lastPathComponent)", category: "image")
+                    }
+                } catch {
+                    logError("Failed to load image from \(url.lastPathComponent): \(error)", category: "storage")
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.parent.selectedImages.append(contentsOf: loadedImages)
+                logInfo("Successfully loaded \(loadedImages.count) images from Files", category: "image")
+            }
+        }
+        
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            logDebug("User cancelled document picker", category: "ui")
+        }
+    }
+}
+
+// MARK: - Selected Image Thumbnail (for Files/iCloud Drive images)
+
+struct SelectedImageThumbnail: View {
+    let image: UIImage
+    let index: Int
+    let onRemove: () -> Void
+    
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 100, height: 100)
+                .clipped()
+                .cornerRadius(8)
+            
+            // Remove button
+            Button {
+                logDebug("User removed iCloud Drive image \(index + 1) from selection", category: "ui")
+                onRemove()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.red)
+                    .background(
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 20, height: 20)
+                    )
+            }
+            .offset(x: 8, y: -8)
+            
+            // Index badge
+            VStack {
+                Spacer()
+                HStack {
+                    HStack(spacing: 2) {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 8))
+                        Text("\(index + 1)")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(4)
+                    .background(Color.purple.opacity(0.8))
+                    .cornerRadius(4)
+                    Spacer()
+                }
+            }
+            .padding(4)
         }
     }
 }

@@ -94,6 +94,35 @@ class BatchImageExtractorViewModel: ObservableObject {
         }
     }
     
+    func startBatchExtractionFromImages(
+        images: [UIImage],
+        shouldCrop: Bool
+    ) {
+        guard !images.isEmpty else { return }
+        
+        logInfo("Starting batch image extraction from \(images.count) UIImages (Files/iCloud Drive), shouldCrop: \(shouldCrop)", category: "batch")
+        
+        self.currentBatch = images
+        self.shouldCrop = shouldCrop
+        self.totalToExtract = images.count
+        self.currentProgress = 0
+        self.successCount = 0
+        self.failureCount = 0
+        self.errorLog = []
+        self.isExtracting = true
+        self.isPaused = false
+        
+        // Clear asset-related state
+        self.allAssets = []
+        self.remainingAssets = []
+        self.processedAssets = []
+        
+        // Start extraction task
+        extractionTask = Task {
+            await processImageBatch()
+        }
+    }
+    
     func pause() {
         isPaused = true
         currentStatus = "Paused"
@@ -286,6 +315,61 @@ class BatchImageExtractorViewModel: ObservableObject {
             failureCount += 1
             currentRecipe = nil
         }
+    }
+    
+    private func processImageBatch() async {
+        logInfo("Processing batch of \(currentBatch.count) UIImages from Files/iCloud Drive", category: "batch")
+        
+        for (index, image) in currentBatch.enumerated() {
+            // Check if stopped
+            guard isExtracting else {
+                logInfo("Extraction stopped", category: "batch")
+                break
+            }
+            
+            // Wait while paused
+            while isPaused && isExtracting {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            }
+            
+            currentStatus = "Processing image \(index + 1) of \(totalToExtract)..."
+            logInfo("Processing UIImage \(index + 1) of \(totalToExtract)", category: "batch")
+            
+            currentImage = image
+            
+            // Handle cropping if enabled
+            var imageToProcess = image
+            if shouldCrop {
+                let shouldCropThisImage = await askToCrop()
+                
+                if shouldCropThisImage {
+                    if let croppedImage = await requestCrop(for: image) {
+                        imageToProcess = croppedImage
+                        logInfo("Image cropped successfully for batch extraction", category: "batch")
+                    } else {
+                        logInfo("Crop cancelled, using original image", category: "batch")
+                    }
+                }
+            }
+            
+            // Extract recipe from image
+            await extractRecipeFromImage(imageToProcess, imageIndex: index)
+            
+            currentProgress += 1
+            
+            // Process in batches of 10
+            if currentProgress % 10 == 0 && currentProgress < totalToExtract {
+                currentStatus = "Completed \(currentProgress) images. Continuing with next batch..."
+                logInfo("Completed batch of 10, continuing...", category: "batch")
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second pause
+            }
+        }
+        
+        // Extraction complete
+        currentStatus = "Complete! Extracted \(successCount) recipes."
+        isExtracting = false
+        currentBatch = []
+        logInfo("Batch extraction from UIImages complete: \(successCount) success, \(failureCount) failures", category: "batch")
     }
     
     private func saveRecipe(_ recipeModel: RecipeModel, withImage image: UIImage) async {
