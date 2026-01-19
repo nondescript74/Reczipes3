@@ -72,6 +72,18 @@ struct SettingsView: View {
                                isOn: .constant(RecipeExtractorConfig.defaultUsePreprocessing))
                     }
                     
+                    Section("System Status") {
+                        NavigationLink {
+                            SystemHealthView()
+                        } label: {
+                            HStack {
+                                Label("System Health", systemImage: "heart.text.square")
+                                Spacer()
+                                SystemHealthBadge()
+                            }
+                        }
+                    }
+                    
                     Section("Data & Sync") {
                         NavigationLink(destination: QuickSyncStatusView()) {
                             HStack {
@@ -169,6 +181,30 @@ struct SettingsView: View {
                     
                     Section {
                         NavigationLink {
+                            DatabaseMaintenanceView()
+                        } label: {
+                            HStack {
+                                Label("Database Maintenance", systemImage: "wrench.and.screwdriver.fill")
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                            }
+                        }
+                        
+                        NavigationLink {
+                            DuplicateRecipeDetectorView()
+                        } label: {
+                            HStack {
+                                Label("Duplicate Recipe Detector", systemImage: "doc.on.doc.fill")
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                            }
+                        }
+                        
+                        NavigationLink {
                             DatabaseInvestigationView()
                         } label: {
                             HStack {
@@ -200,7 +236,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Developer Tools")
                     } footer: {
-                        Text("Use 'Remove Duplicate Recipes' if you have 421 recipes but only 208 are unique. Database Investigation shows all database files and their contents.")
+                        Text("Database Maintenance: Comprehensive cleanup tools. Duplicate Detector: Find and remove duplicate recipes (you have ~27 duplicates). Database Investigation shows all database files and their contents.")
                             .font(.caption)
                     }
 
@@ -242,6 +278,8 @@ struct SettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        
+                        DiagnosticMenuItem()
                         
                         Button {
                             showDiagnosticLog = true

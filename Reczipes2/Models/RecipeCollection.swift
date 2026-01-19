@@ -18,18 +18,54 @@ final class RecipeCollection {
     }
     
     /// Returns all recipes from SwiftData (extracted via Claude API)
+    /// Automatically deduplicates based on title and content
     func allRecipes(savedRecipes: [Recipe]) -> [RecipeModel] {
-        // Convert saved Recipe objects to RecipeModels
         logInfo("📚 RecipeCollection.allRecipes called with \(savedRecipes.count) saved recipes", category: "recipe")
-        let models = savedRecipes.compactMap { recipe -> RecipeModel? in
+        
+        // Deduplicate first
+        let deduplicatedRecipes = deduplicateRecipes(savedRecipes)
+        
+        if deduplicatedRecipes.count < savedRecipes.count {
+            logWarning("⚠️ Found \(savedRecipes.count - deduplicatedRecipes.count) duplicate recipes (filtered out)", category: "recipe")
+        }
+        
+        // Convert saved Recipe objects to RecipeModels
+        let models = deduplicatedRecipes.compactMap { recipe -> RecipeModel? in
             let model = recipe.toRecipeModel()
-//            if let model = model {
-//                logInfo("📚 Converting Recipe '\(recipe.title)' - imageName in Recipe: '\(recipe.imageName ?? "nil")' -> imageName in Model: '\(model.imageName ?? "nil")'", category: "recipe")
-//            }
             return model
         }
+        
         logInfo("📚 RecipeCollection.allRecipes returning \(models.count) models", category: "recipe")
         return models
+    }
+    
+    // MARK: - Deduplication
+    
+    /// Remove duplicate recipes, keeping the canonical (oldest) version
+    private func deduplicateRecipes(_ recipes: [Recipe]) -> [Recipe] {
+        var uniqueRecipes: [Recipe] = []
+        var seenFingerprints: Set<String> = []
+        
+        // Sort by creation date (oldest first) to prefer older recipes
+        let sortedRecipes = recipes.sorted { recipe1, recipe2 in
+            let date1 = recipe1.dateCreated ?? recipe1.dateAdded
+            let date2 = recipe2.dateCreated ?? recipe2.dateAdded
+            return date1 < date2
+        }
+        
+        for recipe in sortedRecipes {
+            let fingerprint = recipe.contentFingerprint
+            
+            // Check if we've seen this content before
+            if !seenFingerprints.contains(fingerprint) {
+                uniqueRecipes.append(recipe)
+                seenFingerprints.insert(fingerprint)
+            } else {
+                logInfo("🔍 Duplicate detected: '\(recipe.title)' (ID: \(recipe.id))", category: "recipe")
+            }
+        }
+        
+        return uniqueRecipes
     }
     
     /// Returns all recipes with their save status

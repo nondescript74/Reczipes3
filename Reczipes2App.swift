@@ -98,18 +98,6 @@ struct Reczipes2App: App {
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
-            
-//            let container = try ModelContainer(
-//                for: Recipe.self,
-//                RecipeImageAssignment.self,
-//                UserAllergenProfile.self,
-//                CachedDiabeticAnalysis.self,
-//                SavedLink.self,
-//                RecipeBook.self,
-//                CookingSession.self,
-//                migrationPlan: Reczipes2MigrationPlan.self,
-//                configurations: cloudKitConfiguration
-//            )
             print("✅ ModelContainer created successfully with CloudKit sync enabled")
             print("   Container: iCloud.com.headydiscy.reczipes")
             print("   Database: CloudKitModel.sqlite (separate from local-only)")
@@ -141,17 +129,6 @@ struct Reczipes2App: App {
                     migrationPlan: Reczipes2MigrationPlan.self,
                     configurations: cloudKitConfiguration
                 )
-//                let container = try ModelContainer(
-//                    for: Recipe.self,
-//                    RecipeImageAssignment.self,
-//                    UserAllergenProfile.self,
-//                    CachedDiabeticAnalysis.self,
-//                    SavedLink.self,
-//                    RecipeBook.self,
-//                    CookingSession.self,
-//                    migrationPlan: Reczipes2MigrationPlan.self,
-//                    configurations: localConfiguration
-//                )
                 print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
                 print("   Migration Plan: Reczipes2MigrationPlan")
                 print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
@@ -206,6 +183,8 @@ struct Reczipes2App: App {
                         .fullScreenCover(isPresented: $showAPIKeySetup) {
                             APIKeySetupView(isPresented: $showAPIKeySetup)
                         }
+                        .diagnosticsCapable()
+                        .shakeToShowDiagnostics()
                         .onAppear {
                             // Check license and API key status on appear
                             showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
@@ -524,6 +503,11 @@ struct MainTabView: View {
                     Label("Settings", systemImage: "gear")
                 }
                 .tag(AppTab.settings)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                DiagnosticButton()
+            }
         }
         .task {
             // Perform background initialization tasks after UI has appeared

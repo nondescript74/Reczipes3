@@ -17,17 +17,19 @@ struct DatabaseDuplicateCleanupView: View {
     @State private var duplicateInfo: DuplicateInfo?
     @State private var isRemoving = false
     @State private var cleanupComplete = false
+    @State private var removedCount = 0
     @State private var error: Error?
+    @State private var showSuccessAlert = false
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
                 if isScanning {
                     scanningView
-                } else if let info = duplicateInfo, info.hasDuplicates {
-                    duplicatesFoundView(info: info)
                 } else if cleanupComplete {
                     cleanupCompleteView
+                } else if let info = duplicateInfo, info.hasDuplicates {
+                    duplicatesFoundView(info: info)
                 } else {
                     noDuplicatesView
                 }
@@ -42,6 +44,13 @@ struct DatabaseDuplicateCleanupView: View {
                     }
                     .disabled(isRemoving)
                 }
+            }
+            .alert("Success!", isPresented: $showSuccessAlert) {
+                Button("Done") {
+                    dismiss()
+                }
+            } message: {
+                Text("Successfully removed \(removedCount) duplicate recipes. Your database now has \(duplicateInfo?.uniqueRecipes ?? 0) unique recipes.")
             }
             .task {
                 await scanForDuplicates()
@@ -166,31 +175,64 @@ struct DatabaseDuplicateCleanupView: View {
     
     private var cleanupCompleteView: some View {
         VStack(spacing: 24) {
+            // Animated checkmark
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
+                .font(.system(size: 80))
                 .foregroundStyle(.green)
+                .symbolEffect(.bounce, value: cleanupComplete)
             
             Text("Cleanup Complete!")
-                .font(.title)
+                .font(.largeTitle)
                 .fontWeight(.bold)
+                .foregroundStyle(.green)
             
-            if let info = duplicateInfo {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Removed \(info.duplicateCount) duplicate recipes")
-                        .font(.headline)
+            VStack(spacing: 16) {
+                // Results card
+                VStack(spacing: 12) {
+                    HStack {
+                        Image(systemName: "trash.fill")
+                            .foregroundStyle(.red)
+                        Text("Removed:")
+                        Spacer()
+                        Text("\(removedCount)")
+                            .fontWeight(.bold)
+                            .foregroundStyle(.red)
+                        Text("duplicates")
+                            .foregroundStyle(.secondary)
+                    }
                     
-                    Text("Your database now has \(info.uniqueRecipes) clean recipes")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Divider()
+                    
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Clean recipes:")
+                        Spacer()
+                        Text("\(duplicateInfo?.uniqueRecipes ?? 0)")
+                            .fontWeight(.bold)
+                            .foregroundStyle(.green)
+                    }
                 }
                 .padding()
                 .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                
+                // Success message
+                Text("Your database is now clean and optimized!")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
             }
             
-            VStack(spacing: 12) {
-                Button("Done") {
-                    dismiss()
+            Spacer()
+            
+            // Action button
+            Button {
+                dismiss()
+            } label: {
+                HStack {
+                    Image(systemName: "checkmark")
+                    Text("Done")
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity)
@@ -198,13 +240,9 @@ struct DatabaseDuplicateCleanupView: View {
                 .background(Color.green)
                 .foregroundColor(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                Text("You can now proceed with CloudKit cleanup if needed")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
         }
+        .padding()
     }
     
     private var noDuplicatesView: some View {
@@ -279,7 +317,7 @@ struct DatabaseDuplicateCleanupView: View {
         error = nil
         
         do {
-            var removedCount = 0
+            var count = 0
             
             // For each duplicate group, keep the newest and delete the rest
             for (_, recipes) in info.duplicateGroups {
@@ -291,20 +329,28 @@ struct DatabaseDuplicateCleanupView: View {
                 // Delete all except the first (newest)
                 for recipe in sorted.dropFirst() {
                     modelContext.delete(recipe)
-                    removedCount += 1
+                    count += 1
                 }
             }
             
             // Save changes
             try modelContext.save()
             
-            print("✅ Removed \(removedCount) duplicate recipes")
+            // Update state for UI
+            removedCount = count
+            
+            print("✅ Removed \(count) duplicate recipes")
             print("✅ Database now has \(info.uniqueRecipes) unique recipes")
             
-            cleanupComplete = true
+            // Show success
+            await MainActor.run {
+                cleanupComplete = true
+                showSuccessAlert = true
+            }
             
         } catch {
             self.error = error
+            print("❌ Failed to remove duplicates: \(error)")
         }
         
         isRemoving = false

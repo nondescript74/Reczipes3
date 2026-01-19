@@ -214,6 +214,7 @@ final class Recipe {
     var recipeYield: String?
     var reference: String?
     var dateAdded: Date = Date()
+    var dateCreated: Date?  // CloudKit creation timestamp (for duplicate resolution)
     var imageName: String? // Main/primary image (set during extraction, immutable in UI)
     var additionalImageNames: [String]? // Additional images added by user
     
@@ -255,6 +256,7 @@ final class Recipe {
          recipeYield: String? = nil,
          reference: String? = nil,
          dateAdded: Date = Date(),
+         dateCreated: Date? = nil,
          imageName: String? = nil,
          additionalImageNames: [String]? = nil,
          imageData: Data? = nil,
@@ -271,6 +273,7 @@ final class Recipe {
         self.recipeYield = recipeYield
         self.reference = reference
         self.dateAdded = dateAdded
+        self.dateCreated = dateCreated ?? Date()  // Default to now if not provided
         self.imageName = imageName
         self.additionalImageNames = additionalImageNames
         self.imageData = imageData
@@ -527,6 +530,34 @@ final class Recipe {
         )
         
         return recipe
+    }
+    
+    // MARK: - Duplicate Detection
+    
+    /// Generate a content fingerprint for duplicate detection
+    /// Combines title + ingredients hash + instructions hash
+    /// Two recipes with the same fingerprint are likely duplicates
+    var contentFingerprint: String {
+        var components: [String] = []
+        
+        // Normalized title (lowercase, trimmed)
+        let normalizedTitle = title.lowercased().trimmingCharacters(in: .whitespaces)
+        components.append(normalizedTitle)
+        
+        // Ingredients hash (already calculated for cache invalidation)
+        if let hash = ingredientsHash {
+            components.append(hash)
+        }
+        
+        // Instructions hash
+        if let instructionsData = instructionSectionsData {
+            let instructionsHash = String(describing: instructionsData.hashValue)
+            components.append(instructionsHash)
+        }
+        
+        // Combine and hash
+        let combined = components.joined(separator: "|")
+        return combined.sha256Hash()
     }
 }
 
