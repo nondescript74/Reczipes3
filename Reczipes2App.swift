@@ -48,109 +48,10 @@ struct Reczipes2App: App {
     }
     
     // Keep the old static initializer for reference, but don't use it
+    // NOTE: This is no longer used - ModelContainerManager handles container creation
     private static var _legacySharedModelContainer: ModelContainer = {
-        // Log schema version information
-        print("🚀 STARTING MODEL CONTAINER INITIALIZATION")
-        print("   Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
-        SchemaVersionManager.logSchemaInfo()
-        
-        // MARK: - CloudKit Configuration with Migration Support
-        // To disable CloudKit and use local-only storage, comment out the cloudKitDatabase parameter below
-        
-        // CloudKit configuration with migration plan
-        // Use a specific URL to avoid conflicts with old database files
-        let cloudKitURL = URL.applicationSupportDirectory.appending(path: "CloudKitModel.sqlite")
-        let cloudKitConfiguration = ModelConfiguration(
-            url: cloudKitURL,
-            cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
-        )
-        
-        // Fallback configuration without CloudKit 
-        // IMPORTANT: Use the SAME URL as CloudKit config to preserve existing data!
-        let localConfiguration = ModelConfiguration(
-            url: cloudKitURL,  // Use same database file
-            cloudKitDatabase: .none  // Just disable CloudKit sync, keep the data
-        )
-
-        // Try CloudKit configuration first
-        // Using SchemaMigrationPlan for automatic schema versioning and migration
-        print("📦 Attempting to create ModelContainer...")
-        do {
-            print("   Creating container with models:")
-            print("     - Recipe")
-            print("     - RecipeImageAssignment")
-            print("     - UserAllergenProfile")
-            print("     - CachedDiabeticAnalysis")
-            print("     - SavedLink")
-            print("     - RecipeBook")
-            print("     - CookingSession")
-            let container = try ModelContainer(
-                for: Recipe.self,
-                    RecipeImageAssignment.self,
-                    UserAllergenProfile.self,
-                    CachedDiabeticAnalysis.self,
-                    SavedLink.self,
-                    RecipeBook.self,
-                    CookingSession.self,
-                    SharedRecipe.self,          // ADD THIS
-                    SharedRecipeBook.self,      // ADD THIS
-                    SharingPreferences.self,    // ADD THIS
-                migrationPlan: Reczipes2MigrationPlan.self,
-                configurations: cloudKitConfiguration
-            )
-            print("✅ ModelContainer created successfully with CloudKit sync enabled")
-            print("   Container: iCloud.com.headydiscy.reczipes")
-            print("   Database: CloudKitModel.sqlite (separate from local-only)")
-            print("   Migration Plan: Reczipes2MigrationPlan")
-            print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
-            print("   Automatic schema migration enabled")
-            return container
-        } catch {
-            // CloudKit failed, try local-only as fallback
-            print("⚠️ CloudKit ModelContainer creation failed: \(error)")
-            print("   Error details: \(error.localizedDescription)")
-            if let underlyingError = (error as NSError).userInfo[NSUnderlyingErrorKey] as? Error {
-                print("   Underlying error: \(underlyingError)")
-            }
-            print("   Attempting fallback to local-only container...")
-            
-            do {
-                let container = try ModelContainer(
-                    for: Recipe.self,
-                        RecipeImageAssignment.self,
-                        UserAllergenProfile.self,
-                        CachedDiabeticAnalysis.self,
-                        SavedLink.self,
-                        RecipeBook.self,
-                        CookingSession.self,
-                        SharedRecipe.self,          // ADD THIS
-                        SharedRecipeBook.self,      // ADD THIS
-                        SharingPreferences.self,    // ADD THIS
-                    migrationPlan: Reczipes2MigrationPlan.self,
-                    configurations: cloudKitConfiguration
-                )
-                print("✅ ModelContainer created successfully (local-only, no CloudKit sync)")
-                print("   Migration Plan: Reczipes2MigrationPlan")
-                print("   Current Schema Version: \(SchemaVersionManager.versionString(SchemaVersionManager.currentVersion))")
-                print("   Automatic schema migration enabled")
-                print("   Note: CloudKit was enabled but failed. Check your iCloud settings and container identifier.")
-                print("   See CLOUDKIT_SETUP_GUIDE.md for troubleshooting steps.")
-                return container
-            } catch {
-                print("❌ All ModelContainer initialization attempts failed")
-                print("   Final error: \(error)")
-                print("")
-                print("   TROUBLESHOOTING:")
-                print("   1. Check that all @Model classes are properly defined")
-                print("   2. Verify SwiftData schema is valid")
-                print("   3. Try cleaning build folder (Cmd+Shift+K)")
-                print("   4. Delete app from device/simulator and reinstall")
-                print("   5. Check that iCloud is properly configured")
-                print("   6. See CLOUDKIT_SETUP_GUIDE.md for detailed setup")
-                print("")
-                fatalError("Could not create ModelContainer. Please check your model schema and iCloud settings: \(error)")
-            }
-        }
+        logInfo("🚀 Legacy container initializer called (should not be used)", category: "storage")
+        fatalError("Legacy container initializer should not be called - use ModelContainerManager.shared instead")
     }()
     
     @State private var showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
@@ -306,13 +207,49 @@ struct Reczipes2App: App {
         let needsRestoration = RecipeImageMigrationService.needsImageRestoration(modelContext: modelContext)
         
         if needsRestoration {
-            logInfo("Detected missing image files - attempting automatic restoration", category: "image-migration")
+            logInfo("Detected missing image files - attempting automatic restoration", category: "image")
+            
+            logUserDiagnostic(
+                .info,
+                category: .image,
+                title: "Restoring Images",
+                message: "Restoring recipe images from backup...",
+                technicalDetails: "Detected missing image files on disk"
+            )
             
             do {
                 try await RecipeImageMigrationService.restoreAllRecipeImages(modelContext: modelContext)
-                logInfo("Successfully restored images from SwiftData", category: "image-migration")
+                logInfo("Successfully restored images from SwiftData", category: "image")
+                
+                logUserDiagnostic(
+                    .info,
+                    category: .image,
+                    title: "Images Restored",
+                    message: "Successfully restored all recipe images.",
+                    technicalDetails: "Images restored from SwiftData backup"
+                )
             } catch {
-                logError("Failed to restore images: \(error)", category: "image-migration")
+                logError("Failed to restore images: \(error)", category: "image")
+                
+                logUserDiagnostic(
+                    .error,
+                    category: .image,
+                    title: "Image Restoration Failed",
+                    message: "Couldn't restore some recipe images. They may appear blank.",
+                    technicalDetails: error.localizedDescription,
+                    suggestedActions: [
+                        DiagnosticAction(
+                            title: "Try Image Migration",
+                            description: "Go to Settings > Data & Sync > Image Migration",
+                            actionType: .openSettings(.general)
+                        ),
+                        DiagnosticAction(
+                            title: "Contact Support",
+                            description: "If images remain missing, contact support",
+                            actionType: .contactSupport
+                        )
+                    ]
+                )
             }
         }
     }
@@ -376,43 +313,26 @@ struct Reczipes2App: App {
     // MARK: - CloudKit Diagnostics
     
     private func logCloudKitConfiguration() {
-        print("========================================")
-        print("📱 CLOUDKIT CONFIGURATION")
-        print("========================================")
-        print("Container ID: iCloud.com.headydiscy.reczipes")
-        print("Configuration: Private Database")
-        print("Framework: SwiftData (not Core Data)")
-        print("")
-        print("⚠️  IMPORTANT: Using explicit container identifier")
-        print("   Cannot use .automatic as it would create different container")
-        print("   Existing container: iCloud.com.headydiscy.reczipes")
-        print("")
+        logInfo("📱 CLOUDKIT CONFIGURATION", category: "storage")
+        logInfo("   Container ID: iCloud.com.headydiscy.reczipes", category: "storage")
+        logInfo("   Configuration: Private Database", category: "storage")
+        logInfo("   Framework: SwiftData (not Core Data)", category: "storage")
         
-        // CRITICAL: Check for multiple database files
+        // Log user-facing diagnostic
+        logUserDiagnostic(
+            .info,
+            category: .storage,
+            title: "App Configuration",
+            message: "Using iCloud container: iCloud.com.headydiscy.reczipes",
+            technicalDetails: "Private Database with SwiftData framework"
+        )
+        
+        // Check for multiple database files
         checkForMultipleDatabases()
-        
-        print("📋 TROUBLESHOOTING:")
-        print("   If CloudKit sync is not working:")
-        print("   1. Go to Settings → Validate CloudKit Container")
-        print("   2. Run the validation tool")
-        print("   3. Follow the specific recommendations")
-        print("   4. Most likely: Add container to entitlements in Xcode")
-        print("")
-        print("Models registered for sync:")
-        print("  - Recipe")
-        print("  - RecipeImageAssignment")
-        print("  - UserAllergenProfile")
-        print("  - CachedDiabeticAnalysis")
-        print("  - SavedLink")
-        print("  - RecipeBook")
-        print("  - CookingSession")
-        print("========================================")
     }
     
     private func checkForMultipleDatabases() {
-        print("")
-        print("🔍 DATABASE FILE DIAGNOSTICS:")
-        print("========================================")
+        logInfo("🔍 DATABASE FILE DIAGNOSTICS", category: "storage")
         
         let appSupport = URL.applicationSupportDirectory
         let fileManager = FileManager.default
@@ -438,30 +358,60 @@ struct Reczipes2App: App {
                     
                     foundDatabases.append((name: dbName, size: fileSize, modified: modDate))
                     
-                    print("✅ Found: \(dbName)")
-                    print("   Size: \(ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file))")
-                    print("   Modified: \(modDate)")
+                    let sizeString = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+                    logInfo("✅ Found database: \(dbName) (\(sizeString))", category: "storage")
                 } catch {
-                    print("⚠️  Found \(dbName) but couldn't read attributes: \(error)")
+                    logWarning("⚠️ Found \(dbName) but couldn't read attributes: \(error)", category: "storage")
                 }
             }
         }
         
         if foundDatabases.isEmpty {
-            print("⚠️  No database files found - this is a fresh install")
+            logInfo("Fresh install - no existing database files", category: "storage")
+            
+            logUserDiagnostic(
+                .info,
+                category: .storage,
+                title: "Fresh Installation",
+                message: "This is a new installation with no existing data.",
+                technicalDetails: "No database files found in app support directory"
+            )
         } else if foundDatabases.count > 1 {
-            print("")
-            print("🚨 CRITICAL: Multiple database files detected!")
-            print("   This may explain missing recipes after update.")
-            print("   The app might be reading from the wrong file.")
-            print("")
-            print("Largest file (likely contains user data):")
+            logWarning("🚨 CRITICAL: Multiple database files detected!", category: "storage")
+            logWarning("   This may explain missing recipes after update", category: "storage")
+            
             if let largest = foundDatabases.max(by: { $0.size < $1.size }) {
-                print("   📁 \(largest.name) - \(ByteCountFormatter.string(fromByteCount: largest.size, countStyle: .file))")
+                let sizeString = ByteCountFormatter.string(fromByteCount: largest.size, countStyle: .file)
+                logInfo("   Largest file (active): \(largest.name) - \(sizeString)", category: "storage")
+                
+                // Log user-facing diagnostic about multiple databases
+                logUserDiagnostic(
+                    .warning,
+                    category: .storage,
+                    title: "Multiple Database Files Detected",
+                    message: "Found \(foundDatabases.count) database files. Using: \(largest.name)",
+                    technicalDetails: "Files: \(foundDatabases.map { $0.name }.joined(separator: ", "))",
+                    suggestedActions: [
+                        DiagnosticAction(
+                            title: "Check Data",
+                            description: "Verify all your recipes are showing correctly",
+                            actionType: .retryOperation
+                        ),
+                        DiagnosticAction(
+                            title: "Database Maintenance",
+                            description: "Go to Settings > Developer Tools > Database Maintenance",
+                            actionType: .openSettings(.general)
+                        )
+                    ]
+                )
+            }
+        } else {
+            // Single database found - this is normal
+            if let db = foundDatabases.first {
+                let sizeString = ByteCountFormatter.string(fromByteCount: db.size, countStyle: .file)
+                logInfo("Using database: \(db.name) (\(sizeString))", category: "storage")
             }
         }
-        
-        print("========================================")
     }
 }
 

@@ -58,20 +58,38 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-                // ADD NEW CHANGES HERE as you commit
-                // Use emoji prefixes from the guide at the bottom of this file
-                // Example: "✨ Added: New feature description"
-                "🐛 Fixed: CloudKit recipe book manager runtime crash during pagination",
-                "⚡️ Improved: Replaced recursive closure pattern with clean async/await loop for fetching CloudKit records",
-                "🔧 Enhanced: Better error handling and logging for CloudKit batch operations",
-                "✅ Added: Safety mechanism to prevent infinite pagination loops (max 100 batches)",
-                "🗑️ Fixed: Successfully delete orphaned recipe books from CloudKit public database",
-                "📊 Improved: More detailed batch progress logging showing record counts per batch"
+                // Database Recovery & Migration Improvements (January 2026)
+                "💾 Fixed: 'Unknown model version' error (code 134504) causing app crashes on databases created before migration plan",
+                "🔧 Added: Automatic database cleanup detects and recovers from incompatible pre-V1.0.0 databases",
+                "⚡️ Enhanced: Recovery system automatically deletes old database files and creates fresh V4 schema",
+                "☁️ Added: CloudKit users' data syncs back automatically after database recovery",
+                "🔧 Fixed: 'Duplicate version checksums' error by abandoning SchemaV0 approach (identical schemas not allowed)",
+                
+                // Technical Implementation Details
+                "🛠️ Enhanced: ModelContainerManager now includes error detection for schema migration failures",
+                "📊 Added: Comprehensive logging for database recovery operations with detailed diagnostics",
+                "⚡️ Improved: Database cleanup happens instantly during container creation with no user intervention",
+                "🔒 Added: Safety mechanism prevents data loss for CloudKit-enabled users during recovery",
+                "📝 Added: Extensive documentation explaining pre-migration database handling and recovery strategy",
+                
+                // Key Learnings Documented
+                "📚 Documented: Why retroactive schema versions fail (duplicate checksums from identical structures)",
+                "💡 Documented: SwiftData migration plan limitations and best practices for future releases",
+                "🔍 Documented: CloudKit data recovery capabilities and sync behavior after database recreation",
+                "⚠️ Documented: Local-only users may lose data during recovery (unavoidable for incompatible databases)",
+                "✅ Documented: Simulator CloudKit limitations showing 'temporarily unavailable' status"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        //15.2.95
+//        "🐛 Fixed: CloudKit recipe book manager runtime crash during pagination",
+//        "⚡️ Improved: Replaced recursive closure pattern with clean async/await loop for fetching CloudKit records",
+//        "🔧 Enhanced: Better error handling and logging for CloudKit batch operations",
+//        "✅ Added: Safety mechanism to prevent infinite pagination loops (max 100 batches)",
+//        "🗑️ Fixed: Successfully delete orphaned recipe books from CloudKit public database",
+//        "📊 Improved: More detailed batch progress logging showing record counts per batch"
         //15.2.92
 //        "✨ Added: 'Remove Duplicate Recipes' tool in Developer Tools to clean up duplicate database records",
 //        "🔧 Fixed: Database Investigation now uses SQLite3 directly (bypasses migration issues)",

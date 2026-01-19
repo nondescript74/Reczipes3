@@ -555,6 +555,7 @@ struct SchemaVersionManager {
  - UserAllergenProfile without diabetes status or nutritional goals
  - Basic profile with sensitivities only
  - **CloudKit Compatibility**: All properties made optional (CloudKit requirement)
+ - **Note**: This was the first version in the migration plan, but databases may have existed before this version
  
  ### Version 2.0.0
  - Added `diabetesStatusRaw` to UserAllergenProfile
@@ -584,6 +585,49 @@ struct SchemaVersionManager {
  - Migration: Lightweight (no data transformation)
  - Existing recipes and data are preserved
  - New models start empty (users opt-in to sharing)
+ 
+ ## Database Recovery and Pre-Migration Databases
+ 
+ ### The "Unknown Model Version" Problem
+ Some databases were created before the migration plan was implemented (pre-V1.0.0). These databases
+ are not recognized by SwiftData's migration system and cause error code 134504:
+ "Cannot use staged migration with an unknown model version."
+ 
+ ### SchemaV0 Attempt (January 2026)
+ Initially attempted to add SchemaV0 (version 0.9.0) to handle pre-migration databases:
+ - **Problem**: SchemaV0 and SchemaV1 had identical structure, causing SwiftData error:
+   `'Duplicate version checksums across stages detected.'`
+ - **Reason**: SwiftData generates checksums based on model structure, not version numbers
+ - **Result**: SchemaV0 approach was abandoned
+ 
+ ### Current Solution: Automatic Database Cleanup
+ Implemented in `ModelContainerManager.swift`:
+ - **Detection**: When error 134504 is encountered during container creation
+ - **Action**: Automatically deletes incompatible database files (.sqlite, .sqlite-shm, .sqlite-wal)
+ - **Recovery**: Creates fresh database with current schema (V4)
+ - **Data Preservation**: 
+   - ✅ CloudKit users: Data syncs back from iCloud automatically
+   - ⚠️ Local-only users: Data is lost (unavoidable for incompatible databases)
+ - **Location**: See `tryCreateCloudKitContainer()` and `createLocalContainer()` methods
+ - **Benefits**:
+   - Prevents app crashes
+   - Automatic recovery without user intervention
+   - Preserves data for CloudKit users
+   - Clear logging for diagnostics
+ 
+ ### Key Learnings
+ - **Migration plans must start from the first structured version**: Cannot retroactively add "pre-migration" schemas
+ - **Identical schemas create duplicate checksums**: Even with different version numbers
+ - **Error handling is essential**: Graceful degradation better than crashes
+ - **CloudKit is forgiving**: Data syncs back after database recreation
+ - **Simulator limitations**: CloudKit shows "temporarily unavailable" in simulators
+ 
+ ### Handling Future Pre-Migration Scenarios
+ If you need to support very old databases in the future:
+ 1. **Option A**: Accept data loss and use automatic cleanup (current approach)
+ 2. **Option B**: Create a manual migration tool that exports to current format
+ 3. **Option C**: Provide in-app backup/restore functionality (already implemented!)
+ 4. **Best Practice**: Always implement migration plans from day one of production releases
  
  ## Future Versions
  

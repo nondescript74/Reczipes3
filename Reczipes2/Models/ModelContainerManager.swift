@@ -158,9 +158,68 @@ class ModelContainerManager: ObservableObject {
             logInfo("   Container: iCloud.com.headydiscy.reczipes", category: "storage")
             logInfo("   Database: CloudKitModel.sqlite", category: "storage")
             return container
-        } catch {
-            logError("❌ CloudKit ModelContainer creation failed: \(error.localizedDescription)", category: "storage")
-            return nil
+        } catch let error as NSError {
+            // Check for the specific "unknown model version" error (error code 134504)
+            if error.domain == "NSCocoaErrorDomain" && error.code == 134504 {
+                logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
+                logWarning("   This usually happens when upgrading from a pre-migration version", category: "storage")
+                logWarning("   Attempting to delete corrupted database and start fresh...", category: "storage")
+                
+                // Try to delete the old database files
+                let fileManager = FileManager.default
+                let filesToDelete = [
+                    cloudKitURL.path,
+                    cloudKitURL.path + "-shm",
+                    cloudKitURL.path + "-wal"
+                ]
+                
+                var deletedCount = 0
+                for filePath in filesToDelete {
+                    if fileManager.fileExists(atPath: filePath) {
+                        do {
+                            try fileManager.removeItem(atPath: filePath)
+                            deletedCount += 1
+                            logInfo("   ✅ Deleted: \(filePath.split(separator: "/").last ?? "")", category: "storage")
+                        } catch {
+                            logError("   ❌ Failed to delete \(filePath): \(error)", category: "storage")
+                        }
+                    }
+                }
+                
+                if deletedCount > 0 {
+                    logInfo("   Deleted \(deletedCount) database file(s), attempting to recreate...", category: "storage")
+                    
+                    // Try creating container again with clean slate
+                    do {
+                        let container = try ModelContainer(
+                            for: Recipe.self,
+                            RecipeImageAssignment.self,
+                            UserAllergenProfile.self,
+                            CachedDiabeticAnalysis.self,
+                            SavedLink.self,
+                            RecipeBook.self,
+                            CookingSession.self,
+                            SharedRecipe.self,
+                            SharedRecipeBook.self,
+                            SharingPreferences.self,
+                            migrationPlan: Reczipes2MigrationPlan.self,
+                            configurations: cloudKitConfiguration
+                        )
+                        logInfo("✅ ModelContainer recreated successfully after database cleanup", category: "storage")
+                        logWarning("   Note: Previous local data was lost, but CloudKit data should sync back", category: "storage")
+                        return container
+                    } catch {
+                        logError("❌ Failed to recreate container after cleanup: \(error)", category: "storage")
+                        return nil
+                    }
+                } else {
+                    logError("   No database files found to delete", category: "storage")
+                    return nil
+                }
+            } else {
+                logError("❌ CloudKit ModelContainer creation failed: \(error.localizedDescription)", category: "storage")
+                return nil
+            }
         }
     }
     
@@ -190,10 +249,69 @@ class ModelContainerManager: ObservableObject {
             logInfo("   Using existing database: CloudKitModel.sqlite", category: "storage")
             logInfo("   Your data is preserved even though CloudKit is disabled", category: "storage")
             return container
-        } catch {
-            logCritical("❌ All ModelContainer initialization attempts failed", category: "storage")
-            logCritical("   Final error: \(error)", category: "storage")
-            fatalError("Could not create ModelContainer: \(error)")
+        } catch let error as NSError {
+            // Check for the specific "unknown model version" error (error code 134504)
+            if error.domain == "NSCocoaErrorDomain" && error.code == 134504 {
+                logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
+                logWarning("   This usually happens when upgrading from a pre-migration version", category: "storage")
+                logWarning("   Attempting to delete corrupted database and start fresh...", category: "storage")
+                
+                // Try to delete the old database files
+                let fileManager = FileManager.default
+                let filesToDelete = [
+                    cloudKitURL.path,
+                    cloudKitURL.path + "-shm",
+                    cloudKitURL.path + "-wal"
+                ]
+                
+                var deletedCount = 0
+                for filePath in filesToDelete {
+                    if fileManager.fileExists(atPath: filePath) {
+                        do {
+                            try fileManager.removeItem(atPath: filePath)
+                            deletedCount += 1
+                            logInfo("   ✅ Deleted: \(filePath.split(separator: "/").last ?? "")", category: "storage")
+                        } catch {
+                            logError("   ❌ Failed to delete \(filePath): \(error)", category: "storage")
+                        }
+                    }
+                }
+                
+                if deletedCount > 0 {
+                    logInfo("   Deleted \(deletedCount) database file(s), attempting to recreate...", category: "storage")
+                    
+                    // Try creating container again with clean slate
+                    do {
+                        let container = try ModelContainer(
+                            for: Recipe.self,
+                            RecipeImageAssignment.self,
+                            UserAllergenProfile.self,
+                            CachedDiabeticAnalysis.self,
+                            SavedLink.self,
+                            RecipeBook.self,
+                            CookingSession.self,
+                            SharedRecipe.self,
+                            SharedRecipeBook.self,
+                            SharingPreferences.self,
+                            migrationPlan: Reczipes2MigrationPlan.self,
+                            configurations: localConfiguration
+                        )
+                        logInfo("✅ ModelContainer recreated successfully after database cleanup", category: "storage")
+                        logWarning("   Note: Previous local data was lost, but may sync back from iCloud", category: "storage")
+                        return container
+                    } catch {
+                        logCritical("❌ Failed to recreate container after cleanup: \(error)", category: "storage")
+                        fatalError("Could not create ModelContainer even after cleanup: \(error)")
+                    }
+                } else {
+                    logCritical("❌ No database files found to delete, cannot recover", category: "storage")
+                    fatalError("Could not create ModelContainer: \(error)")
+                }
+            } else {
+                logCritical("❌ All ModelContainer initialization attempts failed", category: "storage")
+                logCritical("   Final error: \(error)", category: "storage")
+                fatalError("Could not create ModelContainer: \(error)")
+            }
         }
     }
     
