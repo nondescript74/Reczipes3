@@ -58,22 +58,24 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-                "📁 Added: iCloud Drive support for batch recipe extraction",
-                "✨ Added: Select multiple recipe images from Files app and iCloud Drive",
-                "🔄 Added: Mix images from both Photos library and iCloud Drive in single batch",
-                "🎨 Added: Visual distinction - purple folder badges for Files images, blue for Photos",
-                "📱 Enhanced: Batch extraction now supports three source modes (Photos only, Files only, Mixed)",
-                "⚡️ Added: Security-scoped resource handling for proper iCloud Drive file access",
-                "🔧 Added: Document picker integration with multi-selection support",
-                "📊 Enhanced: Selection summary shows breakdown of images from each source",
-                "🎯 Added: Smart routing between PHAsset and UIImage extraction workflows",
-                "📚 Added: Comprehensive user guide and technical documentation for new feature"
+
 
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        //15.3.98
+//        "📁 Added: iCloud Drive support for batch recipe extraction",
+//        "✨ Added: Select multiple recipe images from Files app and iCloud Drive",
+//        "🔄 Added: Mix images from both Photos library and iCloud Drive in single batch",
+//        "🎨 Added: Visual distinction - purple folder badges for Files images, blue for Photos",
+//        "📱 Enhanced: Batch extraction now supports three source modes (Photos only, Files only, Mixed)",
+//        "⚡️ Added: Security-scoped resource handling for proper iCloud Drive file access",
+//        "🔧 Added: Document picker integration with multi-selection support",
+//        "📊 Enhanced: Selection summary shows breakdown of images from each source",
+//        "🎯 Added: Smart routing between PHAsset and UIImage extraction workflows",
+//        "📚 Added: Comprehensive user guide and technical documentation for new feature"
         //15.3.97
         // Database Recovery & Migration Improvements (January 2026)
 //        "💾 Fixed: 'Unknown model version' error (code 134504) causing app crashes on databases created before migration plan",

@@ -28,6 +28,8 @@ struct BatchImageExtractorView: View {
     @State private var shouldCropImages = false
     @State private var showingHelp = false
     @State private var showingSourcePicker = false
+    @State private var isLoadingImages = false
+    @State private var loadingProgress = LoadingProgress(current: 0, total: 0)
     
     init(apiKey: String, modelContext: ModelContext) {
         _viewModel = StateObject(wrappedValue: BatchImageExtractorViewModel(
@@ -46,6 +48,11 @@ struct BatchImageExtractorView: View {
                     extractionProgressView
                 } else {
                     imageSelectionView
+                }
+                
+                // Loading overlay for file picker
+                if isLoadingImages {
+                    loadingOverlay
                 }
             }
             .navigationTitle("Batch Image Extract")
@@ -126,7 +133,11 @@ struct BatchImageExtractorView: View {
                 )
             }
             .sheet(isPresented: $showingDocumentPicker) {
-                DocumentPickerView(selectedImages: $selectedImages)
+                DocumentPickerView(
+                    selectedImages: $selectedImages,
+                    isLoadingImages: $isLoadingImages,
+                    loadingProgress: $loadingProgress
+                )
             }
             .sheet(isPresented: $showingSourcePicker) {
                 sourceSelectionSheet
@@ -170,6 +181,24 @@ struct BatchImageExtractorView: View {
                     logInfo("Loaded \(newImages.count) images from iCloud Drive/Files", category: "ui")
                 }
             }
+            .onChange(of: isLoadingImages) { oldValue, newValue in
+                // When loading finishes, provide haptic feedback
+                if oldValue && !newValue && loadingProgress.total > 0 {
+                    let successCount = selectedImages.count
+                    _ = loadingProgress.total
+                    
+                    if successCount > 0 {
+                        // Success haptic
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
+                        
+                        logInfo("Finished loading images: \(successCount) loaded successfully", category: "ui")
+                    }
+                    
+                    // Reset progress
+                    loadingProgress = LoadingProgress(current: 0, total: 0)
+                }
+            }
             .fullScreenCover(isPresented: $viewModel.showingCropForBatch) {
                 if let image = viewModel.imageToCropInBatch {
                     ImageCropView(
@@ -189,6 +218,45 @@ struct BatchImageExtractorView: View {
     }
     
     // MARK: - Empty State
+    
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
+                
+                VStack(spacing: 8) {
+                    Text("Loading Images from Files")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    if loadingProgress.total > 0 {
+                        Text(loadingProgress.progressText)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        ProgressView(value: loadingProgress.percentage)
+                            .progressViewStyle(.linear)
+                            .tint(.white)
+                            .frame(width: 200)
+                    }
+                }
+            }
+            .padding(30)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.black.opacity(0.8))
+            )
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: isLoadingImages)
+    }
     
     private var emptyStateView: some View {
         VStack(spacing: 24) {
@@ -277,17 +345,39 @@ struct BatchImageExtractorView: View {
                         .foregroundColor(.secondary)
                     
                     if !selectedAssets.isEmpty && !selectedImages.isEmpty {
-                        Text("\(selectedAssets.count) from Photos • \(selectedImages.count) from Files")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "photo.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.blue)
+                                Text("\(selectedAssets.count)")
+                            }
+                            Text("•")
+                            HStack(spacing: 2) {
+                                Image(systemName: "folder.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.purple)
+                                Text("\(selectedImages.count)")
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                     } else if !selectedAssets.isEmpty {
-                        Text("From Photos Library")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 2) {
+                            Image(systemName: "photo.fill")
+                                .font(.system(size: 10))
+                            Text("From Photos Library")
+                        }
+                        .font(.caption2)
+                        .foregroundColor(.blue)
                     } else if !selectedImages.isEmpty {
-                        Text("From Files/iCloud Drive")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 2) {
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: 10))
+                            Text("From Files/iCloud Drive")
+                        }
+                        .font(.caption2)
+                        .foregroundColor(.purple)
                     }
                 }
                 
@@ -927,6 +1017,8 @@ struct BatchImageExtractorView: View {
 
 struct DocumentPickerView: UIViewControllerRepresentable {
     @Binding var selectedImages: [UIImage]
+    @Binding var isLoadingImages: Bool
+    @Binding var loadingProgress: LoadingProgress
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
@@ -952,39 +1044,99 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             logInfo("User selected \(urls.count) images from Files/iCloud Drive", category: "ui")
             
-            var loadedImages: [UIImage] = []
-            
-            for url in urls {
-                // Start accessing the security-scoped resource
-                guard url.startAccessingSecurityScopedResource() else {
-                    logWarning("Failed to access security-scoped resource: \(url)", category: "storage")
-                    continue
-                }
-                
-                defer { url.stopAccessingSecurityScopedResource() }
-                
-                // Load image data
-                do {
-                    let imageData = try Data(contentsOf: url)
-                    if let image = UIImage(data: imageData) {
-                        loadedImages.append(image)
-                        logDebug("Loaded image from \(url.lastPathComponent)", category: "image")
-                    } else {
-                        logWarning("Failed to create UIImage from \(url.lastPathComponent)", category: "image")
-                    }
-                } catch {
-                    logError("Failed to load image from \(url.lastPathComponent): \(error)", category: "storage")
-                }
+            // Show loading state immediately
+            DispatchQueue.main.async {
+                self.parent.isLoadingImages = true
+                self.parent.loadingProgress = LoadingProgress(current: 0, total: urls.count)
             }
             
-            DispatchQueue.main.async {
-                self.parent.selectedImages.append(contentsOf: loadedImages)
-                logInfo("Successfully loaded \(loadedImages.count) images from Files", category: "image")
+            // Load images on background thread to avoid blocking UI
+            Task.detached(priority: .userInitiated) {
+                var loadedImages: [UIImage] = []
+                var successCount = 0
+                var failureCount = 0
+                
+                for (index, url) in urls.enumerated() {
+                    // Update progress on main thread
+                    await MainActor.run {
+                        self.parent.loadingProgress = LoadingProgress(
+                            current: index,
+                            total: urls.count,
+                            currentFileName: url.lastPathComponent
+                        )
+                    }
+                    
+                    // Start accessing the security-scoped resource
+                    guard url.startAccessingSecurityScopedResource() else {
+                        await logWarning("Failed to access security-scoped resource: \(url.lastPathComponent)", category: "storage")
+                        failureCount += 1
+                        continue
+                    }
+                    
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    
+                    // Load image data
+                    do {
+                        let imageData = try Data(contentsOf: url)
+                        if let image = UIImage(data: imageData) {
+                            loadedImages.append(image)
+                            successCount += 1
+                            await logDebug("Loaded image \(successCount)/\(urls.count) from \(url.lastPathComponent)", category: "image")
+                        } else {
+                            await logWarning("Failed to create UIImage from \(url.lastPathComponent)", category: "image")
+                            failureCount += 1
+                        }
+                    } catch {
+                        await logError("Failed to load image from \(url.lastPathComponent): \(error)", category: "storage")
+                        failureCount += 1
+                    }
+                    
+                    // Small delay to prevent UI freezing with many files
+                    if index % 10 == 0 && index > 0 {
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    }
+                }
+                
+                // Update on main thread
+                await MainActor.run {
+                    self.parent.selectedImages.append(contentsOf: loadedImages)
+                    self.parent.isLoadingImages = false
+                    
+                    logInfo("Successfully loaded \(successCount) images from Files (\(failureCount) failed)", category: "image")
+                    
+                    if failureCount > 0 {
+                        logWarning("Failed to load \(failureCount) out of \(urls.count) selected files", category: "storage")
+                    }
+                }
             }
         }
         
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
             logDebug("User cancelled document picker", category: "ui")
+            DispatchQueue.main.async {
+                self.parent.isLoadingImages = false
+            }
+        }
+    }
+}
+
+// MARK: - Loading Progress Model
+
+struct LoadingProgress {
+    var current: Int
+    var total: Int
+    var currentFileName: String = ""
+    
+    var percentage: Double {
+        guard total > 0 else { return 0 }
+        return Double(current) / Double(total)
+    }
+    
+    var progressText: String {
+        if !currentFileName.isEmpty {
+            return "Loading \(current + 1) of \(total): \(currentFileName)"
+        } else {
+            return "Loading \(current) of \(total)"
         }
     }
 }
