@@ -15,6 +15,7 @@ import UniformTypeIdentifiers
 struct BatchImageExtractorView: View {
     @StateObject private var viewModel: BatchImageExtractorViewModel
     @StateObject private var photoManager = PhotoLibraryManager()
+    @State private var keepAwakeManager = KeepAwakeManager.shared
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -225,6 +226,22 @@ struct BatchImageExtractorView: View {
                 }
             } message: {
                 Text("Batch extraction is still running. You can let it continue in the background, or stop it now.")
+            }
+            .onChange(of: viewModel.isExtracting) { oldValue, newValue in
+                // Automatically enable keep awake during batch extraction
+                if newValue {
+                    logInfo("Batch extraction started - enabling keep awake", category: "batch")
+                    keepAwakeManager.enable()
+                } else if oldValue {
+                    logInfo("Batch extraction ended - disabling keep awake", category: "batch")
+                    keepAwakeManager.disable()
+                }
+            }
+            .onDisappear {
+                // Disable keep awake when view disappears if extraction is not running
+                if !viewModel.isExtracting {
+                    keepAwakeManager.disable()
+                }
             }
         }
     }
@@ -767,6 +784,22 @@ struct BatchImageExtractorView: View {
     
     private var controlButtons: some View {
         VStack(spacing: 12) {
+            // Keep awake indicator
+            if keepAwakeManager.isKeepAwakeEnabled {
+                HStack {
+                    Image(systemName: "moon.zzz.fill")
+                        .foregroundColor(.orange)
+                    Text("Device will stay awake during extraction")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
             // Background extraction indicator
             if !shouldCropImages && viewModel.isExtracting {
                 HStack {

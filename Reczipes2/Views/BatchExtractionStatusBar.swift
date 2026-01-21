@@ -10,6 +10,7 @@ import SwiftUI
 /// Global status bar that appears at the top of any view during batch extraction
 struct BatchExtractionStatusBar: View {
     @ObservedObject var manager: BatchExtractionManager
+    @State private var keepAwakeManager = KeepAwakeManager.shared
     @State private var showingDetails = false
     @State private var showingCancelConfirmation = false
     
@@ -27,10 +28,19 @@ struct BatchExtractionStatusBar: View {
                         
                         // Status text
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Extracting Recipes")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
+                            HStack(spacing: 6) {
+                                Text("Extracting Recipes")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+                                
+                                // Keep awake indicator
+                                if keepAwakeManager.isKeepAwakeEnabled {
+                                    Image(systemName: "moon.zzz.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                }
+                            }
                             
                             if let status = manager.currentStatus {
                                 HStack(spacing: 4) {

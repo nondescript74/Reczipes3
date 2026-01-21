@@ -58,8 +58,31 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-                // Critical Fix - Files/iCloud Drive Loading
+                // CRITICAL Database Fix
+                "🐛 FIXED: Critical bug causing database deletion on every app launch",
+                "💾 Fixed: Removed overly aggressive database compatibility pre-check in ModelContainerManager",
+                "✅ Fixed: User data now persists correctly between app launches",
+                "🔧 Enhanced: Database cleanup now only runs when actual errors occur, not preventively",
                 
+                // Import/Export Bug Fixes
+                "🐛 Fixed: Recipe export now shows correct success message instead of book export message",
+                "✅ Fixed: Export messages are now properly separated from import messages in User Content view",
+                
+                // Keep Awake Feature
+                "✨ Added: Keep Awake toggle in Cooking Mode prevents device sleep during recipe preparation",
+                "⚡️ Added: Automatic keep-awake during batch extractions (URLs and images) to prevent interruption",
+                "🎨 Added: Visual indicator showing when device is staying awake during batch operations",
+                
+                // Batch Image Processing
+                "📸 Added: Batch recipe extraction from Photos library - select multiple images at once",
+                "📁 Added: Batch extraction from Files and iCloud Drive with multi-select support",
+                "🔄 Added: Mix images from Photos and Files in a single batch extraction session",
+                "⚡️ Enhanced: Process up to 10 images simultaneously for faster batch extraction",
+                "✂️ Added: Optional crop-each-image workflow for precise extraction control",
+                "📊 Added: Real-time progress tracking with success/failure counts during batch extraction",
+                "🔄 Added: Background extraction support - continue extraction when view is dismissed",
+                "⏸️ Added: Pause/resume controls for batch extraction operations",
+                "🎯 Added: Smart queue management showing remaining images and preview thumbnails"
             ]
         ))
         

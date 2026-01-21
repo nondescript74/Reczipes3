@@ -11,6 +11,7 @@ import SwiftData
 /// UI for managing batch recipe extraction from saved links
 struct BatchRecipeExtractorView: View {
     @StateObject private var viewModel: BatchRecipeExtractorViewModel
+    @State private var keepAwakeManager = KeepAwakeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SavedLink.dateAdded, order: .reverse) private var allLinks: [SavedLink]
@@ -55,6 +56,22 @@ struct BatchRecipeExtractorView: View {
                 }
             } message: {
                 Text("Extracted \(viewModel.successCount) recipe\(viewModel.successCount == 1 ? "" : "s") successfully\(viewModel.failureCount > 0 ? " with \(viewModel.failureCount) failure\(viewModel.failureCount == 1 ? "" : "s")" : "").")
+            }
+            .onChange(of: viewModel.isExtracting) { oldValue, newValue in
+                // Automatically enable keep awake during batch extraction
+                if newValue {
+                    logInfo("Batch URL extraction started - enabling keep awake", category: "batch")
+                    keepAwakeManager.enable()
+                } else if oldValue {
+                    logInfo("Batch URL extraction ended - disabling keep awake", category: "batch")
+                    keepAwakeManager.disable()
+                }
+            }
+            .onDisappear {
+                // Disable keep awake when view disappears if extraction is not running
+                if !viewModel.isExtracting {
+                    keepAwakeManager.disable()
+                }
             }
         }
     }

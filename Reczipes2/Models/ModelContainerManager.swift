@@ -152,6 +152,10 @@ class ModelContainerManager: ObservableObject {
     private static func tryCreateCloudKitContainer() -> ModelContainer? {
         let cloudKitURL = URL.applicationSupportDirectory.appending(path: "CloudKitModel.sqlite")
         
+        // NOTE: We removed the pre-check that was deleting the database on every launch.
+        // Database compatibility issues will be handled in the catch block below
+        // if container creation fails. This prevents accidental data loss.
+        
         let cloudKitConfiguration = ModelConfiguration(
             url: cloudKitURL,
             cloudKitDatabase: .private("iCloud.com.headydiscy.reczipes")
@@ -178,11 +182,20 @@ class ModelContainerManager: ObservableObject {
             logInfo("   Database: CloudKitModel.sqlite", category: "storage")
             return container
         } catch let error as NSError {
+            // Log the full error details for debugging
+            logError("❌ CloudKit ModelContainer creation failed: \(error.localizedDescription)", category: "storage")
+            logError("   Error domain: \(error.domain), code: \(error.code)", category: "storage")
+            logError("   Underlying error: \(String(describing: error.userInfo[NSUnderlyingErrorKey]))", category: "storage")
+            
             // Check for the specific "unknown model version" error (error code 134504)
-            if error.domain == "NSCocoaErrorDomain" && error.code == 134504 {
+            // This can be either the direct error or wrapped in a SwiftData error
+            let isUnknownModelVersion = (error.domain == "NSCocoaErrorDomain" && error.code == 134504) ||
+                                       (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.code == 134504
+            
+            if isUnknownModelVersion {
                 logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
-                logWarning("   This usually happens when upgrading from a pre-migration version", category: "storage")
-                logWarning("   Attempting to delete corrupted database and start fresh...", category: "storage")
+                logWarning("   This usually happens when the database was created with a schema version that no longer exists", category: "storage")
+                logWarning("   Attempting to delete incompatible database and start fresh...", category: "storage")
                 
                 // Try to delete the old database files
                 let fileManager = FileManager.default
@@ -269,11 +282,20 @@ class ModelContainerManager: ObservableObject {
             logInfo("   Your data is preserved even though CloudKit is disabled", category: "storage")
             return container
         } catch let error as NSError {
+            // Log the full error details for debugging
+            logError("❌ Local ModelContainer creation failed: \(error.localizedDescription)", category: "storage")
+            logError("   Error domain: \(error.domain), code: \(error.code)", category: "storage")
+            logError("   Underlying error: \(String(describing: error.userInfo[NSUnderlyingErrorKey]))", category: "storage")
+            
             // Check for the specific "unknown model version" error (error code 134504)
-            if error.domain == "NSCocoaErrorDomain" && error.code == 134504 {
+            // This can be either the direct error or wrapped in a SwiftData error
+            let isUnknownModelVersion = (error.domain == "NSCocoaErrorDomain" && error.code == 134504) ||
+                                       (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.code == 134504
+            
+            if isUnknownModelVersion {
                 logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
-                logWarning("   This usually happens when upgrading from a pre-migration version", category: "storage")
-                logWarning("   Attempting to delete corrupted database and start fresh...", category: "storage")
+                logWarning("   This usually happens when the database was created with a schema version that no longer exists", category: "storage")
+                logWarning("   Attempting to delete incompatible database and start fresh...", category: "storage")
                 
                 // Try to delete the old database files
                 let fileManager = FileManager.default

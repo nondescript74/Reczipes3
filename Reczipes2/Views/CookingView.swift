@@ -14,6 +14,7 @@ struct CookingView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var viewModel: CookingViewModel?
+    @State private var keepAwakeManager = KeepAwakeManager.shared
     
     private var isWideLayout: Bool {
         horizontalSizeClass == .regular && verticalSizeClass == .regular
@@ -112,15 +113,19 @@ struct CookingView: View {
     @ViewBuilder
     private func keepAwakeToggle(viewModel: CookingViewModel) -> some View {
         Toggle(isOn: Binding(
-            get: { viewModel.keepAwakeManager.isEnabled },
+            get: { keepAwakeManager.isKeepAwakeEnabled },
             set: { newValue in
-                viewModel.keepAwakeManager.isEnabled = newValue
+                if newValue {
+                    keepAwakeManager.enable()
+                } else {
+                    keepAwakeManager.disable()
+                }
                 viewModel.saveSession()
             }
         )) {
             Label(
                 "Keep Awake",
-                systemImage: viewModel.keepAwakeManager.isEnabled ? "eye" : "eye.slash"
+                systemImage: keepAwakeManager.isKeepAwakeEnabled ? "eye" : "eye.slash"
             )
         }
         .toggleStyle(.button)

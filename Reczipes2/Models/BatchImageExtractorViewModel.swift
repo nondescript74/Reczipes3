@@ -53,6 +53,7 @@ class BatchImageExtractorViewModel: ObservableObject {
     
     // Background extraction support
     private let batchManager = BatchExtractionManager.shared
+    private let backgroundManager = BackgroundProcessingManager.shared
     private var isUsingBackgroundExtraction = false
     
     // MARK: - Computed Properties
@@ -68,8 +69,9 @@ class BatchImageExtractorViewModel: ObservableObject {
         self.modelContext = modelContext
         self.apiClient = ClaudeAPIClient(apiKey: apiKey)
         
-        // Configure background extraction manager
+        // Configure background extraction managers
         batchManager.configure(apiKey: apiKey, modelContext: modelContext)
+        backgroundManager.configure(apiKey: apiKey, modelContext: modelContext)
     }
     
     // MARK: - Public Methods
@@ -461,11 +463,26 @@ class BatchImageExtractorViewModel: ObservableObject {
     private func startBackgroundExtractionWithProcessedImages(_ processedImages: [(image: UIImage, index: Int)]) async {
         logInfo("Handing off \(processedImages.count) images to background extraction", category: "batch")
         
-        // Process images in background using a long-running task
+        // Start background task to allow continuation when app is backgrounded
+        backgroundManager.beginBackgroundTask(name: "Batch Recipe Extraction")
+        
+        // Convert images to Data and queue them for background processing
+        var imageDataQueue: [(data: Data, index: Int)] = []
+        for (image, index) in processedImages {
+            if let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 500_000) {
+                imageDataQueue.append((data: imageData, index: index))
+            }
+        }
+        
+        // Queue for background processing (in case app is terminated)
+        backgroundManager.queueExtractions(images: imageDataQueue)
+        
+        // Process images in foreground/background hybrid mode
         for (image, index) in processedImages {
             // Check if stopped
             guard isExtracting else {
                 logInfo("Background extraction stopped", category: "batch")
+                backgroundManager.endBackgroundTask()
                 break
             }
             
@@ -474,7 +491,10 @@ class BatchImageExtractorViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             }
             
-            guard isExtracting else { break }
+            guard isExtracting else { 
+                backgroundManager.endBackgroundTask()
+                break 
+            }
             
             currentStatus = "Processing image \(index + 1) of \(totalToExtract)..."
             currentImage = image
@@ -494,6 +514,11 @@ class BatchImageExtractorViewModel: ObservableObject {
         currentStatus = "Complete! Extracted \(successCount) recipes."
         isExtracting = false
         currentBatch = []
+        
+        // End background task
+        backgroundManager.endBackgroundTask()
+        backgroundManager.clearQueue()
+        
         logInfo("Background extraction complete: \(successCount) success, \(failureCount) failures", category: "batch")
     }
     

@@ -179,6 +179,7 @@ struct Reczipes2App: App {
         }
     }
     
+
     // MARK: - Container Recreation Overlay
     
     private var containerRecreationOverlay: some View {
@@ -384,11 +385,17 @@ struct Reczipes2App: App {
             if oldPhase == .background {
                 logInfo("App returning from background", category: "state")
                 taskRestoration.checkForTaskRestoration()
+                
+                // Notify background manager
+                BackgroundProcessingManager.shared.handleAppWillEnterForeground()
             }
             
         case .background:
             // App is going to background - state is automatically saved by AppStateManager
             logInfo("App entering background", category: "state")
+            
+            // IMPORTANT: Enable background extraction to continue
+            BackgroundProcessingManager.shared.handleAppDidEnterBackground()
             
         case .inactive:
             break

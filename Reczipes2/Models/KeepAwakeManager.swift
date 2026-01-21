@@ -2,40 +2,50 @@
 //  KeepAwakeManager.swift
 //  reczipes2-imageextract
 //
-//  Created for dual-recipe cooking mode
+//  Manages device screen idle timer to prevent sleep during long operations
+//  Used by cooking mode and batch extraction operations
 //
 
 import SwiftUI
 import Observation
 
+/// Manager for controlling device sleep during long operations
+/// Shared singleton ensures consistent state across cooking mode and extraction operations
+@MainActor
 @Observable
 final class KeepAwakeManager {
-    var isEnabled: Bool = false {
-        didSet {
-            updateIdleTimer()
-        }
-    }
+    /// Shared singleton instance
+    static let shared = KeepAwakeManager()
     
-    init() {}
+    /// Current keep awake state - observable for UI binding
+    var isKeepAwakeEnabled = false
     
-    private func updateIdleTimer() {
-        Task { @MainActor in
-            UIApplication.shared.isIdleTimerDisabled = isEnabled
-        }
-    }
+    private init() {}
     
+    /// Enable keep awake - prevents device from sleeping
     func enable() {
-        isEnabled = true
+        guard !isKeepAwakeEnabled else { return }
+        
+        UIApplication.shared.isIdleTimerDisabled = true
+        isKeepAwakeEnabled = true
+        logInfo("Keep awake enabled - device will not sleep", category: "ui")
     }
     
+    /// Disable keep awake - allows normal sleep behavior
     func disable() {
-        isEnabled = false
+        guard isKeepAwakeEnabled else { return }
+        
+        UIApplication.shared.isIdleTimerDisabled = false
+        isKeepAwakeEnabled = false
+        logInfo("Keep awake disabled - normal sleep behavior restored", category: "ui")
     }
     
-    deinit {
-        // Ensure we re-enable idle timer when manager is deallocated
-        Task { @MainActor in
-            UIApplication.shared.isIdleTimerDisabled = false
+    /// Toggle keep awake state
+    func toggle() {
+        if isKeepAwakeEnabled {
+            disable()
+        } else {
+            enable()
         }
     }
 }

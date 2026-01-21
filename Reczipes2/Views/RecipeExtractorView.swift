@@ -11,6 +11,7 @@ import SwiftData
 
 struct RecipeExtractorView: View {
     @StateObject private var viewModel: RecipeExtractorViewModel
+    @State private var keepAwakeManager = KeepAwakeManager.shared
     @EnvironmentObject private var appState: AppStateManager
     @State private var showImagePicker = false
     @State private var showCamera = false
@@ -104,6 +105,24 @@ struct RecipeExtractorView: View {
             .navigationTitle("Recipe Extractor")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        keepAwakeManager.toggle()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: keepAwakeManager.isKeepAwakeEnabled ? "moon.zzz.fill" : "moon.zzz")
+                                .foregroundColor(keepAwakeManager.isKeepAwakeEnabled ? .blue : .secondary)
+                            
+                            if keepAwakeManager.isKeepAwakeEnabled {
+                                Text("Stay Awake")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                    .help(keepAwakeManager.isKeepAwakeEnabled ? "Device will stay awake" : "Tap to prevent sleep")
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     CloudKitSyncBadge()
                 }

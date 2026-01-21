@@ -13,7 +13,9 @@ import Observation
 final class CookingViewModel {
     var selectedRecipes: [Recipe?] = [nil, nil]
     var currentRecipeIndex: Int = 0
-    var keepAwakeManager = KeepAwakeManager()
+    
+    // Use the shared singleton instead of creating a new instance
+    private var keepAwakeManager = KeepAwakeManager.shared
     
     private var modelContext: ModelContext
     private var session: CookingSession?
@@ -32,7 +34,11 @@ final class CookingViewModel {
             if let existingSession = sessions.first {
                 session = existingSession
                 loadRecipesFromSession(existingSession)
-                keepAwakeManager.isEnabled = existingSession.keepAwakeEnabled
+                if existingSession.keepAwakeEnabled {
+                    keepAwakeManager.enable()
+                } else {
+                    keepAwakeManager.disable()
+                }
             } else {
                 createNewSession()
             }
@@ -58,7 +64,7 @@ final class CookingViewModel {
     
     func saveSession() {
         guard let session = session else { return }
-        session.keepAwakeEnabled = keepAwakeManager.isEnabled
+        session.keepAwakeEnabled = keepAwakeManager.isKeepAwakeEnabled
         session.lastUpdated = Date()
         
         do {

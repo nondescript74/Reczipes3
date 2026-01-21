@@ -25,6 +25,7 @@ struct UserContentBackupView: View {
     @State private var exportedURL: URL?
     @State private var errorMessage: String?
     @State private var importResult: String?
+    @State private var exportResult: String?
     @State private var showImportPicker = false
     @State private var selectedImportMode: ImportOverwriteMode = .keepBoth
     @State private var availableRecipeBackups: [BackupFileInfo] = []
@@ -438,10 +439,12 @@ struct UserContentBackupView: View {
     }
     
     private var exportSuccessMessage: String {
-        if let result = importResult {
+        // Use the export-specific result if available
+        if let result = exportResult {
             return result
         }
         
+        // Fall back to default messages
         switch selectedTab {
         case .recipes:
             return "Backup created with \(recipes.count) recipes. Share it to save somewhere safe."
@@ -478,12 +481,14 @@ struct UserContentBackupView: View {
     private func exportRecipes() async {
         isExporting = true
         errorMessage = nil
+        exportResult = nil
         
         do {
             let url = try await RecipeBackupManager.shared.createBackup(from: recipes)
             
             await MainActor.run {
                 exportedURL = url
+                exportResult = "Backup created with \(recipes.count) recipes. Share it to save somewhere safe."
                 showExportSuccess = true
             }
         } catch {
@@ -565,6 +570,7 @@ struct UserContentBackupView: View {
     private func exportAllBooks() async {
         isExporting = true
         errorMessage = nil
+        exportResult = nil
         
         do {
             // Create a temporary directory to hold all exported books
@@ -628,7 +634,7 @@ struct UserContentBackupView: View {
             
             await MainActor.run {
                 exportedURL = outputURL
-                importResult = "Successfully exported \(exportedCount) recipe books"
+                exportResult = "Successfully exported \(exportedCount) recipe books"
                 showExportSuccess = true
             }
             
@@ -646,6 +652,7 @@ struct UserContentBackupView: View {
     private func exportBook(_ book: RecipeBook) async {
         isExporting = true
         errorMessage = nil
+        exportResult = nil
         
         do {
             // Get recipes in this book
@@ -665,6 +672,7 @@ struct UserContentBackupView: View {
             
             await MainActor.run {
                 exportedURL = url
+                exportResult = "Recipe book '\(book.name)' exported successfully with \(book.recipeCount) recipes."
                 showExportSuccess = true
             }
             

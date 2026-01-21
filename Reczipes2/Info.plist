@@ -89,5 +89,19 @@
 			</dict>
 		</dict>
 	</array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>processing</string>
+        <string>fetch</string>
+    </array>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>recipe-extraction</string>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+        <string>processing</string>
+    </array>
 </dict>
 </plist>
