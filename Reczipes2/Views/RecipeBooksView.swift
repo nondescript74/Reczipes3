@@ -299,6 +299,10 @@ struct BookCardView: View {
         book.coverImageName
     }
     
+    private var coverImageData: Data? {
+        book.coverImageData
+    }
+    
     private var bookName: String {
         book.name
     }
@@ -322,9 +326,10 @@ struct BookCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover image or placeholder
             ZStack {
-                if let coverImageName = coverImageName {
+                if coverImageName != nil || coverImageData != nil {
                     RecipeImageView(
                         imageName: coverImageName,
+                        imageData: coverImageData,
                         size: CGSize(width: 160, height: 220),
                         cornerRadius: 12
                     )
@@ -373,7 +378,7 @@ struct BookCardView: View {
             .frame(height: 220)
             
             // Book name (if we have cover image)
-            if coverImageName != nil {
+            if coverImageName != nil || coverImageData != nil {
                 Text(bookName)
                     .font(.headline)
                     .lineLimit(2)

@@ -156,13 +156,15 @@ struct AppHelp {
         title: "Batch Image Extraction",
         icon: "photo.stack.fill",
         description: """
-        Extract multiple recipes at once from images in your Photos library. Perfect for digitizing recipe collections quickly - process up to 10 images at a time with optional cropping.
+        Extract multiple recipes at once from images in your Photos library or Files app. Perfect for digitizing recipe collections quickly - process up to 10 images at a time with optional cropping and background extraction.
         """,
         tips: [
             "Tap 'Batch Extract Images' from the Extract tab to get started",
-            "Select multiple recipe photos from your Photos library",
+            "Select multiple recipe photos from your Photos library or Files app",
             "Toggle 'Crop each image' ON to adjust each photo individually, or OFF for fastest processing",
-            "The app processes images sequentially in batches of 10 with progress updates",
+            "With cropping OFF, extraction continues in the background - you can close the screen and do other things!",
+            "Recipes appear in the 'Recipes Mine' tab in real-time as they're extracted",
+            "The app processes images sequentially with progress updates",
             "Use Pause to temporarily stop, Resume to continue, or Stop to cancel the entire batch",
             "Each extraction takes 10-30 seconds per image depending on complexity",
             "All successfully extracted recipes are automatically saved to your collection",
@@ -170,7 +172,66 @@ struct AppHelp {
             "Start with 3-5 images to learn the workflow before processing larger batches",
             "Best results on WiFi to avoid data charges and ensure stable connection"
         ],
-        relatedTopics: ["Recipe Extraction", "Image Preprocessing", "Claude API", "Image Assignment"]
+        relatedTopics: ["Recipe Extraction", "Background Extraction", "Image Preprocessing", "Claude API", "Image Assignment"]
+    )
+    
+    static let backgroundExtraction = HelpTopic(
+        title: "Background Extraction",
+        icon: "arrow.triangle.2.circlepath",
+        description: """
+        When cropping is disabled, batch extraction continues in the background even if you close the extraction screen. Recipes appear in your collection as they're extracted, letting you use the app while extraction runs.
+        """,
+        tips: [
+            "Background extraction only works when 'Crop each image' is turned OFF",
+            "Look for the purple banner 'Extraction will continue if you close this screen'",
+            "Tap 'Close' during extraction to see three options: Continue in Background, Stop and Close, or Cancel",
+            "Choose 'Continue in Background' to keep extraction running while you navigate away",
+            "Extracted recipes appear in 'Recipes Mine' tab in real-time - no need to wait",
+            "You can pause the extraction, close the screen, and resume later by reopening the batch extractor",
+            "Background extraction stops if you force-quit the app",
+            "With cropping ON, extraction requires you to stay on the screen for manual adjustments",
+            "Perfect for extracting 10-20 recipes while browsing your existing collection",
+            "Check the diagnostic log to monitor progress even when the extraction screen is closed"
+        ],
+        relatedTopics: ["Batch Image Extraction", "Recipe Extraction", "Pause and Resume", "Real-Time Updates"]
+    )
+    
+    static let pauseAndResume = HelpTopic(
+        title: "Pause and Resume Extraction",
+        icon: "pause.circle.fill",
+        description: """
+        Control batch extraction with pause and resume functionality. Take a break during long extraction sessions or pause to review extracted recipes before continuing.
+        """,
+        tips: [
+            "Tap 'Pause' during extraction to temporarily stop processing",
+            "While paused, the current image finishes extracting, then extraction stops",
+            "Tap 'Resume' to continue from where you left off",
+            "Paused state persists even if you close the extraction screen (background mode)",
+            "Use 'Stop' to cancel the entire batch and exit extraction",
+            "Pause is useful for checking recipes in the 'Mine' tab during extraction",
+            "Paused extractions remain in memory until resumed or stopped",
+            "Progress and extracted recipes are preserved when paused"
+        ],
+        relatedTopics: ["Batch Image Extraction", "Background Extraction", "Extraction Controls"]
+    )
+    
+    static let realTimeUpdates = HelpTopic(
+        title: "Real-Time Recipe Updates",
+        icon: "arrow.clockwise.circle.fill",
+        description: """
+        Extracted recipes appear in your 'Recipes Mine' tab immediately as they're processed. No need to wait for the entire batch to complete before viewing your new recipes.
+        """,
+        tips: [
+            "Each recipe is saved to your collection as soon as it's successfully extracted",
+            "Navigate to 'Recipes Mine' to see new recipes appearing in real-time",
+            "Recipes include all extracted details: ingredients, instructions, notes, and images",
+            "You can start using newly extracted recipes immediately - view, edit, or cook with them",
+            "Failed extractions are logged but don't create incomplete recipes",
+            "The extraction screen shows a count of successful and failed extractions",
+            "All images are automatically assigned to their extracted recipes",
+            "Perfect for starting to organize recipes while the rest are still being extracted"
+        ],
+        relatedTopics: ["Batch Image Extraction", "Background Extraction", "Recipe Collection"]
     )
     
     // MARK: - Allergen Features
@@ -611,6 +672,9 @@ struct AppHelp {
         "imageAssignment": imageAssignment,
         "imagePreprocessing": imagePreprocessing,
         "batchImageExtraction": batchImageExtraction_image,
+        "backgroundExtraction": backgroundExtraction,
+        "pauseAndResume": pauseAndResume,
+        "realTimeUpdates": realTimeUpdates,
         
         // Allergen Features
         "allergenProfiles": allergenProfiles,
@@ -681,7 +745,10 @@ struct AppHelp {
         ]),
         ("Extraction Features", "camera.fill", [
             extractTab,
-            batchImageExtraction,
+            batchImageExtraction_image,
+            backgroundExtraction,
+            pauseAndResume,
+            realTimeUpdates,
             imagePreprocessing
         ]),
         ("Allergen & Dietary", "heart.fill", [

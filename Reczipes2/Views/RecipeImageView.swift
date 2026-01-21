@@ -8,9 +8,10 @@
 import SwiftUI
 
 /// A view that displays a recipe's image with a fallback placeholder
-/// Supports both Assets catalog images and images saved to Documents directory
+/// Supports SwiftData imageData (CloudKit-synced), Assets catalog, and Documents directory files
 struct RecipeImageView: View {
     let imageName: String?
+    let imageData: Data? // NEW: Direct image data from SwiftData (CloudKit-synced)
     let size: CGSize?
     let aspectRatio: ContentMode
     let cornerRadius: CGFloat
@@ -18,10 +19,12 @@ struct RecipeImageView: View {
     @State private var loadedImage: UIImage?
     
     init(imageName: String?, 
+         imageData: Data? = nil, // NEW: Optional image data parameter
          size: CGSize? = CGSize(width: 100, height: 100),
          aspectRatio: ContentMode = .fill,
          cornerRadius: CGFloat = 8) {
         self.imageName = imageName
+        self.imageData = imageData
         self.size = size
         self.aspectRatio = aspectRatio
         self.cornerRadius = cornerRadius
@@ -80,10 +83,27 @@ struct RecipeImageView: View {
             }
         }
         .task(id: imageName) {
+            // Priority 1: Try imageData from SwiftData (CloudKit-synced)
+            if let imageData, let image = UIImage(data: imageData) {
+                loadedImage = image
+                return
+            }
+            
+            // Priority 2: Try loading from Documents directory (legacy file-based)
             if let imageName {
-                loadedImage = loadImageFromDocuments(imageName)
-            } else {
-                loadedImage = nil
+                if let image = loadImageFromDocuments(imageName) {
+                    loadedImage = image
+                    return
+                }
+            }
+            
+            // Priority 3: No image available
+            loadedImage = nil
+        }
+        .onChange(of: imageData) { _, newValue in
+            // Reload when imageData changes (e.g., after migration)
+            if let newValue, let image = UIImage(data: newValue) {
+                loadedImage = image
             }
         }
     }

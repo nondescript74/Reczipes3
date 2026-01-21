@@ -53,6 +53,25 @@ class ModelContainerManager: ObservableObject {
             logInfo("🔍 Performing startup health check...", category: "storage")
             let isHealthy = await self.verifyContainerHealth()
             
+            if isHealthy {
+                // Run image migration if needed (one-time migration from file-based to SwiftData)
+                if ImageMigrationService.needsMigration {
+                    logInfo("🔄 Image migration needed - starting migration...", category: "storage")
+                    let migratedCount = await ImageMigrationService.migrateAllRecipes(context: self.container.mainContext)
+                    
+                    if migratedCount > 0 {
+                        logInfo("✅ Successfully migrated \(migratedCount) recipe images", category: "storage")
+                        
+                        // Optional: Clean up file-based images after successful migration
+                        // Uncomment this after confirming CloudKit sync is working
+                        // let cleanedCount = await ImageMigrationService.cleanupFileBasedImages(context: self.container.mainContext)
+                        // logInfo("🗑️ Cleaned up \(cleanedCount) file-based images", category: "storage")
+                    }
+                } else {
+                    logInfo("✅ Image migration already completed: \(ImageMigrationService.getMigrationStatus())", category: "storage")
+                }
+            }
+            
             if !isHealthy {
                 logWarning("⚠️ Container health check failed on startup", category: "storage")
                 logWarning("   Attempting automatic recovery...", category: "storage")

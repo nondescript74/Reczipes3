@@ -321,31 +321,56 @@ class BatchRecipeExtractorViewModel: ObservableObject {
         // Set reference to the original link URL
         recipe.reference = link.url
         
-        // Save images and set image names
+        // Save images directly to SwiftData using imageData
         var additionalImageFilenames: [String] = []
+        var totalImageDataSize = 0
+        
         for (index, image) in images.enumerated() {
-            let filename: String
+            guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                logError("Failed to convert image to JPEG data", category: "batch-extraction")
+                continue
+            }
+            
+            totalImageDataSize += imageData.count
+            
             if index == 0 {
-                // First image is the main thumbnail
-                filename = "recipe_\(recipe.id.uuidString).jpg"
+                // First image is the main image - store in imageData
+                let filename = "recipe_\(recipe.id.uuidString).jpg"
                 recipe.imageName = filename
-                saveImageToDisk(image, filename: filename)
+                recipe.imageData = imageData
+                
+                logInfo("Saved main image data (\(imageData.count / 1024)KB) to recipe", category: "batch-extraction")
                 
                 // Create image assignment for compatibility
                 let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
                 modelContext.insert(assignment)
             } else {
-                // Additional images
-                filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
-                saveImageToDisk(image, filename: filename)
+                // Additional images - add to the filename list for tracking
+                let filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
                 additionalImageFilenames.append(filename)
             }
         }
         
-        // Set additionalImageNames on the recipe
-        if !additionalImageFilenames.isEmpty {
-            recipe.additionalImageNames = additionalImageFilenames
-            logInfo("Set recipe.additionalImageNames to \(additionalImageFilenames.count) images", category: "batch-extraction")
+        // Set additional images data if any
+        if images.count > 1 {
+            var additionalImages: [[String: Data]] = []
+            
+            // Process additional images (skip first one as it's the main image)
+            for (index, image) in images.dropFirst().enumerated() {
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else { continue }
+                
+                let filename = "recipe_\(recipe.id.uuidString)_\(index + 1).jpg"
+                additionalImages.append(["data": imageData, "name": Data(filename.utf8)])
+            }
+            
+            // Encode and store additional images
+            if !additionalImages.isEmpty {
+                if let encoded = try? JSONEncoder().encode(additionalImages) {
+                    recipe.additionalImagesData = encoded
+                    recipe.additionalImageNames = additionalImageFilenames
+                    logInfo("Saved \(additionalImages.count) additional images (\(totalImageDataSize / 1024)KB total) to recipe", category: "batch-extraction")
+                }
+            }
         }
         
         // Insert into SwiftData context
@@ -357,28 +382,10 @@ class BatchRecipeExtractorViewModel: ObservableObject {
         // Save the context
         do {
             try modelContext.save()
-            logInfo("Recipe saved successfully: \(recipe.title)", category: "batch-extraction")
+            logInfo("Recipe saved successfully: \(recipe.title) with \(images.count) image(s) in SwiftData", category: "batch-extraction")
         } catch {
             logError("Failed to save recipe to database: \(error)", category: "batch-extraction")
             throw error
-        }
-    }
-    
-    /// Save an image to disk
-    private func saveImageToDisk(_ image: UIImage, filename: String) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            logError("Failed to convert image to JPEG data", category: "batch-extraction")
-            return
-        }
-        
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        do {
-            try imageData.write(to: fileURL)
-            logInfo("Saved image: \(filename)", category: "batch-extraction")
-        } catch {
-            logError("Failed to save image \(filename): \(error)", category: "batch-extraction")
         }
     }
 }

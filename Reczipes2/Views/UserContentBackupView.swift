@@ -271,7 +271,32 @@ struct UserContentBackupView: View {
                 }
             }
             
-            // Export Section
+            // Export All Section
+            if !recipeBooks.isEmpty {
+                Section {
+                    Button {
+                        Task {
+                            await exportAllBooks()
+                        }
+                    } label: {
+                        if isExporting {
+                            HStack {
+                                ProgressView()
+                                Text("Exporting All Books...")
+                            }
+                        } else {
+                            Label("Export All Books", systemImage: "square.and.arrow.up.on.square")
+                        }
+                    }
+                    .disabled(isExporting || isImporting)
+                } header: {
+                    Text("Export All Books")
+                } footer: {
+                    Text("Creates a complete backup of all \(recipeBooks.count) recipe books with their recipes and images.")
+                }
+            }
+            
+            // Export Individual Section
             Section {
                 if recipeBooks.isEmpty {
                     Text("No recipe books to export")
@@ -413,6 +438,10 @@ struct UserContentBackupView: View {
     }
     
     private var exportSuccessMessage: String {
+        if let result = importResult {
+            return result
+        }
+        
         switch selectedTab {
         case .recipes:
             return "Backup created with \(recipes.count) recipes. Share it to save somewhere safe."
@@ -533,6 +562,87 @@ struct UserContentBackupView: View {
     
     // MARK: - Book Export/Import
     
+    private func exportAllBooks() async {
+        isExporting = true
+        errorMessage = nil
+        
+        do {
+            // Create a temporary directory to hold all exported books
+            let tempDir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("AllBooksExport_\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            
+            defer {
+                try? FileManager.default.removeItem(at: tempDir)
+            }
+            
+            // Export each book
+            var exportedCount = 0
+            for book in recipeBooks {
+                let bookRecipeModels = book.recipeIDs.compactMap { recipeID -> RecipeModel? in
+                    guard let recipe = recipes.first(where: { $0.id == recipeID }),
+                          let recipeModel = recipe.toRecipeModel() else {
+                        return nil
+                    }
+                    return recipeModel
+                }
+                
+                let bookURL = try await RecipeBookExportService.exportBook(
+                    book,
+                    recipes: bookRecipeModels,
+                    includeImages: true
+                )
+                
+                // Move to temp directory with a clean name
+                let fileName = sanitizeFileName(book.name)
+                let destURL = tempDir.appendingPathComponent("\(fileName).recipebook")
+                try? FileManager.default.moveItem(at: bookURL, to: destURL)
+                
+                exportedCount += 1
+            }
+            
+            // Create a ZIP of all books
+            let outputFileName = "AllRecipeBooks_\(Date().ISO8601Format()).zip"
+            let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent(outputFileName)
+            
+            // Use FileManager's native zipping
+            let coordinator = NSFileCoordinator()
+            var coordinatorError: NSError?
+            var copyError: NSError?
+            
+            coordinator.coordinate(readingItemAt: tempDir, options: [.forUploading], error: &coordinatorError) { zipURL in
+                do {
+                    if FileManager.default.fileExists(atPath: outputURL.path) {
+                        try FileManager.default.removeItem(at: outputURL)
+                    }
+                    try FileManager.default.copyItem(at: zipURL, to: outputURL)
+                } catch {
+                    copyError = error as NSError
+                }
+            }
+            
+            // Check for errors from either the coordinator or the copy operation
+            if let error = coordinatorError ?? copyError {
+                throw error
+            }
+            
+            await MainActor.run {
+                exportedURL = outputURL
+                importResult = "Successfully exported \(exportedCount) recipe books"
+                showExportSuccess = true
+            }
+            
+        } catch {
+            await MainActor.run {
+                errorMessage = "Export all books failed: \(error.localizedDescription)"
+            }
+        }
+        
+        await MainActor.run {
+            isExporting = false
+        }
+    }
+    
     private func exportBook(_ book: RecipeBook) async {
         isExporting = true
         errorMessage = nil
@@ -567,6 +677,11 @@ struct UserContentBackupView: View {
         await MainActor.run {
             isExporting = false
         }
+    }
+    
+    private func sanitizeFileName(_ name: String) -> String {
+        let invalidCharacters = CharacterSet(charactersIn: ":/\\?%*|\"<>")
+        return name.components(separatedBy: invalidCharacters).joined(separator: "_")
     }
     
     private func handleBookImport(result: Result<[URL], Error>) async {

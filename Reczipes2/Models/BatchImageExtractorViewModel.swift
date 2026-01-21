@@ -51,6 +51,10 @@ class BatchImageExtractorViewModel: ObservableObject {
     private var cropContinuation: CheckedContinuation<Bool, Never>?
     private var cropImageContinuation: CheckedContinuation<UIImage?, Never>?
     
+    // Background extraction support
+    private let batchManager = BatchExtractionManager.shared
+    private var isUsingBackgroundExtraction = false
+    
     // MARK: - Computed Properties
     
     var remainingCount: Int {
@@ -63,6 +67,9 @@ class BatchImageExtractorViewModel: ObservableObject {
         self.apiKey = apiKey
         self.modelContext = modelContext
         self.apiClient = ClaudeAPIClient(apiKey: apiKey)
+        
+        // Configure background extraction manager
+        batchManager.configure(apiKey: apiKey, modelContext: modelContext)
     }
     
     // MARK: - Public Methods
@@ -88,9 +95,16 @@ class BatchImageExtractorViewModel: ObservableObject {
         self.isExtracting = true
         self.isPaused = false
         
-        // Start extraction task
-        extractionTask = Task {
-            await processBatch(photoManager: photoManager)
+        // If cropping is disabled, use background extraction
+        if !shouldCrop {
+            isUsingBackgroundExtraction = true
+            startBackgroundExtractionFromAssets(assets: assets, photoManager: photoManager)
+        } else {
+            isUsingBackgroundExtraction = false
+            // Start extraction task with cropping (must stay in foreground)
+            extractionTask = Task {
+                await processBatch(photoManager: photoManager)
+            }
         }
     }
     
@@ -117,9 +131,16 @@ class BatchImageExtractorViewModel: ObservableObject {
         self.remainingAssets = []
         self.processedAssets = []
         
-        // Start extraction task
-        extractionTask = Task {
-            await processImageBatch()
+        // If cropping is disabled, use background extraction
+        if !shouldCrop {
+            isUsingBackgroundExtraction = true
+            startBackgroundExtractionFromImages(images: images)
+        } else {
+            isUsingBackgroundExtraction = false
+            // Start extraction task with cropping (must stay in foreground)
+            extractionTask = Task {
+                await processImageBatch()
+            }
         }
     }
     
@@ -378,36 +399,117 @@ class BatchImageExtractorViewModel: ObservableObject {
         // Convert to SwiftData Recipe
         let recipe = Recipe(from: recipeModel)
         
-        // Generate filename and save image
-        let imageName = "recipe_\(recipe.id.uuidString).jpg"
-        recipe.imageName = imageName
-        
-        // Save image to disk
-        if let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 500_000) {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let fileURL = documentsPath.appendingPathComponent(imageName)
-            
-            do {
-                try imageData.write(to: fileURL)
-                logInfo("Saved image to: \(fileURL.path)", category: "batch")
-            } catch {
-                logError("Failed to save image: \(error)", category: "batch")
-            }
-        }
+        // NEW: Save image directly to SwiftData (CloudKit-synced)
+        recipe.setImage(image, isMainImage: true)
         
         // Insert into SwiftData
         modelContext.insert(recipe)
         
-        // Create image assignment for compatibility
-        let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
-        modelContext.insert(assignment)
+        // Create image assignment for compatibility (uses imageName which is set by setImage)
+        if let imageName = recipe.imageName {
+            let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
+            modelContext.insert(assignment)
+        }
         
         // Save context
         do {
             try modelContext.save()
-            logInfo("Recipe saved to database", category: "batch")
+            logInfo("✅ Recipe saved to database with imageData (CloudKit-synced)", category: "batch")
         } catch {
             logError("Failed to save recipe to database: \(error)", category: "batch")
         }
     }
+    
+    // MARK: - Background Extraction Methods
+    
+    private func startBackgroundExtractionFromImages(images: [UIImage]) {
+        logInfo("Starting background extraction from \(images.count) images", category: "batch")
+        
+        // Start a task to process images and feed them to the background manager
+        extractionTask = Task {
+            var processedImages: [(image: UIImage, index: Int)] = []
+            
+            for (index, image) in images.enumerated() {
+                processedImages.append((image: image, index: index))
+            }
+            
+            // Hand off to background manager
+            await startBackgroundExtractionWithProcessedImages(processedImages)
+        }
+    }
+    
+    private func startBackgroundExtractionFromAssets(assets: [PHAsset], photoManager: PhotoLibraryManager) {
+        logInfo("Starting background extraction from \(assets.count) assets", category: "batch")
+        
+        // Start a task to load images from assets and feed them to the background manager
+        extractionTask = Task {
+            var processedImages: [(image: UIImage, index: Int)] = []
+            
+            for (index, asset) in assets.enumerated() {
+                if let image = await photoManager.loadImage(for: asset, targetSize: PHImageManagerMaximumSize) {
+                    processedImages.append((image: image, index: index))
+                } else {
+                    logError("Failed to load image from asset at index \(index)", category: "batch")
+                }
+            }
+            
+            // Hand off to background manager
+            await startBackgroundExtractionWithProcessedImages(processedImages)
+        }
+    }
+    
+    private func startBackgroundExtractionWithProcessedImages(_ processedImages: [(image: UIImage, index: Int)]) async {
+        logInfo("Handing off \(processedImages.count) images to background extraction", category: "batch")
+        
+        // Process images in background using a long-running task
+        for (image, index) in processedImages {
+            // Check if stopped
+            guard isExtracting else {
+                logInfo("Background extraction stopped", category: "batch")
+                break
+            }
+            
+            // Wait while paused
+            while isPaused && isExtracting {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            }
+            
+            guard isExtracting else { break }
+            
+            currentStatus = "Processing image \(index + 1) of \(totalToExtract)..."
+            currentImage = image
+            
+            // Extract recipe from image
+            await extractRecipeFromImage(image, imageIndex: index)
+            
+            currentProgress += 1
+            
+            // Log progress
+            if currentProgress % 5 == 0 || currentProgress == totalToExtract {
+                logInfo("Background extraction progress: \(currentProgress)/\(totalToExtract)", category: "batch")
+            }
+        }
+        
+        // Extraction complete
+        currentStatus = "Complete! Extracted \(successCount) recipes."
+        isExtracting = false
+        currentBatch = []
+        logInfo("Background extraction complete: \(successCount) success, \(failureCount) failures", category: "batch")
+    }
+    
+    /// Returns whether background extraction is currently active
+    var canDismissView: Bool {
+        // Can always dismiss if using background extraction
+        // Otherwise, only if not extracting or not waiting for crop
+        return isUsingBackgroundExtraction || !isExtracting || !isWaitingForCrop
+    }
+    
+    /// Prepares for view dismissal during background extraction
+    func prepareForBackgroundDismissal() {
+        if isUsingBackgroundExtraction && isExtracting {
+            logInfo("View dismissing, extraction will continue in background", category: "batch")
+            // Extraction will continue in the background
+        }
+    }
 }
+

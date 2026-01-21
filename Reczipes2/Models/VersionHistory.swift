@@ -58,13 +58,36 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-
-
+                // Critical Fix - Files/iCloud Drive Loading
+                
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.3.100
+//        "🐛 Fixed: Files/iCloud Drive images now load correctly (removed incorrect security-scoped resource access)",
+//        "✅ Fixed: 'Failed to access security-scoped resource' error preventing all Files app images from loading",
+//        "🔧 Fixed: Document picker with 'asCopy: true' now works as intended (files already in app sandbox)",
+//        
+//        // Enhanced User Feedback & Performance
+//        "⚡️ Enhanced: Batch image extraction from Files/iCloud Drive now provides instant visual feedback",
+//        "📊 Added: Real-time progress tracking when loading images from Files (shows current file and count)",
+//        "🎨 Added: Loading overlay with progress bar for multi-file selection from Files app",
+//        "⚡️ Enhanced: Asynchronous image loading prevents UI freezing when selecting many files",
+//        "✨ Added: Haptic feedback when files finish loading successfully",
+//        
+//        // Improved Error Handling & Diagnostics
+//        "🔧 Improved: Better error handling with individual file failures not blocking the batch",
+//        "📊 Added: Comprehensive diagnostic logging for Files/iCloud Drive image loading",
+//        "🔍 Added: Detailed file validation (existence checks, size logging, format verification)",
+//        "📝 Added: Enhanced error messages with emojis for quick issue identification",
+//        "⚡️ Optimized: Throttled loading prevents memory spikes with large file selections",
+//        
+        // UI/UX Improvements
+//        "📱 Enhanced: Selection summary now shows color-coded breakdown (blue=Photos, purple=Files)",
+//        "✅ Fixed: 'Select All' in Files app now works smoothly with clear progress indication",
+//        "🎯 Added: Visual indicators distinguish Photos library images from Files app images"
         //15.3.98
 //        "📁 Added: iCloud Drive support for batch recipe extraction",
 //        "✨ Added: Select multiple recipe images from Files app and iCloud Drive",

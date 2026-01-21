@@ -30,6 +30,7 @@ struct BatchImageExtractorView: View {
     @State private var showingSourcePicker = false
     @State private var isLoadingImages = false
     @State private var loadingProgress = LoadingProgress(current: 0, total: 0)
+    @State private var showingBackgroundExtractionAlert = false
     
     init(apiKey: String, modelContext: ModelContext) {
         _viewModel = StateObject(wrappedValue: BatchImageExtractorViewModel(
@@ -60,13 +61,7 @@ struct BatchImageExtractorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        if viewModel.isExtracting {
-                            logInfo("User stopped extraction and closed view", category: "extraction")
-                            viewModel.stop()
-                        } else {
-                            logInfo("User closed BatchImageExtractorView", category: "ui")
-                        }
-                        dismiss()
+                        handleCloseButton()
                     }
                 }
                 
@@ -147,7 +142,7 @@ struct BatchImageExtractorView: View {
             }
             
             .sheet(isPresented: $showingHelp) {
-                HelpDetailView(topic: AppHelp.batchImageExtraction)
+                HelpDetailView(topic: AppHelp.batchImageExtraction_image)
             }
             .alert("Batch Extraction Complete", isPresented: $showingCompletionAlert) {
                 Button("View Recipes") {
@@ -214,6 +209,42 @@ struct BatchImageExtractorView: View {
                     )
                 }
             }
+            .alert("Extraction in Progress", isPresented: $showingBackgroundExtractionAlert) {
+                Button("Continue in Background", role: .none) {
+                    logInfo("User chose to continue extraction in background", category: "batch")
+                    viewModel.prepareForBackgroundDismissal()
+                    dismiss()
+                }
+                Button("Stop and Close", role: .destructive) {
+                    logInfo("User stopped extraction and closed view", category: "batch")
+                    viewModel.stop()
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {
+                    logInfo("User cancelled close action", category: "batch")
+                }
+            } message: {
+                Text("Batch extraction is still running. You can let it continue in the background, or stop it now.")
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func handleCloseButton() {
+        if viewModel.isExtracting && !shouldCropImages {
+            // If extraction is running without cropping, offer background option
+            logInfo("User tapped close during background-capable extraction", category: "ui")
+            showingBackgroundExtractionAlert = true
+        } else if viewModel.isExtracting {
+            // If cropping is enabled, must stop
+            logInfo("User stopped extraction with cropping and closed view", category: "extraction")
+            viewModel.stop()
+            dismiss()
+        } else {
+            // Not extracting, just close
+            logInfo("User closed BatchImageExtractorView", category: "ui")
+            dismiss()
         }
     }
     
@@ -735,45 +766,64 @@ struct BatchImageExtractorView: View {
     }
     
     private var controlButtons: some View {
-        HStack(spacing: 12) {
-            Button {
-                if viewModel.isPaused {
-                    logInfo("User resumed batch extraction", category: "extraction")
-                    viewModel.resume()
-                } else {
-                    logInfo("User paused batch extraction", category: "extraction")
-                    viewModel.pause()
-                }
-            } label: {
+        VStack(spacing: 12) {
+            // Background extraction indicator
+            if !shouldCropImages && viewModel.isExtracting {
                 HStack {
-                    Image(systemName: viewModel.isPaused ? "play.fill" : "pause.fill")
-                    Text(viewModel.isPaused ? "Resume" : "Pause")
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .foregroundColor(.purple)
+                    Text("Extraction will continue if you close this screen")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(viewModel.isPaused ? Color.green : Color.orange)
-                .foregroundColor(.white)
-                .cornerRadius(12)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(8)
             }
-            .buttonStyle(.plain)
             
-            Button {
-                logWarning("User stopped batch extraction at \(viewModel.currentProgress)/\(viewModel.totalToExtract)", category: "extraction")
-                viewModel.stop()
-            } label: {
-                HStack {
-                    Image(systemName: "stop.fill")
-                    Text("Stop")
+            // Control buttons
+            HStack(spacing: 12) {
+                Button {
+                    if viewModel.isPaused {
+                        logInfo("User resumed batch extraction", category: "extraction")
+                        viewModel.resume()
+                    } else {
+                        logInfo("User paused batch extraction", category: "extraction")
+                        viewModel.pause()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: viewModel.isPaused ? "play.fill" : "pause.fill")
+                        Text(viewModel.isPaused ? "Resume" : "Pause")
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(viewModel.isPaused ? Color.green : Color.orange)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
                 }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.red)
-                .foregroundColor(.white)
-                .cornerRadius(12)
+                .buttonStyle(.plain)
+                
+                Button {
+                    logWarning("User stopped batch extraction at \(viewModel.currentProgress)/\(viewModel.totalToExtract)", category: "extraction")
+                    viewModel.stop()
+                } label: {
+                    HStack {
+                        Image(systemName: "stop.fill")
+                        Text("Stop")
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
     
@@ -1044,14 +1094,24 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             logInfo("User selected \(urls.count) images from Files/iCloud Drive", category: "ui")
             
+            // Log the URLs we received
+            for (index, url) in urls.enumerated() {
+                logDebug("Document picker URL \(index + 1): \(url.path)", category: "storage")
+                logDebug("  - isFileURL: \(url.isFileURL)", category: "storage")
+                logDebug("  - lastPathComponent: \(url.lastPathComponent)", category: "storage")
+            }
+            
             // Show loading state immediately
             DispatchQueue.main.async {
                 self.parent.isLoadingImages = true
                 self.parent.loadingProgress = LoadingProgress(current: 0, total: urls.count)
             }
             
-            // Load images on background thread to avoid blocking UI
-            Task.detached(priority: .userInitiated) {
+            // IMPORTANT: Since document picker uses asCopy: true, the URLs point to files
+            // already copied to our app's temp directory - no security-scoped access needed
+            // We must load them immediately before iOS cleans up the temp directory
+            
+            Task {
                 var loadedImages: [UIImage] = []
                 var successCount = 0
                 var failureCount = 0
@@ -1066,28 +1126,44 @@ struct DocumentPickerView: UIViewControllerRepresentable {
                         )
                     }
                     
-                    // Start accessing the security-scoped resource
-                    guard url.startAccessingSecurityScopedResource() else {
-                        await logWarning("Failed to access security-scoped resource: \(url.lastPathComponent)", category: "storage")
-                        failureCount += 1
-                        continue
-                    }
+                    logDebug("Processing file \(index + 1)/\(urls.count): \(url.lastPathComponent)", category: "storage")
                     
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    
-                    // Load image data
+                    // Load image data directly (files are already in our sandbox from asCopy: true)
                     do {
+                        // Check if file exists
+                        let fileExists = FileManager.default.fileExists(atPath: url.path)
+                        logDebug("  File exists check: \(fileExists) at \(url.path)", category: "storage")
+                        
+                        guard fileExists else {
+                            logWarning("File does not exist at path: \(url.path)", category: "storage")
+                            failureCount += 1
+                            continue
+                        }
+                        
+                        // Try to get file attributes for diagnostics
+                        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) {
+                            let fileSize = attributes[.size] as? Int ?? 0
+                            logDebug("  File size: \(fileSize) bytes", category: "storage")
+                        }
+                        
+                        // Load the image data
                         let imageData = try Data(contentsOf: url)
+                        logDebug("  Successfully loaded \(imageData.count) bytes from \(url.lastPathComponent)", category: "storage")
+                        
+                        // Create UIImage
                         if let image = UIImage(data: imageData) {
-                            loadedImages.append(image)
+                            logDebug("  ✅ Created UIImage (size: \(image.size.width)x\(image.size.height))", category: "image")
+                            await MainActor.run {
+                                loadedImages.append(image)
+                            }
                             successCount += 1
-                            await logDebug("Loaded image \(successCount)/\(urls.count) from \(url.lastPathComponent)", category: "image")
                         } else {
-                            await logWarning("Failed to create UIImage from \(url.lastPathComponent)", category: "image")
+                            logWarning("  ❌ Failed to create UIImage from data - invalid image format", category: "image")
                             failureCount += 1
                         }
                     } catch {
-                        await logError("Failed to load image from \(url.lastPathComponent): \(error)", category: "storage")
+                        logError("  ❌ Failed to load image: \(error.localizedDescription)", category: "storage")
+                        logError("     Error details: \(String(describing: error))", category: "storage")
                         failureCount += 1
                     }
                     
@@ -1102,10 +1178,14 @@ struct DocumentPickerView: UIViewControllerRepresentable {
                     self.parent.selectedImages.append(contentsOf: loadedImages)
                     self.parent.isLoadingImages = false
                     
-                    logInfo("Successfully loaded \(successCount) images from Files (\(failureCount) failed)", category: "image")
+                    logInfo("✅ File loading complete: \(successCount) succeeded, \(failureCount) failed", category: "image")
                     
                     if failureCount > 0 {
-                        logWarning("Failed to load \(failureCount) out of \(urls.count) selected files", category: "storage")
+                        logWarning("⚠️ Failed to load \(failureCount) out of \(urls.count) selected files", category: "storage")
+                    }
+                    
+                    if successCount == 0 && failureCount > 0 {
+                        logError("❌ All files failed to load! Check file formats and permissions.", category: "storage")
                     }
                 }
             }

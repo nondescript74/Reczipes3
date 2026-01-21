@@ -20,6 +20,7 @@ struct RecipeBookEditorView: View {
     @State private var bookDescription: String
     @State private var selectedColor: Color
     @State private var coverImageName: String?
+    @State private var coverImageData: Data? // NEW: Hold image data
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isProcessingImage = false
     @State private var showingRecipeManager = false
@@ -42,6 +43,7 @@ struct RecipeBookEditorView: View {
         _name = State(initialValue: book?.name ?? "")
         _bookDescription = State(initialValue: book?.bookDescription ?? "")
         _coverImageName = State(initialValue: book?.coverImageName)
+        _coverImageData = State(initialValue: book?.coverImageData)
         
         if let colorHex = book?.color, let color = Color(hex: colorHex) {
             _selectedColor = State(initialValue: color)
@@ -65,10 +67,11 @@ struct RecipeBookEditorView: View {
                 }
                 
                 Section("Cover Image") {
-                    if let coverImageName = coverImageName {
+                    if coverImageName != nil || coverImageData != nil {
                         HStack {
                             RecipeImageView(
                                 imageName: coverImageName,
+                                imageData: coverImageData,
                                 size: CGSize(width: 120, height: 160),
                                 cornerRadius: 8
                             )
@@ -81,7 +84,7 @@ struct RecipeBookEditorView: View {
                         }
                     }
                     
-                    let hasCoverImage = coverImageName != nil
+                    let hasCoverImage = coverImageName != nil || coverImageData != nil
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                         Label(hasCoverImage ? "Change Cover Image" : "Add Cover Image",
                               systemImage: "photo")
@@ -191,40 +194,34 @@ struct RecipeBookEditorView: View {
                 return
             }
             
-            // Save the image
-            let imageName = "book_cover_\(UUID().uuidString).jpg"
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let fileURL = documentsPath.appendingPathComponent(imageName)
-            
-            // Compress and save
-            if let jpegData = uiImage.jpegData(compressionQuality: 0.8) {
-                try jpegData.write(to: fileURL)
-                
-                // Remove old image if exists
-                if let oldImageName = coverImageName {
-                    let oldFileURL = documentsPath.appendingPathComponent(oldImageName)
-                    try? FileManager.default.removeItem(at: oldFileURL)
-                }
-                
-                await MainActor.run {
-                    coverImageName = imageName
-                }
-                
-                logInfo("Saved book cover image: \(imageName)", category: "book")
+            // Compress the image
+            guard let jpegData = uiImage.jpegData(compressionQuality: 0.8) else {
+                logError("Failed to compress image", category: "book")
+                return
             }
+            
+            // Generate a name for reference
+            let imageName = "book_cover_\(UUID().uuidString).jpg"
+            
+            await MainActor.run {
+                coverImageName = imageName
+                coverImageData = jpegData
+                // Store image data directly in the model - this will save to SwiftData
+                if let existingBook = book {
+                    existingBook.coverImageData = jpegData
+                    existingBook.coverImageName = imageName
+                }
+            }
+            
+            logInfo("Prepared book cover image: \(imageName) (\(jpegData.count / 1024)KB)", category: "book")
         } catch {
             logError("Error loading image: \(error)", category: "book")
         }
     }
     
     private func removeCoverImage() {
-        if let imageName = coverImageName {
-            // Delete the file
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let fileURL = documentsPath.appendingPathComponent(imageName)
-            try? FileManager.default.removeItem(at: fileURL)
-        }
         coverImageName = nil
+        coverImageData = nil
     }
     
     private func saveBook() {
@@ -237,6 +234,7 @@ struct RecipeBookEditorView: View {
             book.name = trimmedName
             book.bookDescription = trimmedDescription.isEmpty ? nil : trimmedDescription
             book.coverImageName = coverImageName
+            book.coverImageData = coverImageData
             book.color = colorHex
             book.dateModified = Date()
             
@@ -247,6 +245,7 @@ struct RecipeBookEditorView: View {
                 name: trimmedName,
                 bookDescription: trimmedDescription.isEmpty ? nil : trimmedDescription,
                 coverImageName: coverImageName,
+                coverImageData: coverImageData,
                 color: colorHex
             )
             modelContext.insert(newBook)

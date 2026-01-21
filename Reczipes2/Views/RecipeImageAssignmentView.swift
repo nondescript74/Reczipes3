@@ -189,10 +189,9 @@ struct RecipePhotoRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // Recipe header with title
             HStack(spacing: 12) {
-                // Main image thumbnail (read-only)
+                // Main image thumbnail (read-only from imageData)
                 Group {
-                    if let imageName = recipeEntity.imageName,
-                       let image = loadImageFromDocuments(imageName) {
+                    if let image = recipeEntity.getMainImage() {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -255,34 +254,34 @@ struct RecipePhotoRow: View {
                 .buttonStyle(.plain)
             }
             
-            // Additional images grid (if any)
-            if let additionalImages = recipeEntity.additionalImageNames, !additionalImages.isEmpty {
+            // Additional images grid (from imageData)
+            let additionalImages = recipeEntity.getAdditionalImages()
+            if !additionalImages.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Array(additionalImages.enumerated()), id: \.offset) { index, imageName in
-                            if let image = loadImageFromDocuments(imageName) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                    )
-                                    .overlay(alignment: .topTrailing) {
-                                        Button(action: {
-                                            removeAdditionalImage(at: index)
-                                        }) {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.caption)
-                                                .foregroundStyle(.white)
-                                                .background(Circle().fill(Color.red))
-                                        }
-                                        .buttonStyle(.plain)
-                                        .padding(2)
+                        ForEach(Array(additionalImages.enumerated()), id: \.offset) { index, image in
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 50, height: 50)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                                .overlay(alignment: .topTrailing) {
+                                    Button(action: {
+                                        recipeEntity.removeAdditionalImage(at: index)
+                                        try? modelContext.save()
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(.white)
+                                            .background(Circle().fill(Color.red))
                                     }
-                            }
+                                    .buttonStyle(.plain)
+                                    .padding(2)
+                                }
                         }
                     }
                     .padding(.vertical, 4)
@@ -298,37 +297,6 @@ struct RecipePhotoRow: View {
                 modelContext: modelContext
             )
         }
-    }
-    
-    private func loadImageFromDocuments(_ filename: String) -> UIImage? {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        guard let data = try? Data(contentsOf: fileURL) else {
-            return nil
-        }
-        
-        return UIImage(data: data)
-    }
-    
-    private func removeAdditionalImage(at index: Int) {
-        guard var additionalImages = recipeEntity.additionalImageNames,
-              index < additionalImages.count else {
-            return
-        }
-        
-        let imageName = additionalImages[index]
-        
-        // Delete the file
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(imageName)
-        try? FileManager.default.removeItem(at: fileURL)
-        
-        // Remove from array
-        additionalImages.remove(at: index)
-        recipeEntity.additionalImageNames = additionalImages.isEmpty ? nil : additionalImages
-        
-        try? modelContext.save()
     }
 }
 
@@ -412,7 +380,7 @@ struct MultiPhotoPickerSheet: View {
     }
     
     private func addSelectedPhotos() async {
-        var newImageNames: [String] = []
+        var addedCount = 0
         
         for identifier in selectedAssets {
             guard let asset = photoLibrary.photoAssets.first(where: { $0.localIdentifier == identifier }),
@@ -420,42 +388,15 @@ struct MultiPhotoPickerSheet: View {
                 continue
             }
             
-            // Generate a unique filename for each additional image
-            let timestamp = Int(Date().timeIntervalSince1970)
-            let random = Int.random(in: 1000...9999)
-            let filename = "recipe_\(recipe.id.uuidString)_additional_\(timestamp)_\(random).jpg"
-            
-            // Save to documents directory
-            if saveImageToDocuments(image, filename: filename) {
-                newImageNames.append(filename)
-            }
+            // Use the new setImage() method to save to SwiftData (CloudKit-synced)
+            recipeEntity.setImage(image, isMainImage: false)
+            addedCount += 1
         }
         
-        // Update the recipe entity
-        if !newImageNames.isEmpty {
-            var currentAdditional = recipeEntity.additionalImageNames ?? []
-            currentAdditional.append(contentsOf: newImageNames)
-            recipeEntity.additionalImageNames = currentAdditional
-            
+        // Save context
+        if addedCount > 0 {
             try? modelContext.save()
-            print("✅ Added \(newImageNames.count) additional images to recipe '\(recipe.title)'")
-        }
-    }
-    
-    private func saveImageToDocuments(_ image: UIImage, filename: String) -> Bool {
-        guard let data = image.jpegData(compressionQuality: 0.8) else {
-            return false
-        }
-        
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        do {
-            try data.write(to: fileURL)
-            return true
-        } catch {
-            print("❌ Error saving image: \(error)")
-            return false
+            print("✅ Added \(addedCount) additional images to recipe '\(recipe.title)' using setImage() (CloudKit-synced)")
         }
     }
 }

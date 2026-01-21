@@ -346,27 +346,24 @@ class BatchExtractionManager: ObservableObject {
         let recipe = Recipe(from: recipeModel)
         recipe.reference = link.url
         
-        // Save images
-        var additionalImageFilenames: [String] = []
+        // Save images using new setImage() method (CloudKit-synced)
         for (index, image) in images.enumerated() {
-            let filename: String
             if index == 0 {
-                filename = "recipe_\(recipe.id.uuidString).jpg"
-                recipe.imageName = filename
-                saveImageToDisk(image, filename: filename)
+                // First image is the main thumbnail
+                recipe.setImage(image, isMainImage: true)
                 
-                let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
-                modelContext.insert(assignment)
+                // Create image assignment for compatibility
+                if let imageName = recipe.imageName {
+                    let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
+                    modelContext.insert(assignment)
+                }
             } else {
-                filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
-                saveImageToDisk(image, filename: filename)
-                additionalImageFilenames.append(filename)
+                // Additional images
+                recipe.setImage(image, isMainImage: false)
             }
         }
         
-        if !additionalImageFilenames.isEmpty {
-            recipe.additionalImageNames = additionalImageFilenames
-        }
+        logInfo("✅ Saved \(images.count) image(s) using setImage() (CloudKit-synced)", category: "batch-extraction")
         
         modelContext.insert(recipe)
         link.extractedRecipeID = recipe.id
@@ -375,6 +372,9 @@ class BatchExtractionManager: ObservableObject {
         logInfo("Recipe saved: \(recipe.title)", category: "batch-extraction")
     }
     
+    // MARK: - Deprecated Image Methods (kept for reference)
+    
+    @available(*, deprecated, message: "Use recipe.setImage() instead")
     private func saveImageToDisk(_ image: UIImage, filename: String) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             logError("Failed to convert image to JPEG data", category: "batch-extraction")

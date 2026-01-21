@@ -15,7 +15,8 @@ final class RecipeBook {
     var id: UUID = UUID()
     var name: String = ""
     var bookDescription: String?
-    var coverImageName: String? // Cover image for the book
+    var coverImageName: String? // Legacy field for reference, prefer coverImageData
+    var coverImageData: Data? // Cover image stored in SwiftData
     var dateCreated: Date = Date()
     var dateModified: Date = Date()
     var recipeIDs: [UUID] = [] // Ordered list of recipe IDs in this book
@@ -25,6 +26,7 @@ final class RecipeBook {
          name: String,
          bookDescription: String? = nil,
          coverImageName: String? = nil,
+         coverImageData: Data? = nil,
          dateCreated: Date = Date(),
          dateModified: Date = Date(),
          recipeIDs: [UUID] = [],
@@ -33,6 +35,7 @@ final class RecipeBook {
         self.name = name
         self.bookDescription = bookDescription
         self.coverImageName = coverImageName
+        self.coverImageData = coverImageData
         self.dateCreated = dateCreated
         self.dateModified = dateModified
         self.recipeIDs = recipeIDs

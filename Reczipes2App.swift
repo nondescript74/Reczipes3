@@ -103,6 +103,11 @@ struct Reczipes2App: App {
                                 await checkAndRestoreImages()
                             }
                             
+                            // Migrate book cover images from Documents to SwiftData (one-time migration)
+                            Task {
+                                await migrateBookCoverImages()
+                            }
+                            
                             // Check for App Clip data
                             checkForAppClipData()
                         }
@@ -251,6 +256,89 @@ struct Reczipes2App: App {
                     ]
                 )
             }
+        }
+    }
+    
+    // MARK: - Book Cover Image Migration
+    
+    @MainActor
+    private func migrateBookCoverImages() async {
+        let modelContext = sharedModelContainer.mainContext
+        
+        // Check if migration is needed
+        let service = RecipeBookImageMigrationService(modelContext: modelContext)
+        
+        guard service.needsMigration else {
+            logInfo("Book cover image migration not needed (already completed)", category: "migration")
+            return
+        }
+        
+        logInfo("📚 Starting book cover image migration to SwiftData...", category: "migration")
+        
+        logUserDiagnostic(
+            .info,
+            category: .storage,
+            title: "Migrating Book Covers",
+            message: "Updating book cover images for iCloud sync...",
+            technicalDetails: "Migrating from file-based storage to SwiftData"
+        )
+        
+        do {
+            let result = try await service.performMigration()
+            
+            if result.migratedCount > 0 {
+                logInfo("✅ Successfully migrated \(result.migratedCount) book cover(s)", category: "migration")
+                
+                logUserDiagnostic(
+                    .info,
+                    category: .storage,
+                    title: "Book Covers Migrated",
+                    message: "Successfully updated \(result.migratedCount) book cover image(s). They will now sync with iCloud.",
+                    technicalDetails: result.summary
+                )
+            }
+            
+            // Log any errors
+            if !result.errors.isEmpty {
+                logWarning("Migration completed with \(result.errors.count) error(s)", category: "migration")
+                
+                for (bookName, error) in result.errors {
+                    logError("Failed to migrate '\(bookName)': \(error)", category: "migration")
+                }
+                
+                logUserDiagnostic(
+                    .warning,
+                    category: .storage,
+                    title: "Some Book Covers Not Migrated",
+                    message: "\(result.errors.count) book cover(s) could not be migrated. They may appear blank.",
+                    technicalDetails: "Errors: \(result.errors.map { $0.bookName }.joined(separator: ", "))",
+                    suggestedActions: [
+                        DiagnosticAction(
+                            title: "Edit Book",
+                            description: "Try re-adding the cover image in the book editor",
+                            actionType: .openSettings(.general)
+                        )
+                    ]
+                )
+            }
+            
+        } catch {
+            logError("Book cover image migration failed: \(error)", category: "migration")
+            
+            logUserDiagnostic(
+                .error,
+                category: .storage,
+                title: "Book Cover Migration Failed",
+                message: "Couldn't migrate book cover images. Covers may not sync to iCloud.",
+                technicalDetails: error.localizedDescription,
+                suggestedActions: [
+                    DiagnosticAction(
+                        title: "Contact Support",
+                        description: "If this persists, contact support",
+                        actionType: .contactSupport
+                    )
+                ]
+            )
         }
     }
     

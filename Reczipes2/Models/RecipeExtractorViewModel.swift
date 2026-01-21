@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 #if os(iOS)
 import UIKit
 #endif
@@ -24,6 +25,110 @@ class RecipeExtractorViewModel: ObservableObject {
     private let apiClient: ClaudeAPIClient
     private let imagePreprocessor = ImagePreprocessor()
     private let webExtractor = WebRecipeExtractor()
+    
+    @Published var showingDuplicateResolution = false
+    @Published var duplicateMatch: DuplicateMatch?
+    
+    private var duplicateDetectionService: DuplicateDetectionService?
+    private let imageHashService = ImageHashService()
+    
+    func saveRecipe(modelContext: ModelContext) {
+        guard let recipe = extractedRecipe else { return }
+        
+        // Check for duplicates
+        Task {
+            let service = DuplicateDetectionService(modelContext: modelContext)
+            let duplicates = await service.findSimilarByContent(recipe, threshold: 0.8)
+            
+            if let firstMatch = duplicates.first {
+                // Show duplicate resolution
+                duplicateMatch = firstMatch
+                showingDuplicateResolution = true
+            } else {
+                // No duplicates, save normally
+                saveRecipeDirectly(recipe, modelContext: modelContext)
+            }
+        }
+    }
+    
+    private func saveRecipeDirectly(_ recipeModel: RecipeModel, modelContext: ModelContext) {
+        let recipe = Recipe(from: recipeModel)
+        
+        // Generate and store image hash
+        if let image = selectedImage,
+           let hash = imageHashService.generateHash(for: image) {
+            recipe.imageHash = hash
+        }
+        
+        recipe.extractionSource = "camera" // or "photos" or "files"
+        
+        // ... rest of save logic ...
+        
+        modelContext.insert(recipe)
+        try? modelContext.save()
+    }
+    
+    func handleKeepBoth(modelContext: ModelContext) {
+        guard let recipe = extractedRecipe else { return }
+        
+        // Create a new RecipeModel with modified title
+        let modifiedRecipe = RecipeModel(
+            id: recipe.id,
+            title: "\(recipe.title) (2)",
+            headerNotes: recipe.headerNotes,
+            yield: recipe.yield,
+            ingredientSections: recipe.ingredientSections,
+            instructionSections: recipe.instructionSections,
+            notes: recipe.notes,
+            reference: recipe.reference,
+            imageName: recipe.imageName,
+            additionalImageNames: recipe.additionalImageNames,
+            imageURLs: recipe.imageURLs
+        )
+        
+        saveRecipeDirectly(modifiedRecipe, modelContext: modelContext)
+    }
+    
+    func handleReplaceOriginal(modelContext: ModelContext) {
+        guard let newRecipe = extractedRecipe,
+              let match = duplicateMatch else { return }
+        
+        let existingRecipe = match.existingRecipe
+        let encoder = JSONEncoder()
+        
+        // Update existing recipe with new data
+        existingRecipe.title = newRecipe.title
+        existingRecipe.headerNotes = newRecipe.headerNotes
+        existingRecipe.recipeYield = newRecipe.yield
+        existingRecipe.reference = newRecipe.reference
+        
+        // Encode and update ingredient sections
+        if let ingredientsData = try? encoder.encode(newRecipe.ingredientSections) {
+            existingRecipe.ingredientSectionsData = ingredientsData
+        }
+        
+        // Encode and update instruction sections
+        if let instructionsData = try? encoder.encode(newRecipe.instructionSections) {
+            existingRecipe.instructionSectionsData = instructionsData
+        }
+        
+        // Encode and update notes
+        if let notesData = try? encoder.encode(newRecipe.notes) {
+            existingRecipe.notesData = notesData
+        }
+        
+        // Update version tracking
+        existingRecipe.lastModified = Date()
+        existingRecipe.version = (existingRecipe.version ?? 1) + 1
+        existingRecipe.ingredientsHash = Recipe.calculateIngredientsHash(from: existingRecipe.ingredientSectionsData)
+        
+        try? modelContext.save()
+    }
+    
+    func handleKeepOriginal() {
+        // Just dismiss, don't save
+        extractedRecipe = nil
+    }
     
     init(apiKey: String) {
         self.apiClient = ClaudeAPIClient(apiKey: apiKey)
@@ -55,9 +160,9 @@ class RecipeExtractorViewModel: ObservableObject {
             
             // Limit content size to avoid token limits (approximately 100k characters)
             let contentToSend: String
-            if cleanedContent.count > 100_000 {
-                logWarning("Content too large (\(cleanedContent.count) chars), truncating to 100k characters", category: "extraction")
-                contentToSend = String(cleanedContent.prefix(100_000))
+            if cleanedContent.count > 50_000 {
+                logWarning("Content too large (\(cleanedContent.count) chars), truncating to 50k characters", category: "extraction")
+                contentToSend = String(cleanedContent.prefix(50_000))
             } else {
                 contentToSend = cleanedContent
             }

@@ -990,7 +990,8 @@ struct RecipeExtractorView: View {
             if index == 0 {
                 // First image is the main thumbnail
                 filename = "recipe_\(recipe.id.uuidString).jpg"
-                saveImageToDisk(image, filename: filename)
+                recipe.setImage(image, isMainImage: true)
+//                saveImageToDisk(image, filename: filename)
                 
                 // Create image assignment for compatibility
                 let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
@@ -998,7 +999,8 @@ struct RecipeExtractorView: View {
             } else {
                 // Additional images
                 filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
-                saveImageToDisk(image, filename: filename)
+                recipe.setImage(image, isMainImage: false)
+//                saveImageToDisk(image, filename: filename)
                 additionalImageFilenames.append(filename)
             }
         }
@@ -1043,26 +1045,26 @@ struct RecipeExtractorView: View {
     
     // MARK: - Image Management
     
-    private func saveImageToDisk(_ image: UIImage, filename: String) {
-        // Reduce image size to 500KB max before saving
-        let preprocessor = ImagePreprocessor()
-        guard let imageData = preprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
-            logError("Failed to reduce image size", category: "storage")
-            return
-        }
-        
-        logInfo("Saving image with size: \(imageData.count) bytes", category: "storage")
-        
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        do {
-            try imageData.write(to: fileURL)
-            logInfo("Saved recipe image to: \(fileURL.path)", category: "storage")
-        } catch {
-            logError("Error saving recipe image: \(error)", category: "storage")
-        }
-    }
+//    private func saveImageToDisk(_ image: UIImage, filename: String) {
+//        // Reduce image size to 500KB max before saving
+//        let preprocessor = ImagePreprocessor()
+//        guard let imageData = preprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
+//            logError("Failed to reduce image size", category: "storage")
+//            return
+//        }
+//        
+//        logInfo("Saving image with size: \(imageData.count) bytes", category: "storage")
+//        
+//        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+//        let fileURL = documentsPath.appendingPathComponent(filename)
+//        
+//        do {
+//            try imageData.write(to: fileURL)
+//            logInfo("Saved recipe image to: \(fileURL.path)", category: "storage")
+//        } catch {
+//            logError("Error saving recipe image: \(error)", category: "storage")
+//        }
+//    }
     
     private func saveRecipeImage(_ image: UIImage, for recipeID: UUID, isMainImage: Bool = false, imageIndex: Int = 0) {
         // Generate a unique filename

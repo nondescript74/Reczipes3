@@ -246,22 +246,25 @@ class RecipeBookImportService {
             throw RecipeBookImportError.extractionFailed(error)
         }
         
-        // Import images
-        let imagesImported = try importImages(from: tempDir, manifest: exportPackage.imageManifest)
+        // Load images from archive into memory
+        let imageDataMap = try loadImagesFromArchive(from: tempDir, manifest: exportPackage.imageManifest)
         
         // Create or update recipes
         var newRecipes = 0
         var updatedRecipes = 0
         var importedRecipeIDs: [UUID] = []
+        var imagesImported = 0
         
         for recipeModel in exportPackage.recipes {
             let result = try await importOrUpdateRecipe(
                 recipeModel,
+                imageDataMap: imageDataMap,
                 modelContext: modelContext,
                 createNewID: createNewID
             )
             
             importedRecipeIDs.append(result.recipeID)
+            imagesImported += result.imagesAssigned
             
             if result.wasNew {
                 newRecipes += 1
@@ -311,19 +314,23 @@ class RecipeBookImportService {
             throw RecipeBookImportError.extractionFailed(error)
         }
         
-        // Import images
-        let imagesImported = try importImages(from: tempDir, manifest: exportPackage.imageManifest)
+        // Load images from archive into memory
+        let imageDataMap = try loadImagesFromArchive(from: tempDir, manifest: exportPackage.imageManifest)
         
         // Import/update recipes
         var newRecipes = 0
         var updatedRecipes = 0
+        var imagesImported = 0
         
         for recipeModel in exportPackage.recipes {
             let result = try await importOrUpdateRecipe(
                 recipeModel,
+                imageDataMap: imageDataMap,
                 modelContext: modelContext,
                 createNewID: false
             )
+            
+            imagesImported += result.imagesAssigned
             
             // Add to book if not already there
             if !existingBook.recipeIDs.contains(result.recipeID) {
@@ -344,9 +351,10 @@ class RecipeBookImportService {
     
     private func importOrUpdateRecipe(
         _ recipeModel: RecipeModel,
+        imageDataMap: [String: Data],
         modelContext: ModelContext,
         createNewID: Bool
-    ) async throws -> (recipeID: UUID, wasNew: Bool) {
+    ) async throws -> (recipeID: UUID, wasNew: Bool, imagesAssigned: Int) {
         let recipeID = createNewID ? UUID() : recipeModel.id
         
         // Check if recipe exists
@@ -360,8 +368,8 @@ class RecipeBookImportService {
         
         if let existingRecipe = existingRecipes.first, !createNewID {
             // Update existing recipe
-            try updateRecipe(existingRecipe, with: recipeModel)
-            return (recipeID: recipeID, wasNew: false)
+            let imagesAssigned = try updateRecipe(existingRecipe, with: recipeModel, imageDataMap: imageDataMap)
+            return (recipeID: recipeID, wasNew: false, imagesAssigned: imagesAssigned)
         } else {
             // Create new recipe
             var newRecipeModel = recipeModel
@@ -382,14 +390,46 @@ class RecipeBookImportService {
             }
             
             let newRecipe = Recipe(from: newRecipeModel)
+            
+            // Assign image data from the map
+            var imagesAssigned = 0
+            
+            // Assign main image
+            if let imageName = newRecipeModel.imageName,
+               let imageData = imageDataMap[imageName] {
+                newRecipe.imageData = imageData
+                imagesAssigned += 1
+                logDebug("Assigned main image data (\(imageData.count / 1024)KB) to recipe: \(newRecipe.title)", category: "book-import")
+            }
+            
+            // Assign additional images
+            if let additionalImageNames = newRecipeModel.additionalImageNames {
+                var additionalImages: [[String: Data]] = []
+                
+                for imageName in additionalImageNames {
+                    if let imageData = imageDataMap[imageName] {
+                        additionalImages.append(["data": imageData, "name": Data(imageName.utf8)])
+                        imagesAssigned += 1
+                    }
+                }
+                
+                if !additionalImages.isEmpty {
+                    if let encoded = try? JSONEncoder().encode(additionalImages) {
+                        newRecipe.additionalImagesData = encoded
+                        logDebug("Assigned \(additionalImages.count) additional images to recipe: \(newRecipe.title)", category: "book-import")
+                    }
+                }
+            }
+            
             modelContext.insert(newRecipe)
             
-            return (recipeID: recipeID, wasNew: true)
+            return (recipeID: recipeID, wasNew: true, imagesAssigned: imagesAssigned)
         }
     }
     
-    private func updateRecipe(_ recipe: Recipe, with model: RecipeModel) throws {
+    private func updateRecipe(_ recipe: Recipe, with model: RecipeModel, imageDataMap: [String: Data]) throws -> Int {
         let encoder = JSONEncoder()
+        var imagesAssigned = 0
         
         // Update structured data
         if let ingredientSectionsData = try? encoder.encode(model.ingredientSections) {
@@ -410,47 +450,70 @@ class RecipeBookImportService {
         recipe.recipeYield = model.yield
         recipe.reference = model.reference
         
-        // Update images
+        // Update images (both filename and data)
         if let imageName = model.imageName {
             recipe.imageName = imageName
+            
+            // Also update the image data from the map
+            if let imageData = imageDataMap[imageName] {
+                recipe.imageData = imageData
+                imagesAssigned += 1
+                logDebug("Updated main image data (\(imageData.count / 1024)KB) for recipe: \(recipe.title)", category: "book-import")
+            }
         }
         
         if let additionalImages = model.additionalImageNames {
             recipe.additionalImageNames = additionalImages
+            
+            // Also update the additional images data from the map
+            var additionalImagesData: [[String: Data]] = []
+            
+            for imageName in additionalImages {
+                if let imageData = imageDataMap[imageName] {
+                    additionalImagesData.append(["data": imageData, "name": Data(imageName.utf8)])
+                    imagesAssigned += 1
+                }
+            }
+            
+            if !additionalImagesData.isEmpty {
+                if let encoded = try? encoder.encode(additionalImagesData) {
+                    recipe.additionalImagesData = encoded
+                    logDebug("Updated \(additionalImagesData.count) additional images for recipe: \(recipe.title)", category: "book-import")
+                }
+            }
         }
         
         // Update version tracking
         recipe.version = (recipe.version ?? 1) + 1
         recipe.lastModified = Date()
+        
+        return imagesAssigned
     }
     
-    private func importImages(from directory: URL, manifest: [ImageManifestEntry]) throws -> Int {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        var importedCount = 0
+    /// Loads images from the export archive into memory as a dictionary
+    /// Maps filename -> image Data for assignment to recipes during import
+    private func loadImagesFromArchive(from directory: URL, manifest: [ImageManifestEntry]) throws -> [String: Data] {
+        var imageDataMap: [String: Data] = [:]
         
         for entry in manifest {
             let sourceURL = directory.appendingPathComponent(entry.fileName)
-            let destURL = documentsPath.appendingPathComponent(entry.fileName)
             
-            // Only copy if source exists and destination doesn't
+            // Load image data from archive
             if FileManager.default.fileExists(atPath: sourceURL.path) {
-                if !FileManager.default.fileExists(atPath: destURL.path) {
-                    do {
-                        try FileManager.default.copyItem(at: sourceURL, to: destURL)
-                        importedCount += 1
-                        logDebug("Imported image: \(entry.fileName)", category: "book-import")
-                    } catch {
-                        logWarning("Failed to import image \(entry.fileName): \(error)", category: "book-import")
-                    }
-                } else {
-                    logDebug("Image already exists, skipping: \(entry.fileName)", category: "book-import")
+                do {
+                    let imageData = try Data(contentsOf: sourceURL)
+                    imageDataMap[entry.fileName] = imageData
+                    logDebug("Loaded image data: \(entry.fileName) (\(imageData.count / 1024)KB)", category: "book-import")
+                } catch {
+                    logWarning("Failed to load image \(entry.fileName): \(error)", category: "book-import")
                 }
             } else {
                 logWarning("Source image not found: \(entry.fileName)", category: "book-import")
             }
         }
         
-        return importedCount
+        logInfo("Loaded \(imageDataMap.count) images from archive", category: "book-import")
+        return imageDataMap
     }
     
     private func isSupportedVersion(_ version: String) -> Bool {

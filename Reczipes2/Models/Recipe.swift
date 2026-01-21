@@ -7,6 +7,8 @@
 
 import Foundation
 import SwiftData
+import CryptoKit
+import UIKit
 
 // MARK: - CookingMode Compatibility
 
@@ -250,6 +252,11 @@ final class Recipe {
         return lastModified ?? dateAdded
     }
     
+    // NEW: For duplicate detection
+    var imageHash: String?
+    var extractionSource: String? // "camera", "photos", "files"
+    var originalFileName: String?
+    
     init(id: UUID = UUID(),
          title: String,
          headerNotes: String? = nil,
@@ -307,67 +314,76 @@ final class Recipe {
     
     // MARK: - Image Data Management
     
-    /// Load image data from file system if not already stored
-    func ensureImageDataLoaded() {
-        // Load main image if we have a filename but no data
-        if let imageName = imageName, imageData == nil {
-            if let data = loadImageData(fileName: imageName) {
-                self.imageData = data
-            }
+    /// Get main image as UIImage (from imageData)
+    /// No longer loads from file system - uses SwiftData imageData
+    func getMainImage() -> UIImage? {
+        guard let imageData = imageData else { return nil }
+        return UIImage(data: imageData)
+    }
+    
+    /// Get all additional images as UIImage array (from additionalImagesData)
+    /// No longer loads from file system - uses SwiftData additionalImagesData
+    func getAdditionalImages() -> [UIImage] {
+        guard let additionalImagesData = additionalImagesData,
+              let decoded = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData) else {
+            return []
         }
         
-        // Load additional images if we have filenames but no data
-        if let additionalNames = additionalImageNames, !additionalNames.isEmpty, additionalImagesData == nil {
-            var imagesArray: [[String: Data]] = []
-            for imageName in additionalNames {
-                if let data = loadImageData(fileName: imageName) {
-                    imagesArray.append(["fileName": imageName.data(using: .utf8)!, "imageData": data])
-                }
-            }
-            
-            if !imagesArray.isEmpty {
-                // Encode as JSON
-                if let encoded = try? JSONEncoder().encode(imagesArray) {
-                    self.additionalImagesData = encoded
-                }
-            }
+        return decoded.compactMap { imageDict in
+            guard let data = imageDict["data"] else { return nil }
+            return UIImage(data: data)
         }
     }
     
-    /// Save image data back to file system (for compatibility with existing code)
+    /// Get image by index (0 = main image, 1+ = additional images)
+    func getImage(at index: Int) -> UIImage? {
+        if index == 0 {
+            return getMainImage()
+        } else {
+            let additionalImages = getAdditionalImages()
+            let additionalIndex = index - 1
+            guard additionalIndex < additionalImages.count else { return nil }
+            return additionalImages[additionalIndex]
+        }
+    }
+    
+    /// Remove an additional image by index
+    @MainActor
+    func removeAdditionalImage(at index: Int) {
+        guard let additionalImagesData = additionalImagesData,
+              var decoded = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData),
+              index < decoded.count else {
+            return
+        }
+        
+        // Remove from data array
+        decoded.remove(at: index)
+        
+        // Update additionalImagesData
+        if decoded.isEmpty {
+            self.additionalImagesData = nil
+        } else {
+            self.additionalImagesData = try? JSONEncoder().encode(decoded)
+        }
+        
+        // Update additionalImageNames
+        if var names = additionalImageNames, index < names.count {
+            names.remove(at: index)
+            self.additionalImageNames = names.isEmpty ? nil : names
+        }
+        
+        logInfo("🗑️ Removed additional image at index \(index) for recipe: \(title)", category: "recipe")
+    }
+    
+    // MARK: - Deprecated File-Based Methods
+    
+    /// DEPRECATED: No longer needed - images are stored in SwiftData imageData
+    @MainActor @available(*, deprecated, message: "Images are now stored in imageData, not files")
     func ensureImageFilesExist() {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        
-        // Restore main image if data exists but file doesn't
-        if let imageData = imageData, let imageName = imageName {
-            let fileURL = documentsPath.appendingPathComponent(imageName)
-            if !FileManager.default.fileExists(atPath: fileURL.path) {
-                try? imageData.write(to: fileURL)
-            }
-        }
-        
-        // Restore additional images
-        if let additionalImagesData = additionalImagesData,
-           let imagesArray = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData) {
-            for imageDict in imagesArray {
-                if let fileNameData = imageDict["fileName"],
-                   let fileName = String(data: fileNameData, encoding: .utf8),
-                   let data = imageDict["imageData"] {
-                    let fileURL = documentsPath.appendingPathComponent(fileName)
-                    if !FileManager.default.fileExists(atPath: fileURL.path) {
-                        try? data.write(to: fileURL)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func loadImageData(fileName: String) -> Data? {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(fileName)
-        return try? Data(contentsOf: fileURL)
-    }
-    
+        // This method is no longer needed
+        // Images are stored in SwiftData and sync via CloudKit
+        logWarning("⚠️ ensureImageFilesExist() called but is deprecated - images in SwiftData", category: "recipe")
+    } 
     // Convenience initializer from RecipeModel
     convenience init(from recipeModel: RecipeModel) {
         let encoder = JSONEncoder()
@@ -563,7 +579,160 @@ final class Recipe {
 
 // MARK: - String Extension for SHA256 Hashing
 
-import CryptoKit
+// MARK: - Image Migration
+
+extension Recipe {
+    /// Save image data directly to SwiftData (for CloudKit sync)
+    /// This is the NEW way - replaces file-based storage
+    @MainActor
+    func setImage(_ image: UIImage, isMainImage: Bool = true) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            logError("Failed to convert image to JPEG data", category: "recipe")
+            return
+        }
+        
+        if isMainImage {
+            // Set main image
+            self.imageData = imageData
+            
+            // Also set imageName for backward compatibility (but file won't be saved)
+            self.imageName = "recipe_\(id.uuidString).jpg"
+            
+            logInfo("✅ Saved main image data (\(imageData.count / 1024)KB) for recipe: \(title)", category: "recipe")
+        } else {
+            // Add to additional images
+            var additionalImages: [[String: Data]] = []
+            
+            // Decode existing additional images
+            if let existingData = additionalImagesData,
+               let existing = try? JSONDecoder().decode([[String: Data]].self, from: existingData) {
+                additionalImages = existing
+            }
+            
+            // Add new image
+            let imageName = "recipe_\(id.uuidString)_\(additionalImages.count).jpg"
+            additionalImages.append(["data": imageData, "name": Data(imageName.utf8)])
+            
+            // Encode back to JSON
+            if let encoded = try? JSONEncoder().encode(additionalImages) {
+                self.additionalImagesData = encoded
+            }
+            
+            // Update additionalImageNames for backward compatibility
+            if self.additionalImageNames == nil {
+                self.additionalImageNames = []
+            }
+            self.additionalImageNames?.append(imageName)
+            
+            logInfo("✅ Added additional image data (\(imageData.count / 1024)KB) for recipe: \(title)", category: "recipe")
+        }
+    }
+    
+    /// Get all image data (main + additional) for display or export
+    func getAllImageData() -> [Data] {
+        var images: [Data] = []
+        
+        // Add main image
+        if let imageData = imageData {
+            images.append(imageData)
+        }
+        
+        // Add additional images
+        if let additionalImagesData = additionalImagesData,
+           let decoded = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData) {
+            for imageDict in decoded {
+                if let data = imageDict["data"] {
+                    images.append(data)
+                }
+            }
+        }
+        
+        return images
+    }
+    
+    /// Migrate file-based images to SwiftData imageData for CloudKit sync
+    /// This loads images from the Documents directory and stores them in imageData
+    /// so they sync properly via CloudKit. Call this once during app startup.
+    ///
+    /// Returns true if migration was performed, false if already migrated
+    @MainActor
+    func migrateImagesToSwiftData() -> Bool {
+        var didMigrate = false
+        
+        // Only migrate if imageData is nil but we have an imageName
+        if imageData == nil, let imageName = imageName {
+            if let data = loadImageDataFromDocuments(imageName) {
+                imageData = data
+                didMigrate = true
+                logInfo("✅ Migrated main image for recipe: \(title)", category: "migration")
+            } else {
+                logWarning("⚠️ Could not load image file for migration: \(imageName)", category: "migration")
+            }
+        }
+        
+        // Migrate additional images
+        if additionalImagesData == nil, let additionalImageNames = additionalImageNames, !additionalImageNames.isEmpty {
+            var migratedImages: [[String: Data]] = []
+            
+            for imageName in additionalImageNames {
+                if let imageData = loadImageDataFromDocuments(imageName) {
+                    migratedImages.append(["data": imageData, "name": Data(imageName.utf8)])
+                }
+            }
+            
+            if !migratedImages.isEmpty {
+                // Encode array of image data as JSON
+                if let encoded = try? JSONEncoder().encode(migratedImages) {
+                    additionalImagesData = encoded
+                    didMigrate = true
+                    logInfo("✅ Migrated \(migratedImages.count) additional images for recipe: \(title)", category: "migration")
+                }
+            }
+        }
+        
+        return didMigrate
+    }
+    
+    /// Load image data from Documents directory
+    @MainActor private func loadImageDataFromDocuments(_ filename: String) -> Data? {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        do {
+            let data = try Data(contentsOf: fileURL)
+            return data
+        } catch {
+            logDebug("Could not load image file: \(filename) - \(error.localizedDescription)", category: "migration")
+            return nil
+        }
+    }
+    
+    /// Clean up file-based images after successful migration to imageData
+    /// Only call this AFTER confirming imageData is populated and synced
+    @MainActor
+    func cleanupFileBasedImages() {
+        let fileManager = FileManager.default
+        let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        
+        // Delete main image file
+        if let imageName = imageName {
+            let fileURL = documentsPath.appendingPathComponent(imageName)
+            try? fileManager.removeItem(at: fileURL)
+            logDebug("🗑️ Cleaned up image file: \(imageName)", category: "migration")
+        }
+        
+        // Delete additional image files
+        if let additionalImageNames = additionalImageNames {
+            for imageName in additionalImageNames {
+                let fileURL = documentsPath.appendingPathComponent(imageName)
+                try? fileManager.removeItem(at: fileURL)
+                logDebug("🗑️ Cleaned up additional image file: \(imageName)", category: "migration")
+            }
+        }
+    }
+}
+
+
 
 extension String {
     /// Generate SHA256 hash of the string

@@ -129,11 +129,19 @@ class RecipeBackupManager {
             
             // Load main image if exists
             var mainImageBackup: RecipeBackup.ImageBackup?
-            if let mainImageName = recipe.imageName {
+            
+            // UPDATED: Priority 1 - Try SwiftData imageData (current system)
+            if let imageData = recipe.imageData {
+                let fileName = recipe.imageName ?? "image_\(UUID().uuidString).jpg"
+                mainImageBackup = RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData)
+                logDebug("Loaded main image from SwiftData for '\(recipe.title)'", category: "backup")
+            }
+            // Priority 2 - Fall back to file-based (legacy recipes)
+            else if let mainImageName = recipe.imageName {
                 let imageURL = documentsPath.appendingPathComponent(mainImageName)
                 if let imageData = try? Data(contentsOf: imageURL) {
                     mainImageBackup = RecipeBackup.ImageBackup(fileName: mainImageName, imageData: imageData)
-                    logDebug("Loaded main image '\(mainImageName)' for '\(recipe.title)'", category: "backup")
+                    logDebug("Loaded main image from file '\(mainImageName)' for '\(recipe.title)'", category: "backup")
                 } else {
                     logWarning("Could not load main image '\(mainImageName)' for '\(recipe.title)'", category: "backup")
                 }
@@ -141,13 +149,28 @@ class RecipeBackupManager {
             
             // Load additional images if exist
             var additionalImageBackups: [RecipeBackup.ImageBackup]?
-            if let additionalImageNames = recipe.additionalImageNames, !additionalImageNames.isEmpty {
+            
+            // UPDATED: Priority 1 - Try SwiftData additionalImagesData (current system)
+            if let additionalImagesData = recipe.additionalImagesData,
+               let decodedImages = try? JSONDecoder().decode([Data].self, from: additionalImagesData) {
+                var imageBackups: [RecipeBackup.ImageBackup] = []
+                for (index, imageData) in decodedImages.enumerated() {
+                    let fileName = "additional_\(index)_\(UUID().uuidString).jpg"
+                    imageBackups.append(RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData))
+                    logDebug("Loaded additional image \(index) from SwiftData for '\(recipe.title)'", category: "backup")
+                }
+                if !imageBackups.isEmpty {
+                    additionalImageBackups = imageBackups
+                }
+            }
+            // Priority 2 - Fall back to file-based (legacy recipes)
+            else if let additionalImageNames = recipe.additionalImageNames, !additionalImageNames.isEmpty {
                 var imageBackups: [RecipeBackup.ImageBackup] = []
                 for imageName in additionalImageNames {
                     let imageURL = documentsPath.appendingPathComponent(imageName)
                     if let imageData = try? Data(contentsOf: imageURL) {
                         imageBackups.append(RecipeBackup.ImageBackup(fileName: imageName, imageData: imageData))
-                        logDebug("Loaded additional image '\(imageName)' for '\(recipe.title)'", category: "backup")
+                        logDebug("Loaded additional image from file '\(imageName)' for '\(recipe.title)'", category: "backup")
                     } else {
                         logWarning("Could not load additional image '\(imageName)' for '\(recipe.title)'", category: "backup")
                     }
@@ -303,7 +326,7 @@ class RecipeBackupManager {
         var updatedCount = 0
         var skippedCount = 0
         
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        _ = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         
         for recipeBackup in package.recipes {
             let recipeModel = recipeBackup.recipe
@@ -333,44 +356,28 @@ class RecipeBackupManager {
                 newCount += 1
             }
             
-            // Restore images
+            // Restore images to SwiftData (new system)
+            var restoredMainImageData: Data?
             var restoredMainImageName: String?
             if let mainImage = recipeBackup.mainImage {
-                let imageURL = documentsPath.appendingPathComponent(mainImage.fileName)
-                do {
-                    try mainImage.imageData.write(to: imageURL)
-                    restoredMainImageName = mainImage.fileName
-                    logDebug("Restored main image '\(mainImage.fileName)'", category: "backup")
-                } catch {
-                    logWarning("Failed to restore main image '\(mainImage.fileName)': \(error)", category: "backup")
-                }
+                // Store directly in SwiftData
+                restoredMainImageData = mainImage.imageData
+                restoredMainImageName = mainImage.fileName
+                logDebug("Prepared main image for SwiftData: '\(mainImage.fileName)'", category: "backup")
             }
             
-            var restoredAdditionalImageNames: [String]?
+            var restoredAdditionalImagesData: Data?
             if let additionalImages = recipeBackup.additionalImages, !additionalImages.isEmpty {
-                var restoredNames: [String] = []
-                for image in additionalImages {
-                    let imageURL = documentsPath.appendingPathComponent(image.fileName)
-                    do {
-                        try image.imageData.write(to: imageURL)
-                        restoredNames.append(image.fileName)
-                        logDebug("Restored additional image '\(image.fileName)'", category: "backup")
-                    } catch {
-                        logWarning("Failed to restore additional image '\(image.fileName)': \(error)", category: "backup")
-                    }
-                }
-                if !restoredNames.isEmpty {
-                    restoredAdditionalImageNames = restoredNames
-                }
+                // Encode additional images as JSON array of Data
+                let imageDataArray = additionalImages.map { $0.imageData }
+                restoredAdditionalImagesData = try? JSONEncoder().encode(imageDataArray)
+                logDebug("Prepared \(additionalImages.count) additional images for SwiftData", category: "backup")
             }
             
             // Create recipe model with restored image names
             var recipeToImport = recipeModel
             if let mainImageName = restoredMainImageName {
                 recipeToImport = recipeToImport.withImageName(mainImageName)
-            }
-            if let additionalNames = restoredAdditionalImageNames {
-                recipeToImport = recipeToImport.withAdditionalImageNames(additionalNames)
             }
             
             // Handle keep both mode - create new ID
@@ -392,6 +399,17 @@ class RecipeBackupManager {
             
             // Create and insert the recipe
             let newRecipe = Recipe(from: recipeToImport)
+            
+            // UPDATED: Set image data directly in SwiftData
+            if let imageData = restoredMainImageData {
+                newRecipe.imageData = imageData
+                logDebug("Set main image data for '\(recipeToImport.title)'", category: "backup")
+            }
+            if let additionalImagesData = restoredAdditionalImagesData {
+                newRecipe.additionalImagesData = additionalImagesData
+                logDebug("Set additional images data for '\(recipeToImport.title)'", category: "backup")
+            }
+            
             modelContext.insert(newRecipe)
             logDebug("Imported recipe '\(recipeToImport.title)'", category: "backup")
         }

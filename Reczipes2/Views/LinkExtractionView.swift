@@ -565,44 +565,32 @@ struct LinkExtractionView: View {
         // Convert RecipeModel to SwiftData Recipe first
         let recipe = Recipe(from: recipeModel)
         
-        // Generate image filename for the first image (main thumbnail) and set it directly
-        if !imagesToSave.isEmpty {
-            let imageName = "recipe_\(recipeModel.id.uuidString).jpg"
-            recipe.imageName = imageName
-            logInfo("Will save \(imagesToSave.count) image(s), main image: \(imageName)", category: "recipe")
-        }
-        
         // Set reference to the original link URL
         recipe.reference = link.url
         
         // Insert into SwiftData context
         modelContext.insert(recipe)
         
-        // Save all images and build additionalImageNames array
-        var additionalImageFilenames: [String] = []
+        // Save all images using the new setImage() method
         for (index, image) in imagesToSave.enumerated() {
-            let filename: String
             if index == 0 {
                 // First image is the main thumbnail
-                filename = "recipe_\(recipe.id.uuidString).jpg"
-                saveImageToDisk(image, filename: filename)
+                recipe.setImage(image, isMainImage: true)
+                logInfo("✅ Saved main image using setImage() (CloudKit-synced)", category: "recipe")
                 
                 // Create image assignment for compatibility
-                let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
-                modelContext.insert(assignment)
+                if let imageName = recipe.imageName {
+                    let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
+                    modelContext.insert(assignment)
+                }
             } else {
                 // Additional images
-                filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
-                saveImageToDisk(image, filename: filename)
-                additionalImageFilenames.append(filename)
+                recipe.setImage(image, isMainImage: false)
+                logInfo("✅ Saved additional image \(index) using setImage() (CloudKit-synced)", category: "recipe")
             }
         }
         
-        // Set additionalImageNames on the recipe BEFORE saving context
-        if !additionalImageFilenames.isEmpty {
-            recipe.additionalImageNames = additionalImageFilenames
-            logInfo("Set recipe.additionalImageNames to \(additionalImageFilenames.count) images", category: "storage")
-        }
+        logInfo("Saved \(imagesToSave.count) image(s) to SwiftData for CloudKit sync", category: "recipe")
         
         // Update the link to mark it as processed
         link.isProcessed = true
@@ -612,7 +600,7 @@ struct LinkExtractionView: View {
         // Save the context
         do {
             try modelContext.save()
-            logInfo("Recipe saved successfully to SwiftData", category: "storage")
+            logInfo("Recipe saved successfully to SwiftData with imageData", category: "storage")
             
             // Small delay to ensure SwiftData propagates the change
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -624,8 +612,10 @@ struct LinkExtractionView: View {
         }
     }
     
-    // MARK: - Image Management
+    // MARK: - Image Management (Deprecated - kept for reference)
+    // Note: saveImageToDisk() is no longer used - images are saved via recipe.setImage()
     
+    @available(*, deprecated, message: "Use recipe.setImage() instead")
     private func saveImageToDisk(_ image: UIImage, filename: String) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             logError("Failed to convert image to JPEG data", category: "storage")
