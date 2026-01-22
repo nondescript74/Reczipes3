@@ -72,7 +72,9 @@ struct UserContentBackupView: View {
             }
             .fileImporter(
                 isPresented: $showImportPicker,
-                allowedContentTypes: selectedTab == .recipes ? [.reczipesBackup] : [UTType(filenameExtension: "recipebook") ?? .data],
+                allowedContentTypes: selectedTab == .recipes 
+                    ? [.reczipesBackup] 
+                    : [UTType(filenameExtension: "recipebook") ?? .data, .zip],  // Also allow .zip files for books
                 allowsMultipleSelection: false
             ) { result in
                 Task {
@@ -714,15 +716,37 @@ struct UserContentBackupView: View {
                 url.stopAccessingSecurityScopedResource()
             }
             
-            let importResult = try await RecipeBookImportService.shared.importBook(
-                from: url,
-                modelContext: modelContext,
-                importMode: .keepBoth
-            )
+            // Detect import type
+            let importType = try RecipeBookExportService.detectImportType(from: url)
             
-            self.importResult = "Successfully imported '\(importResult.book.name)' with \(importResult.book.recipeCount) recipes."
+            switch importType {
+            case .singleBook:
+                // Single book import
+                let importResult = try await RecipeBookImportService.shared.importBook(
+                    from: url,
+                    modelContext: modelContext,
+                    importMode: .keepBoth
+                )
+                
+                self.importResult = "Successfully imported '\(importResult.book.name)' with \(importResult.book.recipeCount) recipes."
+                
+            case .multipleBooks(let count):
+                // Multi-book import
+                let (books, summary) = try await RecipeBookExportService.importMultipleBooks(
+                    from: url,
+                    modelContext: modelContext,
+                    replaceExisting: false
+                )
+                
+                self.importResult = "Successfully imported \(books.count) of \(count) recipe books.\n\(summary)"
+                
+            case .unknown:
+                errorMessage = "Unable to determine import type. Please ensure this is a valid recipe book export."
+                isImporting = false
+                return
+            }
+            
             showImportSuccess = true
-            
             loadAvailableBackups()
             
         } catch {

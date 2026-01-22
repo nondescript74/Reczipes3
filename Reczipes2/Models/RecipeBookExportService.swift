@@ -47,14 +47,55 @@ class RecipeBookExportService {
     
     /// Extracts a ZIP archive to a directory using native iOS capabilities
     static func extractZipArchive(from sourceURL: URL, to destinationURL: URL) throws {
-        // Create destination directory
-        try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+        let fileManager = FileManager.default
         
-        // Read the entire ZIP file
-        let zipData = try Data(contentsOf: sourceURL)
+        // Try using FileManager's built-in unzipping first (reverse of zipping)
+        // This only works if the file is already a properly formatted ZIP
+        let coordinator = NSFileCoordinator()
+        var coordinatorError: NSError?
+        var extractionSucceeded = false
         
-        // Parse and extract the ZIP file
-        try extractZipData(zipData, to: destinationURL)
+        var localError: NSError?
+        
+        coordinator.coordinate(readingItemAt: sourceURL, options: [.withoutChanges], error: &coordinatorError) { readURL in
+            do {
+                // Check if this is already an unzipped directory (shouldn't happen, but just in case)
+                var isDirectory: ObjCBool = false
+                if fileManager.fileExists(atPath: readURL.path, isDirectory: &isDirectory) && isDirectory.boolValue {
+                    // It's already a directory, just copy it
+                    try fileManager.copyItem(at: readURL, to: destinationURL)
+                    extractionSucceeded = true
+                    return
+                }
+                
+                // Try to use the system's unzipping by reading it as a coordinate
+                // For actual extraction, we need to use our manual parser
+                // Create destination directory
+                try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+                
+                // Read the ZIP file
+                let zipData = try Data(contentsOf: sourceURL)
+                
+                // Parse and extract using our custom parser
+                try extractZipData(zipData, to: destinationURL)
+                extractionSucceeded = true
+                
+            } catch let caughtError {
+                // Use a local variable to avoid overlapping access
+                localError = caughtError as NSError
+            }
+        }
+        
+        // Combine errors - prefer the caught error over coordinator error
+        if let error = localError ?? coordinatorError {
+            throw error
+        }
+        
+        if !extractionSucceeded {
+            throw NSError(domain: "RecipeBookExport", code: -7, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to extract ZIP archive"
+            ])
+        }
     }
     
     /// Parses ZIP file format and extracts contents
@@ -69,7 +110,7 @@ class RecipeBookExportService {
         while offset < data.count - 4 {
             // Read signature
             let signature = data.withUnsafeBytes { buffer in
-                buffer.load(fromByteOffset: offset, as: UInt32.self)
+                buffer.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
             }
             
             // Local file header signature: 0x04034b50
@@ -81,13 +122,13 @@ class RecipeBookExportService {
                 
                 // Read flags
                 _ = data.withUnsafeBytes { buffer in
-                    buffer.load(fromByteOffset: offset, as: UInt16.self)
+                    buffer.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
                 }
                 offset += 2
                 
                 // Read compression method
                 let compressionMethod = data.withUnsafeBytes { buffer in
-                    buffer.load(fromByteOffset: offset, as: UInt16.self)
+                    buffer.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
                 }
                 offset += 2
                 
@@ -99,25 +140,25 @@ class RecipeBookExportService {
                 
                 // Read compressed size
                 let compressedSize = Int(data.withUnsafeBytes { buffer in
-                    buffer.load(fromByteOffset: offset, as: UInt32.self)
+                    buffer.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
                 })
                 offset += 4
                 
                 // Read uncompressed size
                 let uncompressedSize = Int(data.withUnsafeBytes { buffer in
-                    buffer.load(fromByteOffset: offset, as: UInt32.self)
+                    buffer.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
                 })
                 offset += 4
                 
                 // Read file name length
                 let fileNameLength = Int(data.withUnsafeBytes { buffer in
-                    buffer.load(fromByteOffset: offset, as: UInt16.self)
+                    buffer.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
                 })
                 offset += 2
                 
                 // Read extra field length
                 let extraFieldLength = Int(data.withUnsafeBytes { buffer in
-                    buffer.load(fromByteOffset: offset, as: UInt16.self)
+                    buffer.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
                 })
                 offset += 2
                 
@@ -181,28 +222,47 @@ class RecipeBookExportService {
     
     /// Decompresses DEFLATE compressed data
     private static func decompressDeflate(_ data: Data, uncompressedSize: Int) throws -> Data {
-        // ZIP uses raw DEFLATE without zlib wrapper, so we need to add the zlib header
-        // Zlib header: 0x78, 0x9C for default compression
-        var zlibData = Data([0x78, 0x9C])
-        zlibData.append(data)
-        
+        // ZIP uses raw DEFLATE, not zlib-wrapped DEFLATE
         var decompressed = Data(count: uncompressedSize)
         
-        let result = zlibData.withUnsafeBytes { (compressedBuffer: UnsafeRawBufferPointer) -> Int in
+        let result = data.withUnsafeBytes { (compressedBuffer: UnsafeRawBufferPointer) -> Int in
             decompressed.withUnsafeMutableBytes { (decompressedBuffer: UnsafeMutableRawBufferPointer) -> Int in
                 guard let compressedPtr = compressedBuffer.baseAddress,
                       let decompressedPtr = decompressedBuffer.baseAddress else {
                     return 0
                 }
                 
-                return compression_decode_buffer(
+                // Use COMPRESSION_LZFSE for raw DEFLATE, or try ZLIB first
+                var bytesWritten = compression_decode_buffer(
                     decompressedPtr.assumingMemoryBound(to: UInt8.self),
                     uncompressedSize,
                     compressedPtr.assumingMemoryBound(to: UInt8.self),
-                    zlibData.count,
+                    data.count,
                     nil,
                     COMPRESSION_ZLIB
                 )
+                
+                // If ZLIB failed, the data might be raw DEFLATE
+                // Try adding zlib header
+                if bytesWritten == 0 {
+                    var zlibData = Data([0x78, 0x9C])
+                    zlibData.append(data)
+                    
+                    bytesWritten = zlibData.withUnsafeBytes { (zlibBuffer: UnsafeRawBufferPointer) -> Int in
+                        guard let zlibPtr = zlibBuffer.baseAddress else { return 0 }
+                        
+                        return compression_decode_buffer(
+                            decompressedPtr.assumingMemoryBound(to: UInt8.self),
+                            uncompressedSize,
+                            zlibPtr.assumingMemoryBound(to: UInt8.self),
+                            zlibData.count,
+                            nil,
+                            COMPRESSION_ZLIB
+                        )
+                    }
+                }
+                
+                return bytesWritten
             }
         }
         
@@ -225,7 +285,7 @@ class RecipeBookExportService {
     ///   - book: The recipe book to export
     ///   - recipes: The recipes in the book
     ///   - includeImages: Whether to include images in the export
-    /// - Returns: URL to the exported file
+    /// - Returns: URL to the exported file with proper UTType
     static func exportBook(
         _ book: RecipeBook,
         recipes: [RecipeModel],
@@ -314,7 +374,7 @@ class RecipeBookExportService {
         // Create ZIP archive using FileManager's native zipping
         let fileName = sanitizeFileName(book.name)
         let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(fileName)_\(Date().timeIntervalSince1970).recipebook")
+            .appendingPathComponent("\(fileName)_\(Date().timeIntervalSince1970).\(RecipeBookPackageType.fileExtension)")
         
         try createZipArchive(from: tempDir, to: outputURL)
         
@@ -607,5 +667,134 @@ class RecipeBookExportService {
     private static func sanitizeFileName(_ name: String) -> String {
         let invalidCharacters = CharacterSet(charactersIn: ":/\\?%*|\"<>")
         return name.components(separatedBy: invalidCharacters).joined(separator: "_")
+    }
+    
+    // MARK: - Bulk Import
+    
+    /// Imports multiple recipe books from a ZIP file containing .recipebook files
+    /// - Parameters:
+    ///   - url: URL to the ZIP file containing multiple .recipebook files
+    ///   - modelContext: SwiftData model context
+    ///   - replaceExisting: If true, replaces existing books with same ID
+    /// - Returns: Array of imported RecipeBooks and summary information
+    static func importMultipleBooks(
+        from url: URL,
+        modelContext: ModelContext,
+        replaceExisting: Bool = false
+    ) async throws -> (books: [RecipeBook], summary: String) {
+        logInfo("Starting bulk import from: \(url.lastPathComponent)", category: "book-import")
+        
+        // Create temporary extraction directory
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RecipeBookBulkImport_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        defer {
+            // Clean up
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+        
+        // Extract ZIP
+        try extractZipArchive(from: url, to: tempDir)
+        
+        // Find all .recipebook files in the extracted directory
+        let fileManager = FileManager.default
+        let contents = try fileManager.contentsOfDirectory(
+            at: tempDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+        
+        let recipeBookFiles = contents.filter { $0.pathExtension == "recipebook" }
+        
+        guard !recipeBookFiles.isEmpty else {
+            // Check if this is a single .recipebook file (has book.json directly)
+            let jsonURL = tempDir.appendingPathComponent("book.json")
+            if fileManager.fileExists(atPath: jsonURL.path) {
+                // This is a single book, not a multi-book ZIP
+                throw NSError(domain: "RecipeBookExport", code: -5, userInfo: [
+                    NSLocalizedDescriptionKey: "This appears to be a single recipe book, not a collection. Please use the regular import function."
+                ])
+            } else {
+                throw NSError(domain: "RecipeBookExport", code: -6, userInfo: [
+                    NSLocalizedDescriptionKey: "No recipe books found in the ZIP file."
+                ])
+            }
+        }
+        
+        logInfo("Found \(recipeBookFiles.count) recipe books to import", category: "book-import")
+        
+        // Import each book
+        var importedBooks: [RecipeBook] = []
+        var successCount = 0
+        
+        var errorCount = 0
+        
+        for bookFile in recipeBookFiles {
+            do {
+                let book = try await importBook(
+                    from: bookFile,
+                    modelContext: modelContext,
+                    replaceExisting: replaceExisting
+                )
+                importedBooks.append(book)
+                successCount += 1
+                logInfo("Successfully imported: \(book.name)", category: "book-import")
+            } catch {
+                errorCount += 1
+                logError("Failed to import \(bookFile.lastPathComponent): \(error)", category: "book-import")
+            }
+        }
+        
+        let summary = """
+        Imported \(successCount) of \(recipeBookFiles.count) books
+        \(errorCount > 0 ? "Failed: \(errorCount)" : "")
+        """
+        
+        logInfo("Bulk import complete: \(summary)", category: "book-import")
+        
+        return (importedBooks, summary)
+    }
+    
+    /// Detects whether a ZIP file contains multiple recipe books or a single book
+    static func detectImportType(from url: URL) throws -> ImportType {
+        // Create temporary extraction directory
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RecipeBookDetect_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+        
+        // Extract ZIP
+        try extractZipArchive(from: url, to: tempDir)
+        
+        // Check for book.json (single book)
+        let jsonURL = tempDir.appendingPathComponent("book.json")
+        if FileManager.default.fileExists(atPath: jsonURL.path) {
+            return .singleBook
+        }
+        
+        // Check for .recipebook files (multiple books)
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: tempDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+        
+        let recipeBookFiles = contents.filter { $0.pathExtension == "recipebook" }
+        
+        if recipeBookFiles.count > 0 {
+            return .multipleBooks(count: recipeBookFiles.count)
+        }
+        
+        return .unknown
+    }
+    
+    enum ImportType {
+        case singleBook
+        case multipleBooks(count: Int)
+        case unknown
     }
 }

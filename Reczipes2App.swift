@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 @main
 struct Reczipes2App: App {
@@ -19,6 +20,9 @@ struct Reczipes2App: App {
     
     @AppStorage("hasCompletedCloudKitOnboarding") private var hasCompletedOnboarding = false
     @State private var showOnboardingSheet = false
+    
+    // Document handling
+    @StateObject private var documentHandler = RecipeBookDocumentHandler.shared
     
     init() {
         // Suppress Auto Layout constraint warnings from UIKit internals
@@ -72,6 +76,7 @@ struct Reczipes2App: App {
                         .modelContainer(sharedModelContainer)
                         .environmentObject(appState)
                         .environmentObject(taskRestoration)
+                        .environmentObject(documentHandler)
                         .fullScreenCover(isPresented: $showLicenseAgreement) {
                             LicenseAgreementView(isPresented: $showLicenseAgreement)
                                 .onDisappear {
@@ -133,6 +138,10 @@ struct Reczipes2App: App {
                                     hasCompletedOnboarding = true
                                 }
                         }
+                        .sheet(isPresented: $documentHandler.showImportSheet) {
+                            RecipeBookImportSheet(handler: documentHandler)
+                                .modelContainer(sharedModelContainer)
+                        }
                     
                     // Launch screen overlay - shows briefly on every launch (after onboarding)
                     if showLaunchScreen && LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
@@ -177,7 +186,16 @@ struct Reczipes2App: App {
                 logInfo("Scene phase changing: \(String(describing: oldPhase)) -> \(String(describing: newPhase))", category: "state")
                 handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
             }
+            .onOpenURL { url in
+                logInfo("Received URL: \(url)", category: "document")
+                
+                // Check if this is a .recipebook file
+                if url.pathExtension == RecipeBookPackageType.fileExtension {
+                    documentHandler.handleIncomingDocument(url)
+                }
+            }
         }
+        .handlesExternalEvents(matching: [])
     }
     
 

@@ -58,36 +58,44 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-                // CRITICAL Database Fix
-                "🐛 FIXED: Critical bug causing database deletion on every app launch",
-                "💾 Fixed: Removed overly aggressive database compatibility pre-check in ModelContainerManager",
-                "✅ Fixed: User data now persists correctly between app launches",
-                "🔧 Enhanced: Database cleanup now only runs when actual errors occur, not preventively",
-                
-                // Import/Export Bug Fixes
-                "🐛 Fixed: Recipe export now shows correct success message instead of book export message",
-                "✅ Fixed: Export messages are now properly separated from import messages in User Content view",
-                
-                // Keep Awake Feature
-                "✨ Added: Keep Awake toggle in Cooking Mode prevents device sleep during recipe preparation",
-                "⚡️ Added: Automatic keep-awake during batch extractions (URLs and images) to prevent interruption",
-                "🎨 Added: Visual indicator showing when device is staying awake during batch operations",
-                
-                // Batch Image Processing
-                "📸 Added: Batch recipe extraction from Photos library - select multiple images at once",
-                "📁 Added: Batch extraction from Files and iCloud Drive with multi-select support",
-                "🔄 Added: Mix images from Photos and Files in a single batch extraction session",
-                "⚡️ Enhanced: Process up to 10 images simultaneously for faster batch extraction",
-                "✂️ Added: Optional crop-each-image workflow for precise extraction control",
-                "📊 Added: Real-time progress tracking with success/failure counts during batch extraction",
-                "🔄 Added: Background extraction support - continue extraction when view is dismissed",
-                "⏸️ Added: Pause/resume controls for batch extraction operations",
-                "🎯 Added: Smart queue management showing remaining images and preview thumbnails"
+                // Recipe Book Import/Export Enhancements
+                "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
+                "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
+                "✅ Fixed: ZIP file extraction now handles unaligned memory access (no more crashes)",
+                "📁 Enhanced: Import file picker now accepts both .recipebook and .zip files",
+                "⚡️ Enhanced: User Content Backup view now intelligently handles both single and multi-book imports",
+                "📊 Added: Detailed import summary showing success/failure counts for bulk imports",
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        //15.3.101
+        // CRITICAL Database Fix
+//        "🐛 FIXED: Critical bug causing database deletion on every app launch",
+//        "💾 Fixed: Removed overly aggressive database compatibility pre-check in ModelContainerManager",
+//        "✅ Fixed: User data now persists correctly between app launches",
+//        "🔧 Enhanced: Database cleanup now only runs when actual errors occur, not preventively",
+//        
+//        // Import/Export Bug Fixes
+//        "🐛 Fixed: Recipe export now shows correct success message instead of book export message",
+//        "✅ Fixed: Export messages are now properly separated from import messages in User Content view",
+//        
+//        // Keep Awake Feature
+//        "✨ Added: Keep Awake toggle in Cooking Mode prevents device sleep during recipe preparation",
+//        "⚡️ Added: Automatic keep-awake during batch extractions (URLs and images) to prevent interruption",
+//        "🎨 Added: Visual indicator showing when device is staying awake during batch operations",
+//        
+//        // Batch Image Processing
+//        "📸 Added: Batch recipe extraction from Photos library - select multiple images at once",
+//        "📁 Added: Batch extraction from Files and iCloud Drive with multi-select support",
+//        "🔄 Added: Mix images from Photos and Files in a single batch extraction session",
+//        "⚡️ Enhanced: Process up to 10 images simultaneously for faster batch extraction",
+//        "✂️ Added: Optional crop-each-image workflow for precise extraction control",
+//        "📊 Added: Real-time progress tracking with success/failure counts during batch extraction",
+//        "🔄 Added: Background extraction support - continue extraction when view is dismissed",
+//        "⏸️ Added: Pause/resume controls for batch extraction operations",
+//        "🎯 Added: Smart queue management showing remaining images and preview thumbnails"
         // 15.3.100
 //        "🐛 Fixed: Files/iCloud Drive images now load correctly (removed incorrect security-scoped resource access)",
 //        "✅ Fixed: 'Failed to access security-scoped resource' error preventing all Files app images from loading",

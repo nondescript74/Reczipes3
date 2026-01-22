@@ -25,6 +25,9 @@ struct RecipeBookImportView: View {
     @State private var existingBook: RecipeBook?
     @State private var showSuccessAlert = false
     @State private var importResult: RecipeBookImportResult?
+    @State private var isMultiBookImport = false
+    @State private var multiBookCount = 0
+    @State private var multiBookSummary: String?
     
     var body: some View {
         NavigationStack {
@@ -57,7 +60,10 @@ struct RecipeBookImportView: View {
             }
             .fileImporter(
                 isPresented: $showFileImporter,
-                allowedContentTypes: [UTType(filenameExtension: "recipebook") ?? .data],
+                allowedContentTypes: [
+                    UTType(filenameExtension: "recipebook") ?? .data,
+                    .zip  // Also allow .zip files for manual imports
+                ],
                 allowsMultipleSelection: false
             ) { result in
                 handleFileSelection(result)
@@ -72,7 +78,9 @@ struct RecipeBookImportView: View {
                     dismiss()
                 }
             } message: {
-                if let result = importResult {
+                if isMultiBookImport {
+                    Text("Successfully imported \(multiBookCount) recipe books\n\(multiBookSummary ?? "")")
+                } else if let result = importResult {
                     Text("Imported '\(result.book.name)'\n\(result.summary)")
                 }
             }
@@ -338,14 +346,36 @@ struct RecipeBookImportView: View {
     
     private func loadPreview(from url: URL) async {
         do {
-            let package = try await RecipeBookImportService.shared.previewBook(from: url)
-            previewPackage = package
+            // First, detect what type of import this is
+            let importType = try RecipeBookExportService.detectImportType(from: url)
             
-            // Check for existing book
-            existingBook = try RecipeBookImportService.shared.checkForExistingBook(
-                bookID: package.book.id,
-                modelContext: modelContext
-            )
+            switch importType {
+            case .singleBook:
+                // Normal single book import
+                let package = try await RecipeBookImportService.shared.previewBook(from: url)
+                previewPackage = package
+                isMultiBookImport = false
+                
+                // Check for existing book
+                existingBook = try RecipeBookImportService.shared.checkForExistingBook(
+                    bookID: package.book.id,
+                    modelContext: modelContext
+                )
+                
+            case .multipleBooks(let count):
+                // Multi-book import - skip preview and go straight to import
+                isMultiBookImport = true
+                multiBookCount = count
+                previewPackage = nil
+                
+                // Show confirmation and proceed
+                await performMultiBookImport()
+                
+            case .unknown:
+                throw NSError(domain: "RecipeBookImport", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: "Unable to determine the type of import file. Please make sure this is a valid recipe book export."
+                ])
+            }
             
         } catch {
             errorMessage = (error as? RecipeBookImportError)?.errorDescription ?? error.localizedDescription
@@ -381,6 +411,37 @@ struct RecipeBookImportView: View {
             errorMessage = (error as? RecipeBookImportError)?.errorDescription ?? error.localizedDescription
             showError = true
             logError("Import failed: \(error)", category: "book-import")
+        }
+    }
+    
+    private func performMultiBookImport() async {
+        guard let url = importURL else { return }
+        
+        isImporting = true
+        
+        do {
+            let (books, summary) = try await RecipeBookExportService.importMultipleBooks(
+                from: url,
+                modelContext: modelContext,
+                replaceExisting: importMode == .replace
+            )
+            
+            multiBookSummary = summary
+            multiBookCount = books.count
+            
+            // Clean up temp file
+            try? FileManager.default.removeItem(at: url)
+            
+            isImporting = false
+            showSuccessAlert = true
+            
+            logInfo("Successfully imported \(books.count) books", category: "book-import")
+            
+        } catch {
+            isImporting = false
+            errorMessage = error.localizedDescription
+            showError = true
+            logError("Multi-book import failed: \(error)", category: "book-import")
         }
     }
 }

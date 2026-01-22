@@ -1,0 +1,112 @@
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                    RECIPE BOOK UTI QUICK REFERENCE                  ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+📋 WHAT TO ADD TO INFO.PLIST
+────────────────────────────────────────────────────────────────────
+
+1. EXPORTED TYPE IDENTIFIER:
+   ┌──────────────────────────────────────────────────────────────┐
+   │ Identifier:     com.headydiscy.reczipes.recipebook          │
+   │ Description:    Recipe Book Package                          │
+   │ Conforms To:    public.zip-archive, public.data             │
+   │ Extensions:     recipebook                                   │
+   │ MIME Types:     application/x-recipebook                     │
+   └──────────────────────────────────────────────────────────────┘
+
+2. DOCUMENT TYPE:
+   ┌──────────────────────────────────────────────────────────────┐
+   │ Name:           Recipe Book                                  │
+   │ Types:          com.headydiscy.reczipes.recipebook          │
+   │ Role:           Editor                                       │
+   │ Handler Rank:   Owner                                        │
+   └──────────────────────────────────────────────────────────────┘
+
+🎯 HOW TO ADD (Choose One Method)
+────────────────────────────────────────────────────────────────────
+
+METHOD A - XCODE UI:
+  1. Select Reczipes2 target → Info tab
+  2. Scroll to "Exported Type Identifiers" → Click +
+  3. Fill in values from box #1 above
+  4. Scroll to "Document Types" → Click +
+  5. Fill in values from box #2 above
+
+METHOD B - XML SOURCE:
+  1. Right-click Info.plist → Open As → Source Code
+  2. Copy XML from RecipeBook-Info.plist file
+  3. Paste before closing </dict> tag
+  4. Save
+
+🧹 AFTER ADDING
+────────────────────────────────────────────────────────────────────
+  1. Clean Build Folder      (⇧⌘K)
+  2. Delete app from device   
+  3. Build and Run            (⌘R)
+
+✅ VERIFY IT WORKS
+────────────────────────────────────────────────────────────────────
+  □ Export a recipe book
+  □ Save to Files app
+  □ Tap the .recipebook file
+  □ Reczipes2 launches
+  □ Import sheet appears
+  □ No ISSymbol console errors
+
+📁 FILES CREATED
+────────────────────────────────────────────────────────────────────
+  Code:
+    • RecipeBookUTType.swift
+    • RecipeBookDocumentHandler.swift
+    • RecipeBookUTITests.swift
+  
+  Updated:
+    • RecipeBookExportService.swift
+    • Reczipes2App.swift
+  
+  Docs:
+    • RECIPEBOOK_UTI_REGISTRATION.md
+    • RECIPEBOOK_UTI_IMPLEMENTATION.md
+    • INFO_PLIST_VISUAL_GUIDE.md
+    • UTI_REGISTRATION_CHECKLIST.md
+    • UTI_COMPLETE_SUMMARY.md
+    • RecipeBook-Info.plist (XML template)
+
+🐛 TROUBLESHOOTING
+────────────────────────────────────────────────────────────────────
+  Issue: File won't open in app
+    → Verify Info.plist entries match exactly
+    → Clean build and delete app
+    → Reinstall completely
+
+  Issue: Still seeing ISSymbol errors
+    → Delete app from simulator
+    → Reset simulator (Device → Erase All)
+    → Rebuild fresh
+
+  Issue: Changes don't appear
+    → Close and reopen Xcode
+    → Try on real device instead of simulator
+
+🎓 KEY CONCEPTS
+────────────────────────────────────────────────────────────────────
+  UTI = Uniform Type Identifier
+    → System-level file type registration
+    → Like file extensions but more powerful
+    → Required for proper iOS file handling
+
+  Export flow:
+    App → .recipebook file → System recognizes → Share/Save
+
+  Import flow:
+    Tap file → System launches app → Import sheet → Done
+
+📞 NEED HELP?
+────────────────────────────────────────────────────────────────────
+  See: INFO_PLIST_VISUAL_GUIDE.md (step-by-step with screenshots)
+  See: RECIPEBOOK_UTI_REGISTRATION.md (detailed explanations)
+  See: RecipeBookUTITests.swift (manual testing guide)
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  STATUS: ✅ Code Complete | 🔲 Info.plist Pending | 🎯 Ready    ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
