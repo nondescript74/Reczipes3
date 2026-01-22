@@ -533,8 +533,16 @@ class ModelContainerManager: ObservableObject {
             return
         }
         
-        isRecreating = true
-        defer { isRecreating = false }
+        // Ensure we're on MainActor for thread safety
+        await MainActor.run {
+            isRecreating = true
+        }
+        
+        defer {
+            Task { @MainActor in
+                isRecreating = false
+            }
+        }
         
         logInfo("🔄 Recreating ModelContainer...", category: "storage")
         if let enabled = cloudKitEnabled {
@@ -542,14 +550,14 @@ class ModelContainerManager: ObservableObject {
         }
         
         // Determine appropriate wait time based on current container state
-        let wasCloudKitEnabled = isCloudKitEnabled
+        let wasCloudKitEnabled = await MainActor.run { isCloudKitEnabled }
         let waitTime: UInt64 = wasCloudKitEnabled ? 5_000_000_000 : 1_000_000_000 // 5s if CloudKit was on, 1s if local
         
         logInfo("   Waiting for previous container to tear down...", category: "storage")
         logInfo("   (Wait time: \(waitTime / 1_000_000_000) seconds - \(wasCloudKitEnabled ? "CloudKit cleanup needed" : "local-only, minimal wait"))", category: "storage")
         
         // Store reference to old container
-        let oldContainer = container
+        let oldContainer = await MainActor.run { container }
         
         // Give the old container time to tear down properly
         try? await Task.sleep(nanoseconds: waitTime)
@@ -562,15 +570,19 @@ class ModelContainerManager: ObservableObject {
         // Create new container with known CloudKit state if provided
         let (newContainer, actualCloudKitEnabled) = Self.createModelContainer(forceCloudKit: cloudKitEnabled)
         
-        // Replace the old container
-        container = newContainer
-        isCloudKitEnabled = actualCloudKitEnabled
+        // Replace the old container on MainActor
+        await MainActor.run {
+            container = newContainer
+            isCloudKitEnabled = actualCloudKitEnabled
+        }
         
         logInfo("✅ ModelContainer recreated successfully", category: "storage")
         logInfo("   CloudKit enabled: \(actualCloudKitEnabled)", category: "storage")
         
         // Post notification so views can refresh if needed
-        NotificationCenter.default.post(name: .modelContainerRecreated, object: nil)
+        await MainActor.run {
+            NotificationCenter.default.post(name: .modelContainerRecreated, object: nil)
+        }
     }
     
     /// Manually trigger container recreation (for testing or troubleshooting)

@@ -174,6 +174,7 @@ struct Reczipes2App: App {
                 }
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
+                logInfo("Scene phase changing: \(String(describing: oldPhase)) -> \(String(describing: newPhase))", category: "state")
                 handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
             }
         }
@@ -384,10 +385,14 @@ struct Reczipes2App: App {
             // App is now active - check if we need to restore tasks
             if oldPhase == .background {
                 logInfo("App returning from background", category: "state")
-                taskRestoration.checkForTaskRestoration()
                 
-                // Notify background manager
-                BackgroundProcessingManager.shared.handleAppWillEnterForeground()
+                // Ensure we're on main actor for all UI and state operations
+                Task { @MainActor in
+                    taskRestoration.checkForTaskRestoration()
+                    
+                    // Notify background manager on main actor
+                    BackgroundProcessingManager.shared.handleAppWillEnterForeground()
+                }
             }
             
         case .background:
@@ -395,7 +400,10 @@ struct Reczipes2App: App {
             logInfo("App entering background", category: "state")
             
             // IMPORTANT: Enable background extraction to continue
-            BackgroundProcessingManager.shared.handleAppDidEnterBackground()
+            // Ensure this runs on main actor to avoid thread safety issues
+            Task { @MainActor in
+                BackgroundProcessingManager.shared.handleAppDidEnterBackground()
+            }
             
         case .inactive:
             break

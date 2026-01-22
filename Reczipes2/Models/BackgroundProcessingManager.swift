@@ -260,7 +260,10 @@ extension BackgroundProcessingManager {
     
     /// Call this when app enters background during extraction
     func handleAppDidEnterBackground() {
-        guard !pendingExtractions.isEmpty else { return }
+        guard !pendingExtractions.isEmpty else {
+            logInfo("App entering background with no pending extractions", category: "background")
+            return
+        }
         
         logInfo("App entering background with \(pendingExtractions.count) pending extractions", category: "background")
         
@@ -278,6 +281,14 @@ extension BackgroundProcessingManager {
         // Cancel any scheduled background tasks since we're back in foreground
         if pendingExtractions.isEmpty {
             cancelBackgroundTasks()
+        } else {
+            logInfo("Still have \(pendingExtractions.count) pending extractions, keeping background task active", category: "background")
+        }
+        
+        // End any active background tasks since we're in foreground now
+        if backgroundTask != .invalid {
+            logInfo("Ending foreground background task since app is active again", category: "background")
+            endBackgroundTask()
         }
     }
     
@@ -289,5 +300,8 @@ extension BackgroundProcessingManager {
         if !pendingExtractions.isEmpty {
             scheduleBackgroundExtraction()
         }
+        
+        // Clean up any active background tasks
+        endBackgroundTask()
     }
 }
