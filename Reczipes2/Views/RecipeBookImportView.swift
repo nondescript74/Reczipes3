@@ -73,16 +73,12 @@ struct RecipeBookImportView: View {
             } message: {
                 Text(errorMessage ?? "An unknown error occurred")
             }
-            .alert("Import Successful", isPresented: $showSuccessAlert) {
+            .alert(alertTitle, isPresented: $showSuccessAlert) {
                 Button("Done") {
                     dismiss()
                 }
             } message: {
-                if isMultiBookImport {
-                    Text("Successfully imported \(multiBookCount) recipe books\n\(multiBookSummary ?? "")")
-                } else if let result = importResult {
-                    Text("Imported '\(result.book.name)'\n\(result.summary)")
-                }
+                Text(alertMessage)
             }
             .onAppear {
                 showFileImporter = true
@@ -298,6 +294,42 @@ struct RecipeBookImportView: View {
         }
     }
     
+    private var alertTitle: String {
+        if isMultiBookImport {
+            // Parse success count from summary
+            if let summary = multiBookSummary,
+               let successCount = extractSuccessCount(from: summary),
+               successCount > 0 {
+                return successCount == multiBookCount ? "Import Successful" : "Import Partially Successful"
+            } else {
+                return "Import Failed"
+            }
+        } else {
+            return importResult != nil ? "Import Successful" : "Import Failed"
+        }
+    }
+    
+    private var alertMessage: String {
+        if isMultiBookImport {
+            return multiBookSummary ?? "No books were imported"
+        } else if let result = importResult {
+            return "Imported '\(result.book.name)'\n\(result.summary)"
+        } else {
+            return "No books were imported"
+        }
+    }
+    
+    private func extractSuccessCount(from summary: String) -> Int? {
+        // Extract number from "Imported X of Y books"
+        let components = summary.components(separatedBy: " ")
+        if let index = components.firstIndex(of: "Imported"),
+           index + 1 < components.count,
+           let count = Int(components[index + 1]) {
+            return count
+        }
+        return nil
+    }
+    
     // MARK: - Actions
     
     private func handleFileSelection(_ result: Result<[URL], Error>) {
@@ -433,9 +465,16 @@ struct RecipeBookImportView: View {
             try? FileManager.default.removeItem(at: url)
             
             isImporting = false
-            showSuccessAlert = true
             
-            logInfo("Successfully imported \(books.count) books", category: "book-import")
+            // Only show success alert if at least one book was imported
+            if books.count > 0 {
+                showSuccessAlert = true
+                logInfo("Successfully imported \(books.count) books", category: "book-import")
+            } else {
+                errorMessage = summary
+                showError = true
+                logError("No books were imported", category: "book-import")
+            }
             
         } catch {
             isImporting = false

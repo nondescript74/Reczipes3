@@ -58,18 +58,45 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-                // Recipe Book Import/Export Enhancements
+                // Recipe Book Import Fixes (January 22, 2026)
+                "🐛 CRITICAL FIX: Recipe book imports failing with 'book.json not found' error",
+                "✅ Fixed: ZIP archives with nested directory structures now import correctly",
+                "🔧 Added: Recursive book.json finder handles both flat and nested ZIP structures",
+                "📦 Fixed: Export now creates flat ZIP structure (no parent directory) for cross-device compatibility",
+                "🖼️ CRITICAL FIX: Recipe images missing after import - now properly loads image data into database",
+                "⚡️ Enhanced: Image data automatically loaded from Documents directory during recipe import",
+                "✅ Fixed: Both new and updated recipes now have images correctly assigned",
+                "📊 Added: Detailed logging shows image loading progress (sizes in KB)",
+                
+                // Multi-Book Import Improvements
+                "🎯 Fixed: Multi-book import now shows accurate success/failure counts",
+                "✨ Enhanced: Alert title dynamically changes based on import results (Success/Partially Successful/Failed)",
+                "📋 Added: Detailed failure summary lists which books failed to import",
+                "🔧 Fixed: Zero-import scenario now shows error instead of success message",
+                "⚡️ Improved: Better error messages explain what went wrong during imports",
+                
+                // Previous Features
+                "🐛 CRITICAL FIX: ZIP import now handles data descriptors (flags bit 3) - reads sizes from Central Directory",
+                "✅ Fixed: .recipebook files created by macOS/iOS native compression now import successfully",
+                "🔧 Enhanced: Recursive file search finds .recipebook files in nested ZIP directories",
                 "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
                 "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
-                "✅ Fixed: ZIP file extraction now handles unaligned memory access (no more crashes)",
-                "📁 Enhanced: Import file picker now accepts both .recipebook and .zip files",
-                "⚡️ Enhanced: User Content Backup view now intelligently handles both single and multi-book imports",
-                "📊 Added: Detailed import summary showing success/failure counts for bulk imports",
+                "📁 Enhanced: File picker now accepts both .recipebook and .zip files",
+                "⚡️ Improved: Proper zlib header wrapping with FCHECK validation for raw DEFLATE data",
+                "📊 Added: Comprehensive diagnostic logging shows EOCD location, central directory entries, and extraction progress"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.3.102
+        // Recipe Book Import/Export Enhancements
+//        "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
+//        "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
+//        "✅ Fixed: ZIP file extraction now handles unaligned memory access (no more crashes)",
+//        "📁 Enhanced: Import file picker now accepts both .recipebook and .zip files",
+//        "⚡️ Enhanced: User Content Backup view now intelligently handles both single and multi-book imports",
+//        "📊 Added: Detailed import summary showing success/failure counts for bulk imports",
         //15.3.101
         // CRITICAL Database Fix
 //        "🐛 FIXED: Critical bug causing database deletion on every app launch",

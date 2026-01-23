@@ -74,7 +74,7 @@ struct UserContentBackupView: View {
                 isPresented: $showImportPicker,
                 allowedContentTypes: selectedTab == .recipes 
                     ? [.reczipesBackup] 
-                    : [UTType(filenameExtension: "recipebook") ?? .data, .zip],  // Also allow .zip files for books
+                    : [.recipeBook, .zip],  // Accept both .recipebook and .zip files
                 allowsMultipleSelection: false
             ) { result in
                 Task {

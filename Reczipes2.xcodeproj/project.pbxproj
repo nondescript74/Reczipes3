@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		F82B66222F01B60E00500EDE /* Reczipes2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82B65D12F01B60E00500EDE /* Reczipes2App.swift */; };
 		F89D3BB32EF60B9700B52212 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F89D3B622EF60B9700B52212 /* Assets.xcassets */; };
+		F89EEDDD2F22AFF400AE14F7 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = F89EEDDC2F22AFF400AE14F7 /* GoogleGenerativeAI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -161,6 +162,7 @@
 				COOKING_MODE_INTEGRATION_PLAN.md,
 				COOKING_MODE_QUICK_REFERENCE.md,
 				COOKING_MODE_QUICK_START.md,
+				DATA_DESCRIPTOR_FIX_SUMMARY.md,
 				DATABASE_RECOVERY_FIX.md,
 				DATABASE_RECOVERY_GUIDE.md,
 				DIABETES_PROFILE_FEATURE.md,
@@ -318,6 +320,8 @@
 				WEB_IMAGE_FLOW_DIAGRAM.md,
 				WEB_IMAGE_TESTING_CHECKLIST.md,
 				XCODE_INTEGRATION_STEPS.md,
+				ZIP_DECOMPRESSION_FIX.md,
+				ZIP_EXTRACTION_DIAGNOSTICS.md,
 			);
 			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
 		};
@@ -378,6 +382,7 @@
 		F8C80F412EE246D200AA52E7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				F89EEDDD2F22AFF400AE14F7 /* GoogleGenerativeAI in Frameworks */,
 			);
 		};
 		F8C80F502EE246D300AA52E7 /* Frameworks */ = {
@@ -438,6 +443,9 @@
 				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
 			);
 			name = Reczipes2;
+			packageProductDependencies = (
+				F89EEDDC2F22AFF400AE14F7 /* GoogleGenerativeAI */,
+			);
 			productName = Reczipes2;
 			productReference = F8C80F442EE246D200AA52E7 /* Reczipes2.app */;
 			productType = "com.apple.product-type.application";
@@ -517,6 +525,7 @@
 			mainGroup = F8C80F3B2EE246D200AA52E7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				F89EEDDB2F22AFF400AE14F7 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = F8C80F452EE246D200AA52E7 /* Products */;
@@ -710,7 +719,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 103;
+				CURRENT_PROJECT_VERSION = 104;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -766,7 +775,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 103;
+				CURRENT_PROJECT_VERSION = 104;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -958,6 +967,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F89EEDDB2F22AFF400AE14F7 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/generative-ai-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F89EEDDC2F22AFF400AE14F7 /* GoogleGenerativeAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F89EEDDB2F22AFF400AE14F7 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;
+			productName = GoogleGenerativeAI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F8C80F3C2EE246D200AA52E7 /* Project object */;
 }
