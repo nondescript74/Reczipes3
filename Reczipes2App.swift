@@ -413,21 +413,64 @@ struct Reczipes2App: App {
                 }
             }
             
+        case .inactive:
+            // App is becoming inactive (e.g., phone call, control center)
+            // This is our last chance to save before potential force-kill
+            logInfo("App becoming inactive - saving data", category: "state")
+            
+            Task { @MainActor in
+                await saveAllPendingChanges()
+            }
+            
         case .background:
             // App is going to background - state is automatically saved by AppStateManager
             logInfo("App entering background", category: "state")
             
-            // IMPORTANT: Enable background extraction to continue
-            // Ensure this runs on main actor to avoid thread safety issues
+            // Save one more time before going to background
             Task { @MainActor in
+                await saveAllPendingChanges()
+                
+                // IMPORTANT: Enable background extraction to continue
                 BackgroundProcessingManager.shared.handleAppDidEnterBackground()
             }
             
-        case .inactive:
-            break
-            
         @unknown default:
             break
+        }
+    }
+    
+    // MARK: - Data Persistence
+    
+    /// Saves all pending changes to ensure no data loss
+    @MainActor
+    private func saveAllPendingChanges() async {
+        let modelContext = sharedModelContainer.mainContext
+        
+        // Check if there are pending changes
+        if modelContext.hasChanges {
+            do {
+                try modelContext.save()
+                logInfo("✅ Successfully saved pending changes to SwiftData", category: "state")
+            } catch {
+                logError("❌ Failed to save pending changes: \(error)", category: "state")
+                
+                logUserDiagnostic(
+                    .error,
+                    category: .storage,
+                    title: "Save Failed",
+                    message: "Could not save your recent changes. They may be lost.",
+                    technicalDetails: error.localizedDescription,
+                    suggestedActions: [
+                        DiagnosticAction(
+                            title: "Check Storage Space",
+                            description: "Make sure your device has enough storage space",
+                            actionType: .openSettings(.general)
+                        )
+                    ]
+                )
+            }
+        } else {
+            logDebug("No pending changes to save", category: "state")
         }
     }
     

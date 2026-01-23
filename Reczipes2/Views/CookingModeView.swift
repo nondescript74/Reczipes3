@@ -8,11 +8,26 @@
 import SwiftUI
 
 struct CookingModeView: View {
-    let recipe: RecipeModel
+    let item: RecipeDisplayItem
     
     @State private var completedSteps: Set<Int> = []
     @State private var servingMultiplier: Double = 1.0
     @Environment(\.dismiss) private var dismiss
+    
+    // Convenience accessor for the recipe model
+    private var recipe: RecipeModel {
+        item.toRecipeModel()
+    }
+    
+    // Convenience initializer for backward compatibility
+    init(recipe: RecipeModel) {
+        self.item = .owned(recipe)
+    }
+    
+    // New initializer for RecipeDisplayItem
+    init(item: RecipeDisplayItem) {
+        self.item = item
+    }
     
     var body: some View {
         ScrollView {

@@ -487,7 +487,8 @@ class DatabaseInvestigationService {
     }
     
     static func readRecipesFromDatabase(url: URL) async throws -> [RecipeInfo] {
-        let config = ModelConfiguration(url: url)
+        // Create a simple configuration for reading the database
+        let config = ModelConfiguration(url: url, allowsSave: false)
         
         let container = try ModelContainer(
             for: Recipe.self,
@@ -497,6 +498,10 @@ class DatabaseInvestigationService {
             SavedLink.self,
             RecipeBook.self,
             CookingSession.self,
+            SharedRecipe.self,
+            SharedRecipeBook.self,
+            SharingPreferences.self,
+            CachedSharedRecipe.self,
             migrationPlan: Reczipes2MigrationPlan.self,
             configurations: config
         )

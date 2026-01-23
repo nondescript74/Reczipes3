@@ -18,10 +18,13 @@ final class DiagnosticLogger: @unchecked Sendable {
     
     // MARK: - Properties
     
-    private let fileManager = FileManager()
+    private nonisolated(unsafe) let fileManager = FileManager()
     private let logFileName = "reczipes_diagnostics.log"
     private nonisolated(unsafe) var logFileURL: URL?
     private let logQueue = DispatchQueue(label: "com.reczipes.diagnosticlogger", qos: .utility)
+    
+    // UserDefaults key for tracking security migration
+    private let securityMigrationKey = "com.reczipes.diagnosticlog.securityMigration.v1"
     
     // OSLog subsystems for different areas of the app
     private let subsystems: [String: Logger]
@@ -44,6 +47,7 @@ final class DiagnosticLogger: @unchecked Sendable {
         ]
         
         setupLogFile()
+        performSecurityMigrationIfNeeded()
         logInitialization()
     }
     
@@ -77,6 +81,86 @@ final class DiagnosticLogger: @unchecked Sendable {
         info("DiagnosticLogger initialized", category: "general")
         if let url = logFileURL {
             info("Log file location: \(url.path)", category: "general")
+        }
+    }
+    
+    /// One-time security migration to clear logs that may contain exposed API keys
+    /// This runs once per app installation after the security fix is deployed
+    private func performSecurityMigrationIfNeeded() {
+        // Check if migration has already been performed
+        let migrationCompleted = UserDefaults.standard.bool(forKey: securityMigrationKey)
+        
+        if migrationCompleted {
+            // Migration already done, nothing to do
+            return
+        }
+        
+        // Perform one-time log deletion
+        guard let url = logFileURL else {
+            // No log file to clear, mark as complete
+            UserDefaults.standard.set(true, forKey: securityMigrationKey)
+            return
+        }
+        
+        logQueue.async { [weak self] in
+            guard let self else { return }
+            
+            do {
+                // Check if log file exists
+                if fileManager.fileExists(atPath: url.path) {
+                    // Get file size before deletion for logging
+                    let attributes = try? fileManager.attributesOfItem(atPath: url.path)
+                    let fileSize = attributes?[.size] as? Int64 ?? 0
+                    
+                    // Delete the old log file completely
+                    try fileManager.removeItem(at: url)
+                    
+                    // Create a new log file with security migration notice
+                    fileManager.createFile(atPath: url.path, contents: nil)
+                    
+                    let header = """
+                    === Reczipes Diagnostic Log - Security Migration ===
+                    Date: \(Date().formatted())
+                    Previous log cleared for security (API key exposure fix)
+                    Previous log size: \(ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file))
+                    ===================================================
+                    
+                    
+                    """
+                    try header.write(to: url, atomically: false, encoding: .utf8)
+                    
+                    // Log the migration
+                    self.log("Security migration completed - diagnostic log cleared to remove potentially exposed API keys", 
+                            level: .info, 
+                            category: "general", 
+                            file: #file, 
+                            function: #function, 
+                            line: #line)
+                } else {
+                    // Log file doesn't exist yet, just mark as migrated
+                    self.log("Security migration: No existing log file to clear", 
+                            level: .info, 
+                            category: "general", 
+                            file: #file, 
+                            function: #function, 
+                            line: #line)
+                }
+                
+                // Mark migration as complete
+                UserDefaults.standard.set(true, forKey: self.securityMigrationKey)
+                
+            } catch {
+                // Log error but still mark as complete to avoid repeated attempts
+                self.log("Security migration failed: \(error.localizedDescription)", 
+                        level: .error, 
+                        category: "general", 
+                        file: #file, 
+                        function: #function, 
+                        line: #line)
+                
+                // Mark as complete anyway to prevent infinite retry
+                UserDefaults.standard.set(true, forKey: self.securityMigrationKey)
+            }
         }
     }
     
@@ -124,18 +208,21 @@ final class DiagnosticLogger: @unchecked Sendable {
         // Get appropriate logger
         let logger = subsystems[category] ?? subsystems["general"]!
         
+        // Format the log message once to avoid repeated interpolation
+        let logMessage = "[\(fileName):\(line)] \(function) - \(message)"
+        
         // Log to OSLog
         switch level {
         case .debug:
-            logger.debug("[\(fileName):\(line)] \(function) - \(message)")
+            logger.debug("\(logMessage)")
         case .info:
-            logger.info("[\(fileName):\(line)] \(function) - \(message)")
+            logger.info("\(logMessage)")
         case .error:
-            logger.error("[\(fileName):\(line)] \(function) - \(message)")
+            logger.error("\(logMessage)")
         case .fault:
-            logger.critical("[\(fileName):\(line)] \(function) - \(message)")
+            logger.critical("\(logMessage)")
         default:
-            logger.notice("[\(fileName):\(line)] \(function) - \(message)")
+            logger.notice("\(logMessage)")
         }
         
         // Format for file
@@ -259,7 +346,7 @@ private extension Data {
     nonisolated func append(fileOrURL: URL) throws {
         if let fileHandle = FileHandle(forWritingAtPath: fileOrURL.path) {
             defer {
-                fileHandle.closeFile()
+                try? fileHandle.close()
             }
             fileHandle.seekToEndOfFile()
             fileHandle.write(self)

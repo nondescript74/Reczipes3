@@ -1012,6 +1012,66 @@ class CloudKitSharingService: ObservableObject {
         logInfo("   - Found \(missingLocalTracking.count) ghost recipes in CloudKit (need cleanup)", category: "sharing")
     }
     
+    /// Repair missing CloudKit record IDs for shared recipes
+    /// This fixes recipes that were shared but don't have cloudRecordID stored
+    func repairMissingRecipeCloudKitIDs(modelContext: ModelContext) async throws {
+        guard let currentUserID = currentUserID else {
+            throw SharingError.notAuthenticated
+        }
+        
+        logInfo("🔧 REPAIR: Starting repair of missing recipe CloudKit IDs...", category: "sharing")
+        
+        // Find all active shared recipes without cloudRecordID
+        let allSharedRecipes = try modelContext.fetch(FetchDescriptor<SharedRecipe>())
+        let recipesNeedingRepair = allSharedRecipes.filter { $0.cloudRecordID == nil && $0.isActive }
+        
+        if recipesNeedingRepair.isEmpty {
+            logInfo("✅ REPAIR: No recipes need repair - all have CloudKit IDs", category: "sharing")
+            return
+        }
+        
+        logInfo("🔧 REPAIR: Found \(recipesNeedingRepair.count) recipes missing CloudKit IDs", category: "sharing")
+        
+        // Fetch all CloudKit records for current user's recipes
+        let allCloudKitRecords = try await fetchAllCloudKitRecords(type: CloudKitRecordType.sharedRecipe)
+        let myRecords = allCloudKitRecords.filter { record in
+            guard let sharedBy = record["sharedBy"] as? String else { return false }
+            return sharedBy == currentUserID
+        }
+        
+        logInfo("🔧 REPAIR: Found \(myRecords.count) CloudKit records belonging to current user", category: "sharing")
+        
+        // Build mapping from recipeID to cloudRecordID
+        var recipeIDToRecordID: [UUID: String] = [:]
+        for record in myRecords {
+            guard let recipeData = record["recipeData"] as? String,
+                  let jsonData = recipeData.data(using: .utf8),
+                  let cloudRecipe = try? JSONDecoder().decode(CloudKitRecipe.self, from: jsonData) else {
+                continue
+            }
+            
+            recipeIDToRecordID[cloudRecipe.id] = record.recordID.recordName
+        }
+        
+        // Repair each recipe
+        var repairedCount = 0
+        for sharedRecipe in recipesNeedingRepair {
+            guard let recipeID = sharedRecipe.recipeID,
+                  let cloudRecordID = recipeIDToRecordID[recipeID] else {
+                logWarning("🔧 REPAIR: Could not find CloudKit record for recipe '\(sharedRecipe.recipeTitle)'", category: "sharing")
+                continue
+            }
+            
+            sharedRecipe.cloudRecordID = cloudRecordID
+            repairedCount += 1
+            logInfo("🔧 REPAIR: Fixed '\(sharedRecipe.recipeTitle)' - added CloudKit ID: \(cloudRecordID)", category: "sharing")
+        }
+        
+        try modelContext.save()
+        
+        logInfo("✅ REPAIR COMPLETE: Fixed \(repairedCount) of \(recipesNeedingRepair.count) recipes", category: "sharing")
+    }
+    
     /// Remove "ghost recipes" - recipes in CloudKit that users think they've unshared
     /// These are recipes where the CloudKit record exists but there's no active local tracking
     func cleanupGhostRecipes(modelContext: ModelContext) async throws {
@@ -1084,6 +1144,566 @@ class CloudKitSharingService: ObservableObject {
         }
         
         logInfo("✅ GHOST CLEANUP COMPLETE: Deleted \(successCount) ghost recipes, \(failCount) failures", category: "sharing")
+    }
+    
+    // MARK: - Ghost/Orphaned Recipe Books Cleanup
+    
+    /// Diagnostic function to analyze recipe book sharing state
+    func diagnoseSharedRecipeBooks() async {
+        guard let currentUserID = currentUserID else {
+            logError("🔍 DIAGNOSTIC: No user ID available", category: "sharing")
+            return
+        }
+        
+        do {
+            // Fetch ALL recipe books (including current user's) for diagnostic purposes
+            let books = try await fetchSharedRecipeBooks(excludeCurrentUser: false)
+            logInfo("🔍 DIAGNOSTIC: Successfully fetched \(books.count) total recipe books from CloudKit", category: "sharing")
+            
+            // Separate current user's books vs others
+            let myBooks = books.filter { $0.sharedByUserID == currentUserID }
+            let othersBooks = books.filter { $0.sharedByUserID != currentUserID }
+            
+            logInfo("🔍 DIAGNOSTIC: Found \(myBooks.count) recipe books from current user", category: "sharing")
+            logInfo("🔍 DIAGNOSTIC: Found \(othersBooks.count) recipe books from other users", category: "sharing")
+            
+            // Group by sharer
+            let groupedByUser = Dictionary(grouping: books) { $0.sharedByUserID }
+            logInfo("🔍 DIAGNOSTIC: Total unique sharers: \(groupedByUser.count)", category: "sharing")
+            for (userID, userBooks) in groupedByUser.prefix(5) {
+                let userName = userBooks.first?.sharedByUserName ?? "Unknown"
+                logInfo("🔍   User '\(userName)' (\(userID)): \(userBooks.count) recipe books", category: "sharing")
+            }
+            
+            // Detect duplicates by book ID
+            let groupedByBookID = Dictionary(grouping: books) { $0.id }
+            let duplicates = groupedByBookID.filter { $0.value.count > 1 }
+            if !duplicates.isEmpty {
+                logWarning("🔍 DIAGNOSTIC: Found \(duplicates.count) duplicate recipe book IDs in CloudKit!", category: "sharing")
+                for (bookID, dupes) in duplicates.prefix(5) {
+                    logWarning("🔍   Recipe book ID \(bookID) has \(dupes.count) copies", category: "sharing")
+                }
+            } else {
+                logInfo("🔍 DIAGNOSTIC: No duplicates found ✅", category: "sharing")
+            }
+            
+            // Check for orphaned CloudKit records
+            logInfo("🔍 DIAGNOSTIC: Checking for orphaned CloudKit records...", category: "sharing")
+            logInfo("🔍   My CloudKit recipe books: \(myBooks.count)", category: "sharing")
+            
+        } catch {
+            logError("🔍 DIAGNOSTIC: Failed to fetch recipe books: \(error)", category: "sharing")
+        }
+    }
+    
+    /// Sync local SharedRecipeBook tracking with CloudKit truth
+    /// This finds recipe books in CloudKit that should be tracked locally but aren't
+    func syncLocalRecipeBookTrackingWithCloudKit(modelContext: ModelContext) async throws {
+        guard let currentUserID = currentUserID else {
+            throw SharingError.notAuthenticated
+        }
+        
+        logInfo("🔄 SYNC: Starting local recipe book tracking sync...", category: "sharing")
+        
+        // Fetch ALL recipe books from CloudKit (including current user's)
+        let allCloudKitBooks = try await fetchSharedRecipeBooks(excludeCurrentUser: false)
+        let myCloudKitBooks = allCloudKitBooks.filter { $0.sharedByUserID == currentUserID }
+        
+        logInfo("🔄 SYNC: Found \(myCloudKitBooks.count) of my recipe books in CloudKit", category: "sharing")
+        
+        // Fetch all local SharedRecipeBook tracking records
+        let localTracking = try modelContext.fetch(FetchDescriptor<SharedRecipeBook>())
+        let localBookIDs = Set(localTracking.compactMap { $0.bookID })
+        
+        logInfo("🔄 SYNC: Found \(localTracking.count) local tracking records", category: "sharing")
+        
+        // Find CloudKit recipe books that aren't tracked locally
+        var missingLocalTracking: [CloudKitRecipeBook] = []
+        
+        for cloudBook in myCloudKitBooks {
+            if !localBookIDs.contains(cloudBook.id) {
+                missingLocalTracking.append(cloudBook)
+                logWarning("🔄 SYNC: Recipe book '\(cloudBook.name)' (ID: \(cloudBook.id)) is in CloudKit but not tracked locally", category: "sharing")
+            }
+        }
+        
+        // Find local tracking records that don't exist in CloudKit
+        let cloudKitBookIDs = Set(myCloudKitBooks.map { $0.id })
+        var orphanedLocalRecords: [SharedRecipeBook] = []
+        
+        for localRecord in localTracking where localRecord.isActive {
+            if let bookID = localRecord.bookID,
+               !cloudKitBookIDs.contains(bookID) {
+                orphanedLocalRecords.append(localRecord)
+                logWarning("🔄 SYNC: Local tracking for '\(localRecord.bookName)' (ID: \(bookID)) has no CloudKit record", category: "sharing")
+            }
+        }
+        
+        logInfo("🔄 SYNC: Found \(missingLocalTracking.count) CloudKit recipe books not tracked locally", category: "sharing")
+        logInfo("🔄 SYNC: Found \(orphanedLocalRecords.count) orphaned local tracking records", category: "sharing")
+        
+        // Clean up orphaned local records (books that were unshared but local tracking wasn't cleaned)
+        if !orphanedLocalRecords.isEmpty {
+            logInfo("🔄 SYNC: Cleaning up \(orphanedLocalRecords.count) orphaned local tracking records...", category: "sharing")
+            for record in orphanedLocalRecords {
+                record.isActive = false
+                logInfo("🔄   Marked '\(record.bookName)' as inactive", category: "sharing")
+            }
+        }
+        
+        // Warn about missing local tracking
+        if !missingLocalTracking.isEmpty {
+            logWarning("🔄 SYNC: Found \(missingLocalTracking.count) recipe books in CloudKit without local tracking", category: "sharing")
+            logWarning("🔄   This suggests previous unshare operations failed to delete from CloudKit", category: "sharing")
+            logWarning("🔄   Recommendation: Run cleanupGhostRecipeBooks() to remove these from CloudKit", category: "sharing")
+        }
+        
+        try modelContext.save()
+        
+        logInfo("✅ SYNC COMPLETE: Local recipe book tracking is now synced with CloudKit", category: "sharing")
+        logInfo("   - Deactivated \(orphanedLocalRecords.count) stale local records", category: "sharing")
+        logInfo("   - Found \(missingLocalTracking.count) ghost recipe books in CloudKit (need cleanup)", category: "sharing")
+    }
+    
+    /// Repair missing CloudKit record IDs for shared recipe books
+    /// This fixes books that were shared but don't have cloudRecordID stored
+    func repairMissingRecipeBookCloudKitIDs(modelContext: ModelContext) async throws {
+        guard let currentUserID = currentUserID else {
+            throw SharingError.notAuthenticated
+        }
+        
+        logInfo("🔧 REPAIR: Starting repair of missing recipe book CloudKit IDs...", category: "sharing")
+        
+        // Find all active shared books without cloudRecordID
+        let allSharedBooks = try modelContext.fetch(FetchDescriptor<SharedRecipeBook>())
+        let booksNeedingRepair = allSharedBooks.filter { $0.cloudRecordID == nil && $0.isActive }
+        
+        if booksNeedingRepair.isEmpty {
+            logInfo("✅ REPAIR: No recipe books need repair - all have CloudKit IDs", category: "sharing")
+            return
+        }
+        
+        logInfo("🔧 REPAIR: Found \(booksNeedingRepair.count) books missing CloudKit IDs", category: "sharing")
+        
+        // Fetch all CloudKit records for current user's books
+        let allCloudKitRecords = try await fetchAllCloudKitRecords(type: CloudKitRecordType.sharedRecipeBook)
+        let myRecords = allCloudKitRecords.filter { record in
+            guard let sharedBy = record["sharedBy"] as? String else { return false }
+            return sharedBy == currentUserID
+        }
+        
+        logInfo("🔧 REPAIR: Found \(myRecords.count) CloudKit records belonging to current user", category: "sharing")
+        
+        // Build mapping from bookID to cloudRecordID
+        var bookIDToRecordID: [UUID: String] = [:]
+        for record in myRecords {
+            guard let bookData = record["bookData"] as? String,
+                  let jsonData = bookData.data(using: .utf8),
+                  let cloudBook = try? JSONDecoder().decode(CloudKitRecipeBook.self, from: jsonData) else {
+                continue
+            }
+            
+            bookIDToRecordID[cloudBook.id] = record.recordID.recordName
+        }
+        
+        // Repair each book
+        var repairedCount = 0
+        for sharedBook in booksNeedingRepair {
+            guard let bookID = sharedBook.bookID,
+                  let cloudRecordID = bookIDToRecordID[bookID] else {
+                logWarning("🔧 REPAIR: Could not find CloudKit record for book '\(sharedBook.bookName)'", category: "sharing")
+                continue
+            }
+            
+            sharedBook.cloudRecordID = cloudRecordID
+            repairedCount += 1
+            logInfo("🔧 REPAIR: Fixed '\(sharedBook.bookName)' - added CloudKit ID: \(cloudRecordID)", category: "sharing")
+        }
+        
+        try modelContext.save()
+        
+        logInfo("✅ REPAIR COMPLETE: Fixed \(repairedCount) of \(booksNeedingRepair.count) books", category: "sharing")
+    }
+    
+    /// Remove "ghost recipe books" - books in CloudKit that users think they've unshared
+    /// These are books where the CloudKit record exists but there's no active local tracking
+    func cleanupGhostRecipeBooks(modelContext: ModelContext) async throws {
+        guard let currentUserID = currentUserID else {
+            throw SharingError.notAuthenticated
+        }
+        
+        logInfo("👻 GHOST CLEANUP: Starting ghost recipe book detection...", category: "sharing")
+        
+        // Fetch ALL my recipe books from CloudKit
+        let allCloudKitBooks = try await fetchSharedRecipeBooks(excludeCurrentUser: false)
+        let myCloudKitBooks = allCloudKitBooks.filter { $0.sharedByUserID == currentUserID }
+        
+        logInfo("👻 Found \(myCloudKitBooks.count) of my recipe books in CloudKit", category: "sharing")
+        
+        // Fetch all ACTIVE local SharedRecipeBook tracking records
+        let activeTracking = try modelContext.fetch(
+            FetchDescriptor<SharedRecipeBook>(
+                predicate: #Predicate<SharedRecipeBook> { $0.isActive == true }
+            )
+        )
+        let activeBookIDs = Set(activeTracking.compactMap { $0.bookID })
+        
+        logInfo("👻 Found \(activeTracking.count) active local tracking records", category: "sharing")
+        
+        // Find CloudKit recipe books that aren't actively tracked (these are ghosts!)
+        var ghostBooks: [(book: CloudKitRecipeBook, cloudRecordID: String)] = []
+        
+        // We need to fetch the actual CloudKit records to get their record IDs for deletion
+        let allCloudKitRecords = try await fetchAllCloudKitRecords(type: CloudKitRecordType.sharedRecipeBook)
+        
+        for record in allCloudKitRecords {
+            guard let sharedBy = record["sharedBy"] as? String,
+                  sharedBy == currentUserID,
+                  let bookData = record["bookData"] as? String,
+                  let jsonData = bookData.data(using: .utf8),
+                  let cloudBook = try? JSONDecoder().decode(CloudKitRecipeBook.self, from: jsonData) else {
+                continue
+            }
+            
+            // If this book isn't actively tracked locally, it's a ghost
+            if !activeBookIDs.contains(cloudBook.id) {
+                ghostBooks.append((cloudBook, record.recordID.recordName))
+                logWarning("👻 Found ghost recipe book: '\(cloudBook.name)' (ID: \(cloudBook.id))", category: "sharing")
+            }
+        }
+        
+        logInfo("👻 Found \(ghostBooks.count) ghost recipe books", category: "sharing")
+        
+        if ghostBooks.isEmpty {
+            logInfo("✅ No ghost recipe books found - everything is in sync!", category: "sharing")
+            return
+        }
+        
+        // Delete ghost recipe books from CloudKit
+        logInfo("👻 Deleting \(ghostBooks.count) ghost recipe books from CloudKit...", category: "sharing")
+        var successCount = 0
+        var failCount = 0
+        
+        for (book, cloudRecordID) in ghostBooks {
+            do {
+                let recordID = CKRecord.ID(recordName: cloudRecordID)
+                try await publicDatabase.deleteRecord(withID: recordID)
+                logInfo("👻   Deleted '\(book.name)'", category: "sharing")
+                successCount += 1
+            } catch {
+                logError("👻   Failed to delete '\(book.name)': \(error)", category: "sharing")
+                failCount += 1
+            }
+        }
+        
+        logInfo("✅ GHOST CLEANUP COMPLETE: Deleted \(successCount) ghost recipe books, \(failCount) failures", category: "sharing")
+    }
+    
+    // MARK: - Community Recipes Sync (Temporary Cache)
+    
+    /// Sync community recipes for viewing (not permanent import)
+    /// Creates temporary cache for viewing, cooking, etc. with automatic cleanup
+    func syncCommunityRecipesForViewing(modelContext: ModelContext, limit: Int = 100) async throws {
+        guard isCloudKitAvailable else {
+            throw SharingError.cloudKitUnavailable()
+        }
+        
+        logInfo("📖 SYNC: Syncing community recipes for viewing...", category: "sharing")
+        
+        // Fetch recent shared recipes from CloudKit
+        let cloudRecipes = try await fetchSharedRecipes(excludeCurrentUser: true)
+        let recentRecipes = Array(cloudRecipes.prefix(limit)) // Limit to prevent storage bloat
+        
+        logInfo("📖 SYNC: Found \(cloudRecipes.count) community recipes, caching \(recentRecipes.count)", category: "sharing")
+        
+        // Fetch existing cached recipes
+        let existingCached = try modelContext.fetch(FetchDescriptor<CachedSharedRecipe>())
+        var existingByID = [UUID: CachedSharedRecipe]()
+        for cached in existingCached {
+            existingByID[cached.id] = cached
+        }
+        
+        // Track which recipes are still in CloudKit
+        var currentCloudRecipeIDs = Set<UUID>()
+        
+        var addedCount = 0
+        var updatedCount = 0
+        
+        // Process each CloudKit recipe
+        for cloudRecipe in recentRecipes {
+            currentCloudRecipeIDs.insert(cloudRecipe.id)
+            
+            if let existingCached = existingByID[cloudRecipe.id] {
+                // Update existing cache
+                existingCached.title = cloudRecipe.title
+                existingCached.headerNotes = cloudRecipe.headerNotes
+                existingCached.yield = cloudRecipe.yield
+                existingCached.ingredientSections = cloudRecipe.ingredientSections
+                existingCached.instructionSections = cloudRecipe.instructionSections
+                existingCached.notes = cloudRecipe.notes
+                existingCached.reference = cloudRecipe.reference
+                existingCached.imageName = cloudRecipe.imageName
+                existingCached.additionalImageNames = cloudRecipe.additionalImageNames
+                existingCached.sharedByUserName = cloudRecipe.sharedByUserName
+                existingCached.cachedDate = Date()
+                updatedCount += 1
+                logInfo("📖   Updated cached recipe: '\(cloudRecipe.title)'", category: "sharing")
+            } else {
+                // Create new cached recipe
+                let newCached = CachedSharedRecipe(from: cloudRecipe)
+                modelContext.insert(newCached)
+                addedCount += 1
+                logInfo("📖   Cached new recipe: '\(cloudRecipe.title)' by \(cloudRecipe.sharedByUserName ?? "Unknown")", category: "sharing")
+            }
+        }
+        
+        // Clean up cached recipes that are no longer available or old
+        var removedCount = 0
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        
+        for cached in existingCached {
+            let shouldRemove = !currentCloudRecipeIDs.contains(cached.id) || cached.lastAccessedDate < thirtyDaysAgo
+            
+            if shouldRemove {
+                modelContext.delete(cached)
+                removedCount += 1
+                logInfo("📖   Removed cached recipe: '\(cached.title)'", category: "sharing")
+            }
+        }
+        
+        try modelContext.save()
+        
+        logInfo("✅ SYNC COMPLETE: Community recipes cached for viewing", category: "sharing")
+        logInfo("   - Added: \(addedCount) recipes", category: "sharing")
+        logInfo("   - Updated: \(updatedCount) recipes", category: "sharing")
+        logInfo("   - Removed: \(removedCount) recipes", category: "sharing")
+    }
+    
+    /// Update last accessed date for a cached recipe (prevents auto-cleanup)
+    func markCachedRecipeAsAccessed(_ recipeID: UUID, modelContext: ModelContext) throws {
+        let descriptor = FetchDescriptor<CachedSharedRecipe>(
+            predicate: #Predicate<CachedSharedRecipe> { $0.id == recipeID }
+        )
+        
+        if let cached = try modelContext.fetch(descriptor).first {
+            cached.lastAccessedDate = Date()
+            try modelContext.save()
+            logInfo("📖 Marked cached recipe as accessed: '\(cached.title)'", category: "sharing")
+        }
+    }
+    
+    /// Convert a cached recipe to permanent import
+    func importCachedRecipe(_ cachedRecipe: CachedSharedRecipe, modelContext: ModelContext) throws {
+        let recipeModel = RecipeModel(
+            id: UUID(), // New ID - independent copy
+            title: cachedRecipe.title,
+            headerNotes: cachedRecipe.headerNotes,
+            yield: cachedRecipe.yield,
+            ingredientSections: cachedRecipe.ingredientSections,
+            instructionSections: cachedRecipe.instructionSections,
+            notes: cachedRecipe.notes,
+            reference: cachedRecipe.reference,
+            imageName: cachedRecipe.imageName,
+            additionalImageNames: cachedRecipe.additionalImageNames
+        )
+        
+        let recipe = Recipe(from: recipeModel)
+        modelContext.insert(recipe)
+        try modelContext.save()
+        
+        logInfo("Imported cached recipe to permanent collection: \(cachedRecipe.title)", category: "sharing")
+    }
+    
+    /// Clean up old cached recipes (not accessed in 30 days)
+    func cleanupOldCachedRecipes(modelContext: ModelContext) throws {
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        
+        let descriptor = FetchDescriptor<CachedSharedRecipe>(
+            predicate: #Predicate<CachedSharedRecipe> { recipe in
+                recipe.lastAccessedDate < thirtyDaysAgo
+            }
+        )
+        
+        let oldRecipes = try modelContext.fetch(descriptor)
+        
+        for recipe in oldRecipes {
+            modelContext.delete(recipe)
+        }
+        
+        try modelContext.save()
+        
+        logInfo("🧹 Cleaned up \(oldRecipes.count) old cached recipes", category: "sharing")
+    }
+    
+    // MARK: - Community Books Sync
+    
+    /// Sync community recipe books from CloudKit to local SwiftData
+    /// This allows shared books to appear in the Books view's "Shared" tab
+    func syncCommunityBooksToLocal(modelContext: ModelContext) async throws {
+        guard isCloudKitAvailable else {
+            throw SharingError.cloudKitUnavailable()
+        }
+        
+        logInfo("📚 SYNC: Starting community books sync to local SwiftData...", category: "sharing")
+        
+        // Fetch all shared books from CloudKit (excluding current user's books)
+        let cloudKitBooks = try await fetchSharedRecipeBooks(excludeCurrentUser: true)
+        
+        logInfo("📚 SYNC: Found \(cloudKitBooks.count) community books in CloudKit", category: "sharing")
+        
+        // Fetch all existing SharedRecipeBook records that are shared by others
+        let existingSharedBooks = try modelContext.fetch(
+            FetchDescriptor<SharedRecipeBook>(
+                predicate: #Predicate<SharedRecipeBook> { book in
+                    book.sharedByUserID != nil && book.isActive == true
+                }
+            )
+        )
+        
+        // Fetch all existing RecipeBook records
+        let allRecipeBooks = try modelContext.fetch(FetchDescriptor<RecipeBook>())
+        
+        // Create dictionaries for quick lookup
+        var existingSharedBooksByID = [UUID: SharedRecipeBook]()
+        var existingRecipeBooksByID = [UUID: RecipeBook]()
+        
+        for book in existingSharedBooks {
+            if let bookID = book.bookID {
+                existingSharedBooksByID[bookID] = book
+            }
+        }
+        
+        for book in allRecipeBooks {
+            existingRecipeBooksByID[book.id] = book
+        }
+        
+        logInfo("📚 SYNC: Found \(existingSharedBooks.count) existing community book tracking records", category: "sharing")
+        logInfo("📚 SYNC: Found \(allRecipeBooks.count) total RecipeBook entries", category: "sharing")
+        
+        // Track which CloudKit books we've seen (to identify books to remove)
+        var cloudKitBookIDs = Set<UUID>()
+        
+        var addedCount = 0
+        var updatedCount = 0
+        
+        // Process each CloudKit book
+        for cloudBook in cloudKitBooks {
+            cloudKitBookIDs.insert(cloudBook.id)
+            
+            // Check if RecipeBook entity exists
+            let recipeBook: RecipeBook
+            if let existingRecipeBook = existingRecipeBooksByID[cloudBook.id] {
+                recipeBook = existingRecipeBook
+                
+                // Update RecipeBook properties if needed
+                var needsUpdate = false
+                if recipeBook.name != cloudBook.name {
+                    recipeBook.name = cloudBook.name
+                    needsUpdate = true
+                }
+                if recipeBook.bookDescription != cloudBook.bookDescription {
+                    recipeBook.bookDescription = cloudBook.bookDescription
+                    needsUpdate = true
+                }
+                if recipeBook.color != cloudBook.color {
+                    recipeBook.color = cloudBook.color
+                    needsUpdate = true
+                }
+                
+                if needsUpdate {
+                    recipeBook.dateModified = Date()
+                    updatedCount += 1
+                    logInfo("📚   Updated RecipeBook: '\(cloudBook.name)'", category: "sharing")
+                }
+            } else {
+                // Create new RecipeBook entity
+                recipeBook = RecipeBook(
+                    id: cloudBook.id,
+                    name: cloudBook.name,
+                    bookDescription: cloudBook.bookDescription,
+                    coverImageName: cloudBook.coverImageName,
+                    dateCreated: cloudBook.sharedDate,
+                    dateModified: cloudBook.sharedDate,
+                    recipeIDs: cloudBook.recipeIDs,
+                    color: cloudBook.color
+                )
+                
+                modelContext.insert(recipeBook)
+                addedCount += 1
+                logInfo("📚   Created RecipeBook: '\(cloudBook.name)' by \(cloudBook.sharedByUserName ?? "Unknown")", category: "sharing")
+            }
+            
+            // Check if SharedRecipeBook tracking entry exists
+            if let existingSharedBook = existingSharedBooksByID[cloudBook.id] {
+                // Update existing tracking entry if needed
+                var needsUpdate = false
+                
+                if existingSharedBook.bookName != cloudBook.name {
+                    existingSharedBook.bookName = cloudBook.name
+                    needsUpdate = true
+                }
+                
+                if existingSharedBook.bookDescription != cloudBook.bookDescription {
+                    existingSharedBook.bookDescription = cloudBook.bookDescription
+                    needsUpdate = true
+                }
+                
+                if existingSharedBook.sharedByUserName != cloudBook.sharedByUserName {
+                    existingSharedBook.sharedByUserName = cloudBook.sharedByUserName
+                    needsUpdate = true
+                }
+                
+                if needsUpdate {
+                    logInfo("📚   Updated SharedRecipeBook tracking: '\(cloudBook.name)'", category: "sharing")
+                }
+            } else {
+                // Create new SharedRecipeBook tracking entry
+                let newSharedBook = SharedRecipeBook(
+                    bookID: cloudBook.id,
+                    cloudRecordID: nil, // We don't have the CloudKit record ID here
+                    sharedByUserID: cloudBook.sharedByUserID,
+                    sharedByUserName: cloudBook.sharedByUserName,
+                    sharedDate: cloudBook.sharedDate,
+                    bookName: cloudBook.name,
+                    bookDescription: cloudBook.bookDescription,
+                    coverImageName: cloudBook.coverImageName
+                )
+                
+                modelContext.insert(newSharedBook)
+                logInfo("📚   Created SharedRecipeBook tracking: '\(cloudBook.name)' by \(cloudBook.sharedByUserName ?? "Unknown")", category: "sharing")
+            }
+        }
+        
+        // Find and remove books that are no longer in CloudKit
+        var removedCount = 0
+        for existingSharedBook in existingSharedBooks {
+            guard let bookID = existingSharedBook.bookID else { continue }
+            
+            // If this book is not in CloudKit anymore, mark it as inactive and delete the RecipeBook
+            if !cloudKitBookIDs.contains(bookID) {
+                // Only remove books shared by others, not the current user's own shared books
+                if existingSharedBook.sharedByUserID != currentUserID {
+                    // Mark tracking entry as inactive
+                    existingSharedBook.isActive = false
+                    
+                    // Delete the RecipeBook entity
+                    if let recipeBook = existingRecipeBooksByID[bookID] {
+                        modelContext.delete(recipeBook)
+                    }
+                    
+                    removedCount += 1
+                    logInfo("📚   Removed book (no longer shared): '\(existingSharedBook.bookName)'", category: "sharing")
+                }
+            }
+        }
+        
+        // Save changes
+        try modelContext.save()
+        
+        logInfo("✅ SYNC COMPLETE: Community books synced", category: "sharing")
+        logInfo("   - Added: \(addedCount) books", category: "sharing")
+        logInfo("   - Updated: \(updatedCount) books", category: "sharing")
+        logInfo("   - Removed: \(removedCount) books", category: "sharing")
     }
     
     /// Remove orphaned recipes from CloudKit (recipes with invalid/missing sharedByUserID)

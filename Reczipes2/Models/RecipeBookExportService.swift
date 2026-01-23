@@ -653,27 +653,38 @@ class RecipeBookExportService {
         
         // Import images from the content directory
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        var bookCoverImageData: Data?
         
         for entry in exportPackage.imageManifest {
             let sourceURL = contentDir.appendingPathComponent(entry.fileName)
-            let destURL = documentsPath.appendingPathComponent(entry.fileName)
             
-            // Don't overwrite existing images
-            if !FileManager.default.fileExists(atPath: destURL.path) {
-                if FileManager.default.fileExists(atPath: sourceURL.path) {
-                    try FileManager.default.copyItem(at: sourceURL, to: destURL)
-                } else {
-                    logWarning("Image not found during import: \(entry.fileName)", category: "book-import")
+            // Load image data
+            if FileManager.default.fileExists(atPath: sourceURL.path) {
+                if let imageData = try? Data(contentsOf: sourceURL) {
+                    // Check if this is the book cover image
+                    if entry.type == .bookCover && entry.associatedID == exportPackage.book.id {
+                        bookCoverImageData = imageData
+                        logDebug("Loaded book cover image data (\(imageData.count / 1024)KB)", category: "book-import")
+                    }
+                    
+                    // Also copy to Documents for legacy support (optional)
+                    let destURL = documentsPath.appendingPathComponent(entry.fileName)
+                    if !FileManager.default.fileExists(atPath: destURL.path) {
+                        try? FileManager.default.copyItem(at: sourceURL, to: destURL)
+                    }
                 }
+            } else {
+                logWarning("Image not found during import: \(entry.fileName)", category: "book-import")
             }
         }
         
-        // Create RecipeBook
+        // Create RecipeBook with cover image data
         let newBook = RecipeBook(
             id: exportPackage.book.id,
             name: exportPackage.book.name,
             bookDescription: exportPackage.book.bookDescription,
             coverImageName: exportPackage.book.coverImageName,
+            coverImageData: bookCoverImageData,
             dateCreated: exportPackage.book.dateCreated,
             dateModified: Date(), // Update to current date
             recipeIDs: exportPackage.book.recipeIDs,
@@ -728,6 +739,7 @@ class RecipeBookExportService {
         // Import images with new names
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         var newCoverImageName: String?
+        var newCoverImageData: Data?
         
         for entry in exportPackage.imageManifest {
             let newFileName = "\(UUID().uuidString).\(entry.fileName.split(separator: ".").last ?? "jpg")"
@@ -735,13 +747,20 @@ class RecipeBookExportService {
             let destURL = documentsPath.appendingPathComponent(newFileName)
             
             if FileManager.default.fileExists(atPath: sourceURL.path) {
-                try FileManager.default.copyItem(at: sourceURL, to: destURL)
+                // Load image data
+                if let imageData = try? Data(contentsOf: sourceURL) {
+                    // Check if this is the book cover
+                    if entry.type == .bookCover {
+                        newCoverImageName = newFileName
+                        newCoverImageData = imageData
+                        logDebug("Loaded book cover image data (\(imageData.count / 1024)KB) for new book", category: "book-import")
+                    }
+                    
+                    // Copy file for legacy support (optional)
+                    try? FileManager.default.copyItem(at: sourceURL, to: destURL)
+                }
             } else {
                 logWarning("Image not found during import: \(entry.fileName)", category: "book-import")
-            }
-            
-            if entry.type == .bookCover {
-                newCoverImageName = newFileName
             }
         }
         
@@ -769,12 +788,13 @@ class RecipeBookExportService {
             newRecipes.append(newRecipe)
         }
         
-        // Create new book
+        // Create new book with cover image data
         let newBook = RecipeBook(
             id: newBookID,
             name: "\(exportPackage.book.name) (Imported)",
             bookDescription: exportPackage.book.bookDescription,
             coverImageName: newCoverImageName,
+            coverImageData: newCoverImageData,
             dateCreated: Date(),
             dateModified: Date(),
             recipeIDs: newRecipes.map { $0.id },

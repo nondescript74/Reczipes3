@@ -55,9 +55,7 @@ class ClaudeAPIClient {
     /// - Returns: true if the API key is valid, false otherwise
     func validateAPIKey() async -> Bool {
         logInfo("API KEY VALIDATION START", category: "network")
-        logDebug("API key length: \(apiKey.count) characters", category: "network")
-        logDebug("API key prefix: \(String(apiKey.prefix(15)))...", category: "network")
-        logDebug("API key suffix: ...\(String(apiKey.suffix(10)))", category: "network")
+        logDebug("API key configured: \(apiKey.isEmpty ? "NO" : "YES")", category: "network")
         
         let testPrompt = "Hi"
         
@@ -571,7 +569,7 @@ class ClaudeAPIClient {
         
         logInfo("Sending request to Anthropic", category: "network")
         logDebug("URL: \(baseURL)", category: "network")
-        logDebug("Headers: \(request.allHTTPHeaderFields ?? [:])", category: "network")
+        // Note: Not logging headers to protect API key security
         
         // Use do-catch to handle timeouts specifically
         let (data, response): (Data, URLResponse)

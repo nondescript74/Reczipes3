@@ -256,7 +256,7 @@ struct SharingSettingsView: View {
             }
             .disabled(!sharingService.isCloudKitAvailable)
             
-            // Diagnostic & Cleanup Tools
+            // Diagnostic & Cleanup Tools - Recipes
             Button {
                 Task {
                     await cleanupGhostRecipes()
@@ -271,13 +271,69 @@ struct SharingSettingsView: View {
                     await syncLocalTracking()
                 }
             } label: {
-                Label("Sync Sharing Status", systemImage: "arrow.triangle.2.circlepath")
+                Label("Sync Recipe Sharing Status", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            Button {
+                Task {
+                    await repairRecipeCloudKitIDs()
+                }
+            } label: {
+                Label("Repair Recipe CloudKit IDs", systemImage: "wrench.and.screwdriver")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            // Diagnostic & Cleanup Tools - Recipe Books
+            Button {
+                Task {
+                    await cleanupGhostRecipeBooks()
+                }
+            } label: {
+                Label("Clean Up Ghost Recipe Books", systemImage: "sparkles.rectangle.stack")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            Button {
+                Task {
+                    await syncLocalRecipeBookTracking()
+                }
+            } label: {
+                Label("Sync Recipe Book Sharing Status", systemImage: "arrow.triangle.2.circlepath.circle")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            Button {
+                Task {
+                    await repairRecipeBookCloudKitIDs()
+                }
+            } label: {
+                Label("Repair Recipe Book CloudKit IDs", systemImage: "wrench.and.screwdriver.fill")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            // Community Sync
+            Button {
+                Task {
+                    await syncCommunityBooks()
+                }
+            } label: {
+                Label("Sync Community Books", systemImage: "books.vertical.circle")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            Button {
+                Task {
+                    await syncCommunityRecipes()
+                }
+            } label: {
+                Label("Sync Community Recipes", systemImage: "book.circle")
             }
             .disabled(!sharingService.isCloudKitAvailable)
         } header: {
             Text("Quick Actions")
         } footer: {
-            Text("Use 'Clean Up Ghost Recipes' if you see recipes in Browse Shared Recipes that you've already unshared. Use 'Sync Sharing Status' to fix tracking mismatches.")
+            Text("Use 'Clean Up Ghost' buttons if you see content in Browse view that you've already unshared. Use 'Sync Status' buttons to fix tracking mismatches. Use 'Repair CloudKit IDs' if you see '⚠️ No CloudKit ID' warnings. Use 'Sync Community' to refresh shared content for viewing.")
         }
     }
     
@@ -519,14 +575,114 @@ struct SharingSettingsView: View {
     
     private func syncLocalTracking() async {
         isSharing = true
-        sharingStatus = "Syncing sharing status..."
+        sharingStatus = "Syncing recipe sharing status..."
         
         do {
             try await sharingService.syncLocalTrackingWithCloudKit(modelContext: modelContext)
-            alertMessage = "✅ Sharing status synced! Check Console logs for details."
+            alertMessage = "✅ Recipe sharing status synced! Check Console logs for details."
             showingAlert = true
         } catch {
-            alertMessage = "Failed to sync: \(error.localizedDescription)"
+            alertMessage = "Failed to sync recipes: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    private func repairRecipeCloudKitIDs() async {
+        isSharing = true
+        sharingStatus = "Repairing recipe CloudKit IDs..."
+        
+        do {
+            try await sharingService.repairMissingRecipeCloudKitIDs(modelContext: modelContext)
+            alertMessage = "✅ Recipe CloudKit IDs repaired! Check Console logs for details."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to repair recipe IDs: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    // MARK: - Recipe Book Cleanup & Sync Actions
+    
+    private func cleanupGhostRecipeBooks() async {
+        isSharing = true
+        sharingStatus = "Cleaning up ghost recipe books..."
+        
+        do {
+            try await sharingService.cleanupGhostRecipeBooks(modelContext: modelContext)
+            alertMessage = "✅ Ghost recipe book cleanup complete! Check Console logs for details."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to clean up ghost recipe books: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    private func syncLocalRecipeBookTracking() async {
+        isSharing = true
+        sharingStatus = "Syncing recipe book sharing status..."
+        
+        do {
+            try await sharingService.syncLocalRecipeBookTrackingWithCloudKit(modelContext: modelContext)
+            alertMessage = "✅ Recipe book sharing status synced! Check Console logs for details."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to sync recipe books: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    private func repairRecipeBookCloudKitIDs() async {
+        isSharing = true
+        sharingStatus = "Repairing recipe book CloudKit IDs..."
+        
+        do {
+            try await sharingService.repairMissingRecipeBookCloudKitIDs(modelContext: modelContext)
+            alertMessage = "✅ Recipe book CloudKit IDs repaired! Check Console logs for details."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to repair recipe book IDs: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    // MARK: - Community Sync Actions
+    
+    private func syncCommunityBooks() async {
+        isSharing = true
+        sharingStatus = "Syncing community books..."
+        
+        do {
+            try await sharingService.syncCommunityBooksToLocal(modelContext: modelContext)
+            alertMessage = "✅ Community books synced! Shared books should now appear in the Books view."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to sync community books: \(error.localizedDescription)"
+            showingAlert = true
+        }
+        
+        isSharing = false
+    }
+    
+    private func syncCommunityRecipes() async {
+        isSharing = true
+        sharingStatus = "Syncing community recipes..."
+        
+        do {
+            try await sharingService.syncCommunityRecipesForViewing(modelContext: modelContext, limit: 100)
+            alertMessage = "✅ Community recipes synced! Shared recipes are now available for viewing and cooking."
+            showingAlert = true
+        } catch {
+            alertMessage = "Failed to sync community recipes: \(error.localizedDescription)"
             showingAlert = true
         }
         
@@ -800,31 +956,61 @@ struct ManageSharedContentView: View {
                         Section {
                             ForEach(activeSharedRecipes) { sharedRecipe in
                                 HStack {
-                                    VStack(alignment: .leading) {
+                                    VStack(alignment: .leading, spacing: 4) {
                                         Text(sharedRecipe.recipeTitle)
                                             .font(.headline)
                                         
                                         Text("Shared \(sharedRecipe.sharedDate, style: .date)")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
+                                        
+                                        if sharedRecipe.cloudRecordID == nil {
+                                            Text("⚠️ No CloudKit ID")
+                                                .font(.caption2)
+                                                .foregroundStyle(.orange)
+                                        }
                                     }
                                     
                                     Spacer()
                                     
-                                    Button(role: .destructive) {
-                                        if let cloudRecordID = sharedRecipe.cloudRecordID {
+                                    if let cloudRecordID = sharedRecipe.cloudRecordID {
+                                        Button(role: .destructive) {
+                                            logInfo("🗑️ User tapped unshare for recipe: \(sharedRecipe.recipeTitle)", category: "sharing")
                                             itemToUnshare = (cloudRecordID, .recipe)
+                                        } label: {
+                                            Label("Unshare", systemImage: "xmark.circle.fill")
+                                                .labelStyle(.iconOnly)
+                                                .foregroundStyle(.red)
                                         }
-                                    } label: {
-                                        Label("Unshare", systemImage: "xmark.circle.fill")
-                                            .labelStyle(.iconOnly)
-                                            .foregroundStyle(.red)
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        // Recipe has no CloudKit ID - show error
+                                        Button {
+                                            alertMessage = "Cannot unshare '\(sharedRecipe.recipeTitle)': No CloudKit record ID found. Try running 'Sync Recipe Sharing Status' first."
+                                            showingAlert = true
+                                        } label: {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundStyle(.orange)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 2)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    if let cloudRecordID = sharedRecipe.cloudRecordID {
+                                        Button(role: .destructive) {
+                                            logInfo("🗑️ User swiped to unshare recipe: \(sharedRecipe.recipeTitle)", category: "sharing")
+                                            itemToUnshare = (cloudRecordID, .recipe)
+                                        } label: {
+                                            Label("Unshare", systemImage: "xmark.circle")
+                                        }
+                                    }
                                 }
                             }
                         } header: {
                             Text("Shared Recipes")
+                        } footer: {
+                            Text("Tap the ✕ button or swipe to stop sharing a recipe.")
                         }
                     }
                     
@@ -832,7 +1018,7 @@ struct ManageSharedContentView: View {
                         Section {
                             ForEach(activeSharedBooks) { sharedBook in
                                 HStack {
-                                    VStack(alignment: .leading) {
+                                    VStack(alignment: .leading, spacing: 4) {
                                         Text(sharedBook.bookName)
                                             .font(.headline)
                                         
@@ -846,24 +1032,54 @@ struct ManageSharedContentView: View {
                                         Text("Shared \(sharedBook.sharedDate, style: .date)")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
+                                        
+                                        if sharedBook.cloudRecordID == nil {
+                                            Text("⚠️ No CloudKit ID")
+                                                .font(.caption2)
+                                                .foregroundStyle(.orange)
+                                        }
                                     }
                                     
                                     Spacer()
                                     
-                                    Button(role: .destructive) {
-                                        if let cloudRecordID = sharedBook.cloudRecordID {
+                                    if let cloudRecordID = sharedBook.cloudRecordID {
+                                        Button(role: .destructive) {
+                                            logInfo("🗑️ User tapped unshare for book: \(sharedBook.bookName)", category: "sharing")
                                             itemToUnshare = (cloudRecordID, .book)
+                                        } label: {
+                                            Label("Unshare", systemImage: "xmark.circle.fill")
+                                                .labelStyle(.iconOnly)
+                                                .foregroundStyle(.red)
                                         }
-                                    } label: {
-                                        Label("Unshare", systemImage: "xmark.circle.fill")
-                                            .labelStyle(.iconOnly)
-                                            .foregroundStyle(.red)
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        // Book has no CloudKit ID - show error
+                                        Button {
+                                            alertMessage = "Cannot unshare '\(sharedBook.bookName)': No CloudKit record ID found. Try running 'Sync Recipe Book Sharing Status' first."
+                                            showingAlert = true
+                                        } label: {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundStyle(.orange)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 2)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    if let cloudRecordID = sharedBook.cloudRecordID {
+                                        Button(role: .destructive) {
+                                            logInfo("🗑️ User swiped to unshare book: \(sharedBook.bookName)", category: "sharing")
+                                            itemToUnshare = (cloudRecordID, .book)
+                                        } label: {
+                                            Label("Unshare", systemImage: "xmark.circle")
+                                        }
+                                    }
                                 }
                             }
                         } header: {
                             Text("Shared Recipe Books")
+                        } footer: {
+                            Text("Tap the ✕ button or swipe to stop sharing a recipe book.")
                         }
                     }
                 }
@@ -875,17 +1091,25 @@ struct ManageSharedContentView: View {
             set: { if !$0 { itemToUnshare = nil } }
         )) {
             Button("Cancel", role: .cancel) {
+                logInfo("🚫 User cancelled unshare", category: "sharing")
                 itemToUnshare = nil
             }
             Button("Unshare", role: .destructive) {
                 if let item = itemToUnshare {
+                    logInfo("✅ User confirmed unshare for \(item.type)", category: "sharing")
                     Task {
                         await unshareItem(cloudRecordID: item.id, type: item.type)
                     }
+                } else {
+                    logError("❌ itemToUnshare was nil in alert confirmation", category: "sharing")
                 }
             }
         } message: {
-            Text("This will remove the item from the community. You can share it again later.")
+            if let item = itemToUnshare {
+                Text("This will remove this \(item.type == .recipe ? "recipe" : "recipe book") from the community. You can share it again later.")
+            } else {
+                Text("This will remove the item from the community.")
+            }
         }
         .alert("Status", isPresented: $showingAlert) {
             Button("OK", role: .cancel) {}
@@ -895,18 +1119,25 @@ struct ManageSharedContentView: View {
     }
     
     private func unshareItem(cloudRecordID: String, type: UnshareType) async {
+        logInfo("🔄 Starting unshare process for \(type): \(cloudRecordID)", category: "sharing")
+        
         do {
             switch type {
             case .recipe:
+                logInfo("🍽️ Calling unshareRecipe...", category: "sharing")
                 try await sharingService.unshareRecipe(cloudRecordID: cloudRecordID, modelContext: modelContext)
                 alertMessage = "Recipe unshared successfully"
+                logInfo("✅ Recipe unshared successfully", category: "sharing")
             case .book:
+                logInfo("📚 Calling unshareRecipeBook...", category: "sharing")
                 try await sharingService.unshareRecipeBook(cloudRecordID: cloudRecordID, modelContext: modelContext)
                 alertMessage = "Recipe book unshared successfully"
+                logInfo("✅ Recipe book unshared successfully", category: "sharing")
             }
             itemToUnshare = nil
             showingAlert = true
         } catch {
+            logError("❌ Failed to unshare \(type): \(error)", category: "sharing")
             alertMessage = "Failed to unshare: \(error.localizedDescription)"
             itemToUnshare = nil
             showingAlert = true
@@ -1000,6 +1231,15 @@ struct SharedBooksBrowserView: View {
             await MainActor.run {
                 sharedBooks = books
                 logInfo("📚 Loaded \(books.count) shared books from CloudKit", category: "sharing")
+            }
+            
+            // Automatically sync to local SwiftData so books appear in RecipeBooksView
+            do {
+                try await sharingService.syncCommunityBooksToLocal(modelContext: modelContext)
+                logInfo("📚 Synced community books to local SwiftData", category: "sharing")
+            } catch {
+                logError("Failed to sync community books to local: \(error)", category: "sharing")
+                // Don't show error to user - the browse view still works
             }
         } catch {
             await MainActor.run {

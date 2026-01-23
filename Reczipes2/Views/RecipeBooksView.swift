@@ -21,6 +21,10 @@ struct RecipeBooksView: View {
     @State private var showingImport = false
     @State private var refreshID = UUID()
     @State private var contentFilter: ContentFilterMode = .all
+    @State private var lastSyncDate: Date?
+    
+    // Sync interval: 5 minutes
+    private let syncInterval: TimeInterval = 300
     
     // Grid layout
     private let columns = [
@@ -81,6 +85,14 @@ struct RecipeBooksView: View {
                     selectedFilter: $contentFilter,
                     contentType: "Books"
                 )
+                .onChange(of: contentFilter) { oldValue, newValue in
+                    // Sync community books when switching to "Shared" tab
+                    if newValue == .shared {
+                        Task {
+                            await syncCommunityBooksIfNeeded()
+                        }
+                    }
+                }
                 
                 // Main content
                 if filteredBooks.isEmpty {
@@ -273,15 +285,68 @@ struct RecipeBooksView: View {
     
     private func deleteBook(_ book: RecipeBook) {
         withAnimation {
-            // Delete cover image if it exists
+            // Delete all recipes in this book
+            let recipeIDsToDelete = book.recipeIDs
+            logInfo("Deleting recipe book '\(book.name)' and \(recipeIDsToDelete.count) associated recipes", category: "book")
+            
+            // Fetch and delete each recipe
+            for recipeID in recipeIDsToDelete {
+                let descriptor = FetchDescriptor<Recipe>(
+                    predicate: #Predicate<Recipe> { recipe in
+                        recipe.id == recipeID
+                    }
+                )
+                
+                if let recipes = try? modelContext.fetch(descriptor),
+                   let recipe = recipes.first {
+                    logDebug("Deleting recipe '\(recipe.title)' (ID: \(recipeID))", category: "book")
+                    modelContext.delete(recipe)
+                }
+            }
+            
+            // Delete cover image file if it exists
             if let coverImage = book.coverImageName {
                 let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 let fileURL = documentsPath.appendingPathComponent(coverImage)
                 try? FileManager.default.removeItem(at: fileURL)
             }
             
+            // Delete the book itself
             modelContext.delete(book)
-            try? modelContext.save()
+            
+            // Save changes
+            do {
+                try modelContext.save()
+                logInfo("Successfully deleted book '\(book.name)' and its recipes", category: "book")
+            } catch {
+                logError("Failed to save after deleting book: \(error)", category: "book")
+            }
+        }
+    }
+    
+    /// Sync community books from CloudKit to local SwiftData
+    /// Only syncs if enough time has passed since the last sync
+    private func syncCommunityBooksIfNeeded() async {
+        // Check if we need to sync
+        if let lastSync = lastSyncDate {
+            let timeSinceLastSync = Date().timeIntervalSince(lastSync)
+            if timeSinceLastSync < syncInterval {
+                logInfo("📚 Skipping sync - last synced \(Int(timeSinceLastSync))s ago", category: "sharing")
+                return
+            }
+        }
+        
+        logInfo("📚 Syncing community books to local SwiftData...", category: "sharing")
+        
+        do {
+            try await CloudKitSharingService.shared.syncCommunityBooksToLocal(modelContext: modelContext)
+            await MainActor.run {
+                lastSyncDate = Date()
+                refreshID = UUID() // Force UI refresh
+            }
+        } catch {
+            logError("Failed to sync community books: \(error)", category: "sharing")
+            // Don't show error to user - sync will retry next time
         }
     }
 }

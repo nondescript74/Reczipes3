@@ -129,6 +129,25 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    
+                    Section("Diagnostics") {
+                        NavigationLink {
+                            DatabaseDiagnosticsView()
+                        } label: {
+                            Label("Database Diagnostics", systemImage: "stethoscope")
+                        }
+                        
+                        Button {
+                            Task {
+                                await ModelContainerManager.shared.logDiagnosticInfo()
+                                DatabaseRecoveryLogger.shared.logRecoveryStatistics()
+                            }
+                        } label: {
+                            Label("Export Diagnostic Logs", systemImage: "doc.text")
+                        }
+                    }
+                    
+                    
 
                     Section("Community") {
                         NavigationLink(destination: SharingSettingsView()) {
@@ -348,6 +367,14 @@ struct SettingsView: View {
                         }
                         
 #if DEBUG
+                        Section("Debug Tools") {
+                            NavigationLink {
+                                DatabaseDiagnosticsView()
+                            } label: {
+                                Label("Database Diagnostics", systemImage: "stethoscope")
+                            }
+                        }
+                        
                         NavigationLink(destination: VersionDebugView()) {
                             HStack {
                                 Label("Version Debug Info", systemImage: "ant.circle")

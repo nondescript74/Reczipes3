@@ -14,6 +14,7 @@ struct ContentView: View {
     @Query private var imageAssignments: [RecipeImageAssignment]
     @Query private var allergenProfiles: [UserAllergenProfile]
     @Query(sort: \RecipeBook.dateModified, order: .reverse) private var books: [RecipeBook]
+    @Query private var cachedRecipes: [CachedSharedRecipe]
     
     @EnvironmentObject private var appState: AppStateManager
     
@@ -38,6 +39,10 @@ struct ContentView: View {
     // Content filter for showing mine/shared/all
     @State private var contentFilter: ContentFilterMode = .all
     @Query private var sharedRecipes: [SharedRecipe]
+    
+    // Auto-sync tracking for shared recipes
+    @State private var lastCommunitySync: Date?
+    private let syncInterval: TimeInterval = 300 // 5 minutes
     
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
@@ -235,6 +240,38 @@ struct ContentView: View {
         }
     }
     
+    // MARK: - Community Sync
+    
+    /// Auto-sync community recipes when switching to Shared tab
+    /// Only syncs once every 5 minutes to avoid excessive calls
+    private func syncCommunityRecipesIfNeeded() async {
+        // Check if we need to sync (only if 5+ minutes have passed since last sync)
+        if let lastSync = lastCommunitySync {
+            let timeSinceLastSync = Date().timeIntervalSince(lastSync)
+            if timeSinceLastSync < syncInterval {
+                logDebug("Skipping sync - last synced \(Int(timeSinceLastSync))s ago", category: "sharing")
+                return
+            }
+        }
+        
+        logInfo("🔄 Auto-syncing community recipes...", category: "sharing")
+        
+        do {
+            try await CloudKitSharingService.shared.syncCommunityRecipesForViewing(
+                modelContext: modelContext,
+                limit: 100
+            )
+            
+            // Update last sync time
+            lastCommunitySync = Date()
+            
+            logInfo("✅ Auto-sync completed successfully", category: "sharing")
+        } catch {
+            // Silently fail - manual sync still available
+            logError("Auto-sync failed: \(error)", category: "sharing")
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Global batch extraction status bar
@@ -277,6 +314,15 @@ struct ContentView: View {
                 // Initialize recipe cache
                 refreshRecipeCache()
             }
+            .task {
+                // Wait for container initialization
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                
+                let stats = DatabaseRecoveryLogger.shared.getRecoveryStatistics()
+                if stats.totalAttempts > 0 {
+                    DatabaseRecoveryLogger.shared.logRecoveryStatistics()
+                }
+            }
             .onChange(of: filterMode) { _, _ in
                 processFilter()
             }
@@ -305,6 +351,14 @@ struct ContentView: View {
             .onChange(of: selectedRecipe) { _, newRecipe in
                 // Save selected recipe to app state when it changes
                 appState.selectedRecipeId = newRecipe?.id
+            }
+            .onChange(of: contentFilter) { _, newValue in
+                // Auto-sync when switching to Shared tab
+                if newValue == .shared {
+                    Task {
+                        await syncCommunityRecipesIfNeeded()
+                    }
+                }
             }
         }
     }
@@ -496,6 +550,62 @@ struct ContentView: View {
                         } label: {
                             Label("Saved Links", systemImage: "link.circle")
                         }
+                        
+                        #if DEBUG
+                        Divider()
+                        
+                        Menu {
+                            Button("Test Recovery Success") {
+                                DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                                
+                                let testError = NSError(
+                                    domain: "NSCocoaErrorDomain",
+                                    code: 134504,
+                                    userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
+                                )
+                                
+                                DatabaseRecoveryLogger.shared.logRecoverySuccess(
+                                    error: testError,
+                                    filesDeleted: ["CloudKitModel.sqlite", "CloudKitModel.sqlite-shm"],
+                                    cloudKitEnabled: true,
+                                    databaseSizeMB: 10.5
+                                )
+                            }
+                            
+                            Button("Test Recovery Failure") {
+                                DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                                
+                                let testError = NSError(
+                                    domain: "NSCocoaErrorDomain",
+                                    code: 134504,
+                                    userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
+                                )
+                                
+                                let secondaryError = NSError(
+                                    domain: "SwiftData.SwiftDataError",
+                                    code: 1,
+                                    userInfo: [NSLocalizedDescriptionKey: "Failed to recreate container"]
+                                )
+                                
+                                DatabaseRecoveryLogger.shared.logRecoveryFailure(
+                                    error: testError,
+                                    filesDeleted: ["CloudKitModel.sqlite"],
+                                    cloudKitEnabled: true,
+                                    secondaryError: secondaryError
+                                )
+                            }
+                            
+                            Button("View Recovery Stats") {
+                                DatabaseRecoveryLogger.shared.logRecoveryStatistics()
+                            }
+                            
+                            Button("Clear Recovery History") {
+                                DatabaseRecoveryLogger.shared.clearHistory()
+                            }
+                        } label: {
+                            Label("Debug Recovery Logger", systemImage: "ladybug")
+                        }
+                        #endif
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }

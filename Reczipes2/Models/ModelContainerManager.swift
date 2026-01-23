@@ -174,6 +174,7 @@ class ModelContainerManager: ObservableObject {
                 SharedRecipe.self,          // NEW: CloudKit sharing models
                 SharedRecipeBook.self,      // NEW: CloudKit sharing models
                 SharingPreferences.self,    // NEW: CloudKit sharing models
+                CachedSharedRecipe.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
@@ -187,10 +188,112 @@ class ModelContainerManager: ObservableObject {
             logError("   Error domain: \(error.domain), code: \(error.code)", category: "storage")
             logError("   Underlying error: \(String(describing: error.userInfo[NSUnderlyingErrorKey]))", category: "storage")
             
+            // ✨ NEW: Analyze error chain
+            let analysis = DatabaseRecoveryLogger.analyzeError(error)
+            analysis.logAnalysis()
+            
+            if analysis.isSchemaIssue {
+                // ✨ NEW: Begin tracking recovery
+                DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                
+                // ✨ NEW: Capture database size before deletion
+                let databaseSizeMB = DatabaseRecoveryLogger.getDatabaseSize(at: cloudKitURL)
+                
+                logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
+                logWarning("   This usually happens when the database was created with a schema version that no longer exists", category: "storage")
+                logWarning("   Attempting to delete incompatible database and start fresh...", category: "storage")
+                
+                // Try to delete the old database files
+                let fileManager = FileManager.default
+                let filesToDelete = [
+                    cloudKitURL.path,
+                    cloudKitURL.path + "-shm",
+                    cloudKitURL.path + "-wal"
+                ]
+                
+                var filesDeleted: [String] = []
+                
+                // Track which files were deleted
+                for filePath in filesToDelete {
+                    if fileManager.fileExists(atPath: filePath) {
+                        do {
+                            try fileManager.removeItem(atPath: filePath)
+                            filesDeleted.append(filePath.split(separator: "/").last.map(String.init) ?? filePath)
+                            logInfo("   ✅ Deleted: \(filesDeleted.last!)", category: "storage")
+                        } catch {
+                            logError("   ❌ Failed to delete \(filePath): \(error)", category: "storage")
+                        }
+                    }
+                }
+                
+                if filesDeleted.count > 0 {
+                    // Try creating container again
+                    do {
+                        let container = try ModelContainer(
+                            for: Recipe.self,
+                            RecipeImageAssignment.self,
+                            UserAllergenProfile.self,
+                            CachedDiabeticAnalysis.self,
+                            SavedLink.self,
+                            RecipeBook.self,
+                            CookingSession.self,
+                            SharedRecipe.self,          // NEW: CloudKit sharing models
+                            SharedRecipeBook.self,      // NEW: CloudKit sharing models
+                            SharingPreferences.self,    // NEW: CloudKit sharing models
+                            CachedSharedRecipe.self,
+                            migrationPlan: Reczipes2MigrationPlan.self,
+                            configurations: cloudKitConfiguration
+                        )
+                        
+                        // ✨ NEW: Log successful recovery
+                        DatabaseRecoveryLogger.shared.logRecoverySuccess(
+                            error: error,
+                            filesDeleted: filesDeleted,
+                            cloudKitEnabled: true,
+                            databaseSizeMB: databaseSizeMB
+                        )
+                        
+                        return container
+                    } catch let recreationError {
+                        // ✨ NEW: Log failed recovery
+                        DatabaseRecoveryLogger.shared.logRecoveryFailure(
+                            error: error,
+                            filesDeleted: filesDeleted,
+                            cloudKitEnabled: true,
+                            secondaryError: recreationError
+                        )
+                        
+                        return nil
+                    }
+                }
+            }
+
+            
             // Check for the specific "unknown model version" error (error code 134504)
-            // This can be either the direct error or wrapped in a SwiftData error
-            let isUnknownModelVersion = (error.domain == "NSCocoaErrorDomain" && error.code == 134504) ||
-                                       (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.code == 134504
+            // This error can be nested at different levels in the error chain
+            func containsUnknownModelError(_ error: NSError) -> Bool {
+                // Check the error itself
+                if error.domain == "NSCocoaErrorDomain" && error.code == 134504 {
+                    return true
+                }
+                
+                // Check the underlying error
+                if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+                    return containsUnknownModelError(underlyingError)
+                }
+                
+                // Check for SwiftData wrapped errors
+                if error.domain == "SwiftData.SwiftDataError" && error.code == 1 {
+                    // SwiftData error code 1 is loadIssueModelContainer
+                    // This often wraps a Core Data migration error
+                    logWarning("   SwiftData loadIssueModelContainer error detected", category: "storage")
+                    return true
+                }
+                
+                return false
+            }
+            
+            let isUnknownModelVersion = containsUnknownModelError(error)
             
             if isUnknownModelVersion {
                 logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
@@ -234,6 +337,7 @@ class ModelContainerManager: ObservableObject {
                             SharedRecipe.self,
                             SharedRecipeBook.self,
                             SharingPreferences.self,
+                            CachedSharedRecipe.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: cloudKitConfiguration
                         )
@@ -274,6 +378,7 @@ class ModelContainerManager: ObservableObject {
                 SharedRecipe.self,          // NEW: CloudKit sharing models
                 SharedRecipeBook.self,      // NEW: CloudKit sharing models
                 SharingPreferences.self,    // NEW: CloudKit sharing models
+                CachedSharedRecipe.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: localConfiguration
             )
@@ -287,12 +392,17 @@ class ModelContainerManager: ObservableObject {
             logError("   Error domain: \(error.domain), code: \(error.code)", category: "storage")
             logError("   Underlying error: \(String(describing: error.userInfo[NSUnderlyingErrorKey]))", category: "storage")
             
-            // Check for the specific "unknown model version" error (error code 134504)
-            // This can be either the direct error or wrapped in a SwiftData error
-            let isUnknownModelVersion = (error.domain == "NSCocoaErrorDomain" && error.code == 134504) ||
-                                       (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.code == 134504
+            // ✨ NEW: Analyze error chain
+            let analysis = DatabaseRecoveryLogger.analyzeError(error)
+            analysis.logAnalysis()
             
-            if isUnknownModelVersion {
+            if analysis.isSchemaIssue {
+                // ✨ NEW: Begin tracking recovery
+                DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                
+                // ✨ NEW: Capture database size before deletion
+                let databaseSizeMB = DatabaseRecoveryLogger.getDatabaseSize(at: cloudKitURL)
+                
                 logWarning("⚠️ Database incompatible with current schema (unknown model version)", category: "storage")
                 logWarning("   This usually happens when the database was created with a schema version that no longer exists", category: "storage")
                 logWarning("   Attempting to delete incompatible database and start fresh...", category: "storage")
@@ -305,21 +415,23 @@ class ModelContainerManager: ObservableObject {
                     cloudKitURL.path + "-wal"
                 ]
                 
-                var deletedCount = 0
+                var filesDeleted: [String] = []
+                
+                // Track which files were deleted
                 for filePath in filesToDelete {
                     if fileManager.fileExists(atPath: filePath) {
                         do {
                             try fileManager.removeItem(atPath: filePath)
-                            deletedCount += 1
-                            logInfo("   ✅ Deleted: \(filePath.split(separator: "/").last ?? "")", category: "storage")
+                            filesDeleted.append(filePath.split(separator: "/").last.map(String.init) ?? filePath)
+                            logInfo("   ✅ Deleted: \(filesDeleted.last!)", category: "storage")
                         } catch {
                             logError("   ❌ Failed to delete \(filePath): \(error)", category: "storage")
                         }
                     }
                 }
                 
-                if deletedCount > 0 {
-                    logInfo("   Deleted \(deletedCount) database file(s), attempting to recreate...", category: "storage")
+                if filesDeleted.count > 0 {
+                    logInfo("   Deleted \(filesDeleted.count) database file(s), attempting to recreate...", category: "storage")
                     
                     // Try creating container again with clean slate
                     do {
@@ -334,21 +446,48 @@ class ModelContainerManager: ObservableObject {
                             SharedRecipe.self,
                             SharedRecipeBook.self,
                             SharingPreferences.self,
+                            CachedSharedRecipe.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: localConfiguration
                         )
+                        
+                        // ✨ NEW: Log successful recovery
+                        DatabaseRecoveryLogger.shared.logRecoverySuccess(
+                            error: error,
+                            filesDeleted: filesDeleted,
+                            cloudKitEnabled: false,
+                            databaseSizeMB: databaseSizeMB
+                        )
+                        
                         logInfo("✅ ModelContainer recreated successfully after database cleanup", category: "storage")
                         logWarning("   Note: Previous local data was lost, but may sync back from iCloud", category: "storage")
                         return container
-                    } catch {
-                        logCritical("❌ Failed to recreate container after cleanup: \(error)", category: "storage")
-                        fatalError("Could not create ModelContainer even after cleanup: \(error)")
+                    } catch let recreationError {
+                        // ✨ NEW: Log failed recovery
+                        DatabaseRecoveryLogger.shared.logRecoveryFailure(
+                            error: error,
+                            filesDeleted: filesDeleted,
+                            cloudKitEnabled: false,
+                            secondaryError: recreationError
+                        )
+                        
+                        logCritical("❌ Failed to recreate container after cleanup: \(recreationError)", category: "storage")
+                        fatalError("Could not create ModelContainer even after cleanup: \(recreationError)")
                     }
                 } else {
+                    // ✨ NEW: Log recovery failure when no files were found
+                    DatabaseRecoveryLogger.shared.logRecoveryFailure(
+                        error: error,
+                        filesDeleted: [],
+                        cloudKitEnabled: false,
+                        secondaryError: nil
+                    )
+                    
                     logCritical("❌ No database files found to delete, cannot recover", category: "storage")
                     fatalError("Could not create ModelContainer: \(error)")
                 }
             } else {
+                // Non-schema issue - fatal error
                 logCritical("❌ All ModelContainer initialization attempts failed", category: "storage")
                 logCritical("   Final error: \(error)", category: "storage")
                 fatalError("Could not create ModelContainer: \(error)")

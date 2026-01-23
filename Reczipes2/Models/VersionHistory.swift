@@ -75,7 +75,7 @@ class VersionHistoryManager {
                 "🔧 Fixed: Zero-import scenario now shows error instead of success message",
                 "⚡️ Improved: Better error messages explain what went wrong during imports",
                 
-                // Previous Features
+                // ZIP Import Enhancements (January 23, 2026)
                 "🐛 CRITICAL FIX: ZIP import now handles data descriptors (flags bit 3) - reads sizes from Central Directory",
                 "✅ Fixed: .recipebook files created by macOS/iOS native compression now import successfully",
                 "🔧 Enhanced: Recursive file search finds .recipebook files in nested ZIP directories",
@@ -83,12 +83,38 @@ class VersionHistoryManager {
                 "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
                 "📁 Enhanced: File picker now accepts both .recipebook and .zip files",
                 "⚡️ Improved: Proper zlib header wrapping with FCHECK validation for raw DEFLATE data",
-                "📊 Added: Comprehensive diagnostic logging shows EOCD location, central directory entries, and extraction progress"
+                "📊 Added: Comprehensive diagnostic logging shows EOCD location, central directory entries, and extraction progress",
+                
+                // Database Recovery Logging (January 23, 2026)
+                "🔧 Added: DatabaseRecoveryLogger tracks all database recovery attempts with detailed diagnostics",
+                "📊 Added: Recovery statistics showing success rate, average duration, and recent failures",
+                "✅ Enhanced: User-facing diagnostics with actionable suggestions when recovery fails",
+                "⚡️ Added: Automatic recovery history logging shows on startup if recoveries have occurred",
+                "🐛 Fixed: Recovery failure handling now supports optional secondary errors",
+                "🔍 Added: Debug menu in ContentView for testing recovery logging (DEBUG builds only)",
+                
+                // Security Fix - API Key Logging (January 23, 2026)
+                "🔒 SECURITY FIX: Removed API key logging from ClaudeAPIClient to prevent credential exposure",
+                "✅ Fixed: API key prefix/suffix no longer logged during validation",
+                "✅ Fixed: HTTP headers (including x-api-key) no longer logged during requests",
+                "🗑️ Security Migration: Diagnostic logs automatically cleared once on update to remove any exposed keys",
+                "⚠️ IMPORTANT: Users should rotate their Anthropic API keys if they shared diagnostic logs before this update",
+                "📝 Enhanced: Logging now only shows whether API key is configured (YES/NO) without exposing values"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.3.103
+        // Previous Features
+//        "🐛 CRITICAL FIX: ZIP import now handles data descriptors (flags bit 3) - reads sizes from Central Directory",
+//        "✅ Fixed: .recipebook files created by macOS/iOS native compression now import successfully",
+//        "🔧 Enhanced: Recursive file search finds .recipebook files in nested ZIP directories",
+//        "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
+//        "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
+//        "📁 Enhanced: File picker now accepts both .recipebook and .zip files",
+//        "⚡️ Improved: Proper zlib header wrapping with FCHECK validation for raw DEFLATE data",
+//        "📊 Added: Comprehensive diagnostic logging shows EOCD location, central directory entries, and extraction progress"
         // 15.3.102
         // Recipe Book Import/Export Enhancements
 //        "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
