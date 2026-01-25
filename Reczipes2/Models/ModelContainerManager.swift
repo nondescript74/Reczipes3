@@ -175,6 +175,7 @@ class ModelContainerManager: ObservableObject {
                 SharedRecipeBook.self,      // NEW: CloudKit sharing models
                 SharingPreferences.self,    // NEW: CloudKit sharing models
                 CachedSharedRecipe.self,
+                CloudKitRecipePreview.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
@@ -241,6 +242,7 @@ class ModelContainerManager: ObservableObject {
                             SharedRecipeBook.self,      // NEW: CloudKit sharing models
                             SharingPreferences.self,    // NEW: CloudKit sharing models
                             CachedSharedRecipe.self,
+                            CloudKitRecipePreview.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: cloudKitConfiguration
                         )
@@ -338,6 +340,7 @@ class ModelContainerManager: ObservableObject {
                             SharedRecipeBook.self,
                             SharingPreferences.self,
                             CachedSharedRecipe.self,
+                            CloudKitRecipePreview.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: cloudKitConfiguration
                         )
@@ -379,6 +382,7 @@ class ModelContainerManager: ObservableObject {
                 SharedRecipeBook.self,      // NEW: CloudKit sharing models
                 SharingPreferences.self,    // NEW: CloudKit sharing models
                 CachedSharedRecipe.self,
+                CloudKitRecipePreview.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: localConfiguration
             )
@@ -447,6 +451,7 @@ class ModelContainerManager: ObservableObject {
                             SharedRecipeBook.self,
                             SharingPreferences.self,
                             CachedSharedRecipe.self,
+                            CloudKitRecipePreview.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: localConfiguration
                         )

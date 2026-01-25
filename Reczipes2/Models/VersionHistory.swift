@@ -58,53 +58,75 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
-                // Recipe Book Import Fixes (January 22, 2026)
-                "🐛 CRITICAL FIX: Recipe book imports failing with 'book.json not found' error",
-                "✅ Fixed: ZIP archives with nested directory structures now import correctly",
-                "🔧 Added: Recursive book.json finder handles both flat and nested ZIP structures",
-                "📦 Fixed: Export now creates flat ZIP structure (no parent directory) for cross-device compatibility",
-                "🖼️ CRITICAL FIX: Recipe images missing after import - now properly loads image data into database",
-                "⚡️ Enhanced: Image data automatically loaded from Documents directory during recipe import",
-                "✅ Fixed: Both new and updated recipes now have images correctly assigned",
-                "📊 Added: Detailed logging shows image loading progress (sizes in KB)",
+                // CloudKit Compatibility Fix (January 26, 2026)
+                "🐛 FIXED: Critical CloudKit sync crash - CloudKitRecipePreview model incompatibility",
+                "✅ Fixed: Added default values to all non-optional CloudKitRecipePreview properties for CloudKit compatibility",
+                "☁️ Fixed: App now launches successfully with CloudKit enabled and syncs recipe books from community",
+                "🔧 Enhanced: Recipe books view now prevents duplicate book IDs with deduplication logic",
+                "📊 Added: Warning logs when duplicate book entries are detected for debugging",
                 
-                // Multi-Book Import Improvements
-                "🎯 Fixed: Multi-book import now shows accurate success/failure counts",
-                "✨ Enhanced: Alert title dynamically changes based on import results (Success/Partially Successful/Failed)",
-                "📋 Added: Detailed failure summary lists which books failed to import",
-                "🔧 Fixed: Zero-import scenario now shows error instead of success message",
-                "⚡️ Improved: Better error messages explain what went wrong during imports",
+                // Logging Improvements
+                "📝 Enhanced: All CloudKitDuplicateMonitor print statements converted to structured logging (logInfo/logWarning/logError)",
+                "🔍 Improved: CloudKit sync events now properly logged with 'cloudkit' category for better diagnostics",
+                "⚡️ Added: Duplicate detection after sync now includes detailed logging and statistics",
                 
-                // ZIP Import Enhancements (January 23, 2026)
-                "🐛 CRITICAL FIX: ZIP import now handles data descriptors (flags bit 3) - reads sizes from Central Directory",
-                "✅ Fixed: .recipebook files created by macOS/iOS native compression now import successfully",
-                "🔧 Enhanced: Recursive file search finds .recipebook files in nested ZIP directories",
-                "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
-                "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
-                "📁 Enhanced: File picker now accepts both .recipebook and .zip files",
-                "⚡️ Improved: Proper zlib header wrapping with FCHECK validation for raw DEFLATE data",
-                "📊 Added: Comprehensive diagnostic logging shows EOCD location, central directory entries, and extraction progress",
-                
-                // Database Recovery Logging (January 23, 2026)
-                "🔧 Added: DatabaseRecoveryLogger tracks all database recovery attempts with detailed diagnostics",
-                "📊 Added: Recovery statistics showing success rate, average duration, and recent failures",
-                "✅ Enhanced: User-facing diagnostics with actionable suggestions when recovery fails",
-                "⚡️ Added: Automatic recovery history logging shows on startup if recoveries have occurred",
-                "🐛 Fixed: Recovery failure handling now supports optional secondary errors",
-                "🔍 Added: Debug menu in ContentView for testing recovery logging (DEBUG builds only)",
-                
-                // Security Fix - API Key Logging (January 23, 2026)
-                "🔒 SECURITY FIX: Removed API key logging from ClaudeAPIClient to prevent credential exposure",
-                "✅ Fixed: API key prefix/suffix no longer logged during validation",
-                "✅ Fixed: HTTP headers (including x-api-key) no longer logged during requests",
-                "🗑️ Security Migration: Diagnostic logs automatically cleared once on update to remove any exposed keys",
-                "⚠️ IMPORTANT: Users should rotate their Anthropic API keys if they shared diagnostic logs before this update",
-                "📝 Enhanced: Logging now only shows whether API key is configured (YES/NO) without exposing values"
+                // Display Name Feature Implementation
+                "✨ Added: Display Name field in Sharing Settings for community content attribution",
+                "👤 Fixed: 'Show My Name' toggle now properly shows/hides user's name on shared recipes and books",
+                "🔧 Enhanced: CloudKitSharingService now reads display name from SharingPreferences model instead of just UserDefaults",
+                "📱 Added: TextField for entering display name appears when 'Show My Name' is enabled",
+                "🔄 Added: Automatic synchronization between SharingPreferences and CloudKitSharingService",
+                "🔒 Added: Privacy control - toggle OFF clears display name and shows 'Anonymous' on shares",
+                "💾 Enhanced: Display name properly persists in both SwiftData and UserDefaults for reliability",
+                "✅ Improved: Name changes apply to new shares going forward (existing shares retain original name)"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.4.105
+        // Recipe Book Import Fixes (January 22, 2026)
+//        "🐛 CRITICAL FIX: Recipe book imports failing with 'book.json not found' error",
+//        "✅ Fixed: ZIP archives with nested directory structures now import correctly",
+//        "🔧 Added: Recursive book.json finder handles both flat and nested ZIP structures",
+//        "📦 Fixed: Export now creates flat ZIP structure (no parent directory) for cross-device compatibility",
+//        "🖼️ CRITICAL FIX: Recipe images missing after import - now properly loads image data into database",
+//        "⚡️ Enhanced: Image data automatically loaded from Documents directory during recipe import",
+//        "✅ Fixed: Both new and updated recipes now have images correctly assigned",
+//        "📊 Added: Detailed logging shows image loading progress (sizes in KB)",
+//        
+//        // Multi-Book Import Improvements
+//        "🎯 Fixed: Multi-book import now shows accurate success/failure counts",
+//        "✨ Enhanced: Alert title dynamically changes based on import results (Success/Partially Successful/Failed)",
+//        "📋 Added: Detailed failure summary lists which books failed to import",
+//        "🔧 Fixed: Zero-import scenario now shows error instead of success message",
+//        "⚡️ Improved: Better error messages explain what went wrong during imports",
+//        
+//        // ZIP Import Enhancements (January 23, 2026)
+//        "🐛 CRITICAL FIX: ZIP import now handles data descriptors (flags bit 3) - reads sizes from Central Directory",
+//        "✅ Fixed: .recipebook files created by macOS/iOS native compression now import successfully",
+//        "🔧 Enhanced: Recursive file search finds .recipebook files in nested ZIP directories",
+//        "📦 Added: Bulk import support - import multiple recipe books from a single ZIP file",
+//        "🔍 Added: Automatic detection of single vs. multi-book ZIP files during import",
+//        "📁 Enhanced: File picker now accepts both .recipebook and .zip files",
+//        "⚡️ Improved: Proper zlib header wrapping with FCHECK validation for raw DEFLATE data",
+//        "📊 Added: Comprehensive diagnostic logging shows EOCD location, central directory entries, and extraction progress",
+//        
+//        // Database Recovery Logging (January 23, 2026)
+//        "🔧 Added: DatabaseRecoveryLogger tracks all database recovery attempts with detailed diagnostics",
+//        "📊 Added: Recovery statistics showing success rate, average duration, and recent failures",
+//        "✅ Enhanced: User-facing diagnostics with actionable suggestions when recovery fails",
+//        "⚡️ Added: Automatic recovery history logging shows on startup if recoveries have occurred",
+//        "🐛 Fixed: Recovery failure handling now supports optional secondary errors",
+//        "🔍 Added: Debug menu in ContentView for testing recovery logging (DEBUG builds only)",
+//        
+//        // Security Fix - API Key Logging (January 23, 2026)
+//        "🔒 SECURITY FIX: Removed API key logging from ClaudeAPIClient to prevent credential exposure",
+//        "✅ Fixed: API key prefix/suffix no longer logged during validation",
+//        "✅ Fixed: HTTP headers (including x-api-key) no longer logged during requests",
+//        "🗑️ Security Migration: Diagnostic logs automatically cleared once on update to remove any exposed keys",
+//        "⚠️ IMPORTANT: Users should rotate their Anthropic API keys if they shared diagnostic logs before this update",
+//        "📝 Enhanced: Logging now only shows whether API key is configured (YES/NO) without exposing values"
         // 15.3.103
         // Previous Features
 //        "🐛 CRITICAL FIX: ZIP import now handles data descriptors (flags bit 3) - reads sizes from Central Directory",

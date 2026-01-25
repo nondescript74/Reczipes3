@@ -17,8 +17,8 @@ import SwiftUI
 class CloudKitSharingService: ObservableObject {
     static let shared = CloudKitSharingService()
     
-    private let container: CKContainer
-    private let publicDatabase: CKDatabase
+    let container: CKContainer
+    let publicDatabase: CKDatabase
     private let privateDatabase: CKDatabase
     
     @Published var isCloudKitAvailable = false
@@ -79,14 +79,34 @@ class CloudKitSharingService: ObservableObject {
             currentUserID = userRecordID.recordName
             
             // Note: userIdentity(forUserRecordID:) was deprecated in iOS 17.0
-            // For privacy reasons, we'll use a user-configured display name instead
-            // You can retrieve this from UserDefaults or your app's settings
-            currentUserName = UserDefaults.standard.string(forKey: "userDisplayName")
+            // For privacy reasons, we'll use a user-configured display name from SharingPreferences
+            // Fall back to UserDefaults for backwards compatibility
+            await fetchUserDisplayName()
             
             logInfo("User ID: \(currentUserID ?? "unknown"), Name: \(currentUserName ?? "not set")", category: "sharing")
         } catch {
             logError("Failed to fetch user identity: \(error)", category: "sharing")
         }
+    }
+    
+    /// Fetch user's display name from SharingPreferences
+    private func fetchUserDisplayName() async {
+        // This needs to be called from a context where we have access to ModelContext
+        // For now, read from UserDefaults as fallback
+        currentUserName = UserDefaults.standard.string(forKey: "userDisplayName")
+    }
+    
+    /// Update the current user's display name (call this when SharingPreferences change)
+    func updateUserDisplayName(from preferences: SharingPreferences) {
+        if preferences.allowOthersToSeeMyName, let displayName = preferences.displayName, !displayName.isEmpty {
+            currentUserName = displayName
+            // Also save to UserDefaults for persistence
+            UserDefaults.standard.set(displayName, forKey: "userDisplayName")
+        } else {
+            currentUserName = nil
+            UserDefaults.standard.removeObject(forKey: "userDisplayName")
+        }
+        logInfo("Updated user display name: \(currentUserName ?? "not set")", category: "sharing")
     }
     
     
@@ -529,10 +549,64 @@ class CloudKitSharingService: ObservableObject {
             return existingShared.cloudRecordID ?? "Already shared"
         }
         
+        logInfo("📚 Sharing recipe book '\(book.name)' with \(book.recipeIDs.count) recipes...", category: "sharing")
+        
+        // Fetch recipe previews for all recipes in the book
+        var recipePreviews: [RecipePreviewData] = []
+        var recipeCloudRecordIDs: [UUID: String] = [:]
+        
+        for recipeID in book.recipeIDs {
+            // Find the recipe in local SwiftData
+            let recipeDescriptor = FetchDescriptor<Recipe>(
+                predicate: #Predicate<Recipe> { $0.id == recipeID }
+            )
+            
+            guard let recipes = try? modelContext.fetch(recipeDescriptor),
+                  let recipe = recipes.first else {
+                logWarning("Recipe \(recipeID) not found locally, skipping preview", category: "sharing")
+                continue
+            }
+            
+            // Check if this recipe is already shared (to get its CloudKit record ID)
+            let sharedRecipeDescriptor = FetchDescriptor<SharedRecipe>(
+                predicate: #Predicate<SharedRecipe> { $0.recipeID == recipeID && $0.isActive == true }
+            )
+            let cloudRecordID = (try? modelContext.fetch(sharedRecipeDescriptor).first)?.cloudRecordID
+            
+            // Create thumbnail (small, base64-encoded)
+            var thumbnailBase64: String?
+            if let imageName = recipe.imageName {
+                if let thumbnailData = createThumbnail(for: imageName, maxSize: 200) {
+                    thumbnailBase64 = thumbnailData.base64EncodedString()
+                }
+            }
+            
+            // Create preview data with embedded thumbnail
+            let preview = RecipePreviewData(
+                id: recipe.id,
+                title: recipe.title,
+                headerNotes: recipe.headerNotes,
+                imageName: recipe.imageName,
+                recipeYield: recipe.recipeYield,
+                cloudRecordID: cloudRecordID,
+                thumbnailBase64: thumbnailBase64
+            )
+            
+            recipePreviews.append(preview)
+            
+            if let cloudRecordID = cloudRecordID {
+                recipeCloudRecordIDs[recipe.id] = cloudRecordID
+            }
+            
+            logInfo("  ✅ Added preview for '\(recipe.title)'\(thumbnailBase64 != nil ? " (with thumbnail)" : "")", category: "sharing")
+        }
+        
+        logInfo("📚 Created \(recipePreviews.count) recipe previews", category: "sharing")
+        
         // Create CloudKit record
         let record = CKRecord(recordType: CloudKitRecordType.sharedRecipeBook)
         
-        // Convert book to CloudKit-friendly format
+        // Convert book to CloudKit-friendly format with previews
         let cloudBook = CloudKitRecipeBook(
             id: book.id,
             name: book.name,
@@ -545,22 +619,41 @@ class CloudKitSharingService: ObservableObject {
             sharedDate: Date()
         )
         
-        // Encode to JSON
+        // Encode book data to JSON
         let encoder = JSONEncoder()
-        let jsonData = try encoder.encode(cloudBook)
+        let bookJsonData = try encoder.encode(cloudBook)
         
-        record["bookData"] = String(data: jsonData, encoding: .utf8)
+        record["bookData"] = String(data: bookJsonData, encoding: .utf8)
         record["name"] = book.name as CKRecordValue
         record["sharedBy"] = userID as CKRecordValue
         record["sharedByName"] = (currentUserName ?? "Anonymous") as CKRecordValue
         record["sharedDate"] = Date() as CKRecordValue
         
+        // NEW: Store recipe previews with embedded thumbnails
+        let previewsJsonData = try encoder.encode(recipePreviews)
+        record["recipePreviews"] = String(data: previewsJsonData, encoding: .utf8)
+        
+        logInfo("📚 Uploading cover image...", category: "sharing")
+        
         // Upload cover image if exists
-        if let coverImage = book.coverImageName {
-            try await uploadImage(named: coverImage, to: record, fieldName: "coverImage")
+        if let coverImageName = book.coverImageName {
+            do {
+                try await uploadImage(named: coverImageName, to: record, fieldName: "coverImage")
+                logInfo("  ✅ Uploaded cover image: \(coverImageName)", category: "sharing")
+            } catch {
+                logWarning("  ⚠️ Failed to upload cover image: \(error)", category: "sharing")
+            }
+        } else if let coverImageData = book.coverImageData {
+            // Handle inline cover image data
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_cover_\(book.id).jpg")
+            try? coverImageData.write(to: tempURL)
+            let asset = CKAsset(fileURL: tempURL)
+            record["coverImage"] = asset
+            logInfo("  ✅ Uploaded cover image from data", category: "sharing")
         }
         
         // Save to public database
+        logInfo("📚 Saving to CloudKit Public Database...", category: "sharing")
         let savedRecord = try await publicDatabase.save(record)
         
         // Track locally
@@ -577,7 +670,7 @@ class CloudKitSharingService: ObservableObject {
         modelContext.insert(sharedBook)
         try modelContext.save()
         
-        logInfo("Shared recipe book: \(book.name)", category: "sharing")
+        logInfo("✅ Shared recipe book: \(book.name) with \(recipePreviews.count) recipe previews", category: "sharing")
         logInfo("Community share successful", category: "analytics")
         
         return savedRecord.recordID.recordName
@@ -656,6 +749,7 @@ class CloudKitSharingService: ObservableObject {
         try modelContext.save()
         logInfo("Shared content cache cleared - next fetch will be fresh from CloudKit", category: "sharing")
     }
+    
     
     func fetchSharedRecipes(limit: Int = 400, excludeCurrentUser: Bool = true) async throws -> [CloudKitRecipe] {
         guard isCloudKitAvailable else {
@@ -1149,51 +1243,143 @@ class CloudKitSharingService: ObservableObject {
     // MARK: - Ghost/Orphaned Recipe Books Cleanup
     
     /// Diagnostic function to analyze recipe book sharing state
-    func diagnoseSharedRecipeBooks() async {
+    func diagnoseSharedRecipeBooks(modelContext: ModelContext) async {
         guard let currentUserID = currentUserID else {
             logError("🔍 DIAGNOSTIC: No user ID available", category: "sharing")
             return
         }
         
+        logInfo("🔍 DIAGNOSTIC: ========================================", category: "sharing")
+        logInfo("🔍 DIAGNOSTIC: Starting Recipe Books Analysis", category: "sharing")
+        logInfo("🔍 DIAGNOSTIC: Current User ID: \(currentUserID)", category: "sharing")
+        logInfo("🔍 DIAGNOSTIC: ========================================", category: "sharing")
+        
+        // PART 1: Check CloudKit Public Database
+        logInfo("🔍 PART 1: Checking CloudKit Public Database...", category: "sharing")
         do {
             // Fetch ALL recipe books (including current user's) for diagnostic purposes
             let books = try await fetchSharedRecipeBooks(excludeCurrentUser: false)
-            logInfo("🔍 DIAGNOSTIC: Successfully fetched \(books.count) total recipe books from CloudKit", category: "sharing")
+            logInfo("🔍 CloudKit has \(books.count) total recipe books", category: "sharing")
             
             // Separate current user's books vs others
             let myBooks = books.filter { $0.sharedByUserID == currentUserID }
             let othersBooks = books.filter { $0.sharedByUserID != currentUserID }
             
-            logInfo("🔍 DIAGNOSTIC: Found \(myBooks.count) recipe books from current user", category: "sharing")
-            logInfo("🔍 DIAGNOSTIC: Found \(othersBooks.count) recipe books from other users", category: "sharing")
+            logInfo("🔍   My books: \(myBooks.count)", category: "sharing")
+            logInfo("🔍   Others' books: \(othersBooks.count)", category: "sharing")
             
-            // Group by sharer
+            // Show details of each user's books
             let groupedByUser = Dictionary(grouping: books) { $0.sharedByUserID }
-            logInfo("🔍 DIAGNOSTIC: Total unique sharers: \(groupedByUser.count)", category: "sharing")
-            for (userID, userBooks) in groupedByUser.prefix(5) {
+            logInfo("🔍 Total unique sharers: \(groupedByUser.count)", category: "sharing")
+            
+            for (userID, userBooks) in groupedByUser {
                 let userName = userBooks.first?.sharedByUserName ?? "Unknown"
-                logInfo("🔍   User '\(userName)' (\(userID)): \(userBooks.count) recipe books", category: "sharing")
+                let isCurrentUser = userID == currentUserID
+                let marker = isCurrentUser ? "👤 (YOU)" : "👥"
+                
+                logInfo("🔍 \(marker) User '\(userName)' (\(userID.prefix(8))...): \(userBooks.count) books", category: "sharing")
+                
+                for book in userBooks {
+                    logInfo("🔍     - '\(book.name)': \(book.recipeIDs.count) recipes, shared \(book.sharedDate.formatted())", category: "sharing")
+                }
             }
             
             // Detect duplicates by book ID
             let groupedByBookID = Dictionary(grouping: books) { $0.id }
             let duplicates = groupedByBookID.filter { $0.value.count > 1 }
             if !duplicates.isEmpty {
-                logWarning("🔍 DIAGNOSTIC: Found \(duplicates.count) duplicate recipe book IDs in CloudKit!", category: "sharing")
+                logWarning("🔍 ⚠️ Found \(duplicates.count) duplicate recipe book IDs in CloudKit!", category: "sharing")
                 for (bookID, dupes) in duplicates.prefix(5) {
-                    logWarning("🔍   Recipe book ID \(bookID) has \(dupes.count) copies", category: "sharing")
+                    logWarning("🔍   Book ID \(bookID) has \(dupes.count) copies", category: "sharing")
                 }
             } else {
-                logInfo("🔍 DIAGNOSTIC: No duplicates found ✅", category: "sharing")
+                logInfo("🔍 ✅ No duplicates found", category: "sharing")
             }
             
-            // Check for orphaned CloudKit records
-            logInfo("🔍 DIAGNOSTIC: Checking for orphaned CloudKit records...", category: "sharing")
-            logInfo("🔍   My CloudKit recipe books: \(myBooks.count)", category: "sharing")
+        } catch {
+            logError("🔍 ❌ Failed to fetch books from CloudKit: \(error)", category: "sharing")
+        }
+        
+        // PART 2: Check Local SwiftData
+        logInfo("🔍 PART 2: Checking Local SwiftData...", category: "sharing")
+        
+        do {
+            // Fetch all RecipeBook entities
+            let allLocalBooks = try modelContext.fetch(FetchDescriptor<RecipeBook>())
+            logInfo("🔍 Local SwiftData has \(allLocalBooks.count) RecipeBook entities", category: "sharing")
+            
+            // Fetch all SharedRecipeBook tracking entries
+            let allTracking = try modelContext.fetch(FetchDescriptor<SharedRecipeBook>())
+            logInfo("🔍 Local SwiftData has \(allTracking.count) SharedRecipeBook tracking entries", category: "sharing")
+            
+            // Filter active tracking
+            let activeTracking = allTracking.filter { $0.isActive }
+            logInfo("🔍   Active: \(activeTracking.count)", category: "sharing")
+            logInfo("🔍   Inactive: \(allTracking.count - activeTracking.count)", category: "sharing")
+            
+            // Group by sharer
+            let myTracking = activeTracking.filter { $0.sharedByUserID == currentUserID }
+            let othersTracking = activeTracking.filter { $0.sharedByUserID != currentUserID }
+            
+            logInfo("🔍   My shared books (tracking): \(myTracking.count)", category: "sharing")
+            logInfo("🔍   Others' shared books (tracking): \(othersTracking.count)", category: "sharing")
+            
+            // Show tracking details
+            if !othersTracking.isEmpty {
+                logInfo("🔍 Books shared by others (should appear in Shared tab):", category: "sharing")
+                for tracking in othersTracking {
+                    let hasRecipeBook = allLocalBooks.contains { $0.id == tracking.bookID }
+                    let status = hasRecipeBook ? "✅ Has RecipeBook" : "❌ Missing RecipeBook"
+                    logInfo("🔍   - '\(tracking.bookName)' by \(tracking.sharedByUserName ?? "Unknown") [\(status)]", category: "sharing")
+                }
+            } else {
+                logWarning("🔍 ⚠️ No books from other users in local tracking!", category: "sharing")
+            }
+            
+            // Check for orphaned RecipeBook entities (books without tracking)
+            let trackedBookIDs = Set(activeTracking.compactMap { $0.bookID })
+            let orphanedBooks = allLocalBooks.filter { !trackedBookIDs.contains($0.id) }
+            
+            if !orphanedBooks.isEmpty {
+                logWarning("🔍 ⚠️ Found \(orphanedBooks.count) RecipeBook entities without tracking:", category: "sharing")
+                for book in orphanedBooks.prefix(5) {
+                    logWarning("🔍   - '\(book.name)' (ID: \(book.id))", category: "sharing")
+                }
+            }
             
         } catch {
-            logError("🔍 DIAGNOSTIC: Failed to fetch recipe books: \(error)", category: "sharing")
+            logError("🔍 ❌ Failed to fetch from local SwiftData: \(error)", category: "sharing")
         }
+        
+        // PART 3: Recommendations
+        logInfo("🔍 PART 3: Recommendations", category: "sharing")
+        
+        do {
+            let cloudBooks = try await fetchSharedRecipeBooks(excludeCurrentUser: false)
+            let othersCloudBooks = cloudBooks.filter { $0.sharedByUserID != currentUserID }
+            
+            let allTracking = try modelContext.fetch(FetchDescriptor<SharedRecipeBook>())
+            let othersTracking = allTracking.filter { $0.isActive && $0.sharedByUserID != currentUserID }
+            
+            if !othersCloudBooks.isEmpty && othersTracking.isEmpty {
+                logWarning("🔍 ⚠️ Problem: Books exist in CloudKit but not in local tracking", category: "sharing")
+                logWarning("🔍 💡 Solution: Run 'Sync Community Books' to fix this", category: "sharing")
+            } else if othersCloudBooks.count != othersTracking.count {
+                logWarning("🔍 ⚠️ Problem: Mismatch between CloudKit (\(othersCloudBooks.count)) and local tracking (\(othersTracking.count))", category: "sharing")
+                logWarning("🔍 💡 Solution: Run 'Sync Community Books' to sync", category: "sharing")
+            } else if othersCloudBooks.isEmpty {
+                logInfo("🔍 ℹ️ No books have been shared by other users yet", category: "sharing")
+            } else {
+                logInfo("🔍 ✅ Everything looks good! \(othersCloudBooks.count) books synced correctly", category: "sharing")
+            }
+            
+        } catch {
+            logError("🔍 ❌ Failed to check recommendations: \(error)", category: "sharing")
+        }
+        
+        logInfo("🔍 DIAGNOSTIC: ========================================", category: "sharing")
+        logInfo("🔍 DIAGNOSTIC: Analysis Complete", category: "sharing")
+        logInfo("🔍 DIAGNOSTIC: ========================================", category: "sharing")
     }
     
     /// Sync local SharedRecipeBook tracking with CloudKit truth
@@ -1539,17 +1725,25 @@ class CloudKitSharingService: ObservableObject {
     
     /// Sync community recipe books from CloudKit to local SwiftData
     /// This allows shared books to appear in the Books view's "Shared" tab
+    /// Phase 4: Enhanced with recipe previews and thumbnail downloads
     func syncCommunityBooksToLocal(modelContext: ModelContext) async throws {
         guard isCloudKitAvailable else {
             throw SharingError.cloudKitUnavailable()
         }
         
-        logInfo("📚 SYNC: Starting community books sync to local SwiftData...", category: "sharing")
+        logInfo("📚 SYNC: Starting enhanced community books sync to local SwiftData...", category: "sharing")
         
-        // Fetch all shared books from CloudKit (excluding current user's books)
-        let cloudKitBooks = try await fetchSharedRecipeBooks(excludeCurrentUser: true)
+        // Step 1: Fetch all CloudKit records (including assets)
+        logInfo("📚 Step 1: Fetching CloudKit records with assets...", category: "sharing")
+        let allCloudKitRecords = try await fetchAllCloudKitRecords(type: CloudKitRecordType.sharedRecipeBook)
         
-        logInfo("📚 SYNC: Found \(cloudKitBooks.count) community books in CloudKit", category: "sharing")
+        // Filter to exclude current user's books
+        let communityRecords = allCloudKitRecords.filter { record in
+            guard let sharedBy = record["sharedBy"] as? String else { return false }
+            return sharedBy != currentUserID
+        }
+        
+        logInfo("📚 Found \(communityRecords.count) community book records in CloudKit", category: "sharing")
         
         // Fetch all existing SharedRecipeBook records that are shared by others
         let existingSharedBooks = try modelContext.fetch(
@@ -1563,9 +1757,13 @@ class CloudKitSharingService: ObservableObject {
         // Fetch all existing RecipeBook records
         let allRecipeBooks = try modelContext.fetch(FetchDescriptor<RecipeBook>())
         
+        // Fetch all existing CloudKitRecipePreview records
+        let allPreviews = try modelContext.fetch(FetchDescriptor<CloudKitRecipePreview>())
+        
         // Create dictionaries for quick lookup
         var existingSharedBooksByID = [UUID: SharedRecipeBook]()
         var existingRecipeBooksByID = [UUID: RecipeBook]()
+        var existingPreviewsByBookID = [UUID: [CloudKitRecipePreview]]()
         
         for book in existingSharedBooks {
             if let bookID = book.bookID {
@@ -1577,18 +1775,59 @@ class CloudKitSharingService: ObservableObject {
             existingRecipeBooksByID[book.id] = book
         }
         
+        for preview in allPreviews {
+            if let bookID = preview.bookID {
+                existingPreviewsByBookID[bookID, default: []].append(preview)
+            }
+        }
+        
         logInfo("📚 SYNC: Found \(existingSharedBooks.count) existing community book tracking records", category: "sharing")
         logInfo("📚 SYNC: Found \(allRecipeBooks.count) total RecipeBook entries", category: "sharing")
+        logInfo("📚 SYNC: Found \(allPreviews.count) existing recipe previews", category: "sharing")
         
         // Track which CloudKit books we've seen (to identify books to remove)
         var cloudKitBookIDs = Set<UUID>()
         
         var addedCount = 0
         var updatedCount = 0
+        var previewsCreated = 0
+        var thumbnailsDownloaded = 0
         
-        // Process each CloudKit book
-        for cloudBook in cloudKitBooks {
+        // Step 2-6: Process each CloudKit book record
+        for record in communityRecords {
+            // Parse book data
+            guard let bookData = record["bookData"] as? String,
+                  let jsonData = bookData.data(using: .utf8),
+                  let cloudBook = try? JSONDecoder().decode(CloudKitRecipeBook.self, from: jsonData) else {
+                logWarning("📚 Skipping invalid book record: \(record.recordID.recordName)", category: "sharing")
+                continue
+            }
+            
             cloudKitBookIDs.insert(cloudBook.id)
+            let cloudRecordID = record.recordID.recordName
+            
+            logInfo("📚 Processing book: '\(cloudBook.name)' (\(cloudBook.recipeIDs.count) recipes)", category: "sharing")
+            
+            // Step 2: Download cover image
+            if let coverImageAsset = record["coverImage"] as? CKAsset,
+               let coverImageURL = coverImageAsset.fileURL,
+               let coverImageData = try? Data(contentsOf: coverImageURL) {
+                // Save cover image to local storage
+                let coverImageName = "shared_cover_\(cloudBook.id).jpg"
+                try? saveImageToDocuments(data: coverImageData, filename: coverImageName)
+                logInfo("📚   ✅ Downloaded cover image: \(coverImageName)", category: "sharing")
+            }
+            
+            // Step 3: Parse recipe previews JSON
+            var recipePreviews: [RecipePreviewData] = []
+            if let previewsJSON = record["recipePreviews"] as? String,
+               let previewsData = previewsJSON.data(using: .utf8),
+               let previews = try? JSONDecoder().decode([RecipePreviewData].self, from: previewsData) {
+                recipePreviews = previews
+                logInfo("📚   ✅ Parsed \(previews.count) recipe previews", category: "sharing")
+            } else {
+                logWarning("📚   ⚠️ No recipe previews found in record", category: "sharing")
+            }
             
             // Check if RecipeBook entity exists
             let recipeBook: RecipeBook
@@ -1617,11 +1856,12 @@ class CloudKitSharingService: ObservableObject {
                 }
             } else {
                 // Create new RecipeBook entity
+                let coverImageName = "shared_cover_\(cloudBook.id).jpg"
                 recipeBook = RecipeBook(
                     id: cloudBook.id,
                     name: cloudBook.name,
                     bookDescription: cloudBook.bookDescription,
-                    coverImageName: cloudBook.coverImageName,
+                    coverImageName: coverImageName,
                     dateCreated: cloudBook.sharedDate,
                     dateModified: cloudBook.sharedDate,
                     recipeIDs: cloudBook.recipeIDs,
@@ -1653,6 +1893,11 @@ class CloudKitSharingService: ObservableObject {
                     needsUpdate = true
                 }
                 
+                if existingSharedBook.cloudRecordID != cloudRecordID {
+                    existingSharedBook.cloudRecordID = cloudRecordID
+                    needsUpdate = true
+                }
+                
                 if needsUpdate {
                     logInfo("📚   Updated SharedRecipeBook tracking: '\(cloudBook.name)'", category: "sharing")
                 }
@@ -1660,7 +1905,7 @@ class CloudKitSharingService: ObservableObject {
                 // Create new SharedRecipeBook tracking entry
                 let newSharedBook = SharedRecipeBook(
                     bookID: cloudBook.id,
-                    cloudRecordID: nil, // We don't have the CloudKit record ID here
+                    cloudRecordID: cloudRecordID,
                     sharedByUserID: cloudBook.sharedByUserID,
                     sharedByUserName: cloudBook.sharedByUserName,
                     sharedDate: cloudBook.sharedDate,
@@ -1671,6 +1916,49 @@ class CloudKitSharingService: ObservableObject {
                 
                 modelContext.insert(newSharedBook)
                 logInfo("📚   Created SharedRecipeBook tracking: '\(cloudBook.name)' by \(cloudBook.sharedByUserName ?? "Unknown")", category: "sharing")
+            }
+            
+            // Step 4-5: Decode thumbnails from base64 and create CloudKitRecipePreview entries
+            if !recipePreviews.isEmpty {
+                // Delete old previews for this book
+                if let oldPreviews = existingPreviewsByBookID[cloudBook.id] {
+                    for oldPreview in oldPreviews {
+                        modelContext.delete(oldPreview)
+                    }
+                }
+                
+                // Create new previews
+                for previewData in recipePreviews {
+                    // Step 4: Decode thumbnail from base64
+                    var thumbnailData: Data?
+                    if let base64String = previewData.thumbnailBase64,
+                       let data = Data(base64Encoded: base64String) {
+                        thumbnailData = data
+                        thumbnailsDownloaded += 1
+                        logInfo("📚     ✅ Decoded thumbnail: '\(previewData.title)'", category: "sharing")
+                    } else {
+                        logInfo("📚     ⚪️ No thumbnail for '\(previewData.title)'", category: "sharing")
+                    }
+                    
+                    // Step 5: Create CloudKitRecipePreview entry
+                    let preview = CloudKitRecipePreview(
+                        id: previewData.id,
+                        title: previewData.title,
+                        headerNotes: previewData.headerNotes,
+                        imageName: previewData.imageName,
+                        imageData: thumbnailData,
+                        sharedByUserID: cloudBook.sharedByUserID,
+                        sharedByUserName: cloudBook.sharedByUserName,
+                        recipeYield: previewData.recipeYield,
+                        bookID: cloudBook.id,
+                        cloudRecordID: previewData.cloudRecordID
+                    )
+                    
+                    modelContext.insert(preview)
+                    previewsCreated += 1
+                }
+                
+                logInfo("📚   ✅ Created \(recipePreviews.count) recipe previews", category: "sharing")
             }
         }
         
@@ -1691,6 +1979,13 @@ class CloudKitSharingService: ObservableObject {
                         modelContext.delete(recipeBook)
                     }
                     
+                    // Delete associated previews
+                    if let previews = existingPreviewsByBookID[bookID] {
+                        for preview in previews {
+                            modelContext.delete(preview)
+                        }
+                    }
+                    
                     removedCount += 1
                     logInfo("📚   Removed book (no longer shared): '\(existingSharedBook.bookName)'", category: "sharing")
                 }
@@ -1700,10 +1995,46 @@ class CloudKitSharingService: ObservableObject {
         // Save changes
         try modelContext.save()
         
-        logInfo("✅ SYNC COMPLETE: Community books synced", category: "sharing")
+        logInfo("✅ SYNC COMPLETE: Enhanced community books sync finished", category: "sharing")
         logInfo("   - Added: \(addedCount) books", category: "sharing")
         logInfo("   - Updated: \(updatedCount) books", category: "sharing")
         logInfo("   - Removed: \(removedCount) books", category: "sharing")
+        logInfo("   - Recipe previews created: \(previewsCreated)", category: "sharing")
+        logInfo("   - Thumbnails decoded: \(thumbnailsDownloaded)", category: "sharing")
+    }
+    
+    /// Helper: Save image data to Documents directory
+    private func saveImageToDocuments(data: Data, filename: String) throws {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        try data.write(to: fileURL)
+    }
+    
+    /// Helper: Create a small thumbnail from an image
+    /// Returns JPEG data resized to maxSize (width/height), compressed to keep file size small
+    private func createThumbnail(for imageName: String, maxSize: CGFloat = 200) -> Data? {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let imageURL = documentsPath.appendingPathComponent(imageName)
+        
+        guard FileManager.default.fileExists(atPath: imageURL.path),
+              let imageData = try? Data(contentsOf: imageURL),
+              let image = UIImage(data: imageData) else {
+            return nil
+        }
+        
+        // Calculate new size maintaining aspect ratio
+        let size = image.size
+        let ratio = min(maxSize / size.width, maxSize / size.height)
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        
+        // Resize image
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        // Compress to JPEG with quality 0.6 (good balance of size vs quality)
+        return resizedImage?.jpegData(compressionQuality: 0.6)
     }
     
     /// Remove orphaned recipes from CloudKit (recipes with invalid/missing sharedByUserID)

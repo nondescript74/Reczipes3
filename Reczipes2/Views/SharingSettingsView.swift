@@ -57,6 +57,10 @@ struct SharingSettingsView: View {
         }
         .navigationTitle("Sharing & Community")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // Initialize CloudKitSharingService with current preferences
+            sharingService.updateUserDisplayName(from: preferences)
+        }
         .sheet(isPresented: $showingRecipeSelector) {
             RecipeSelectorView(
                 selectedRecipes: [],
@@ -205,9 +209,33 @@ struct SharingSettingsView: View {
                     preferences.allowOthersToSeeMyName = newValue
                     preferences.dateModified = Date()
                     try? modelContext.save()
+                    
+                    // Update CloudKitSharingService with new preference
+                    sharingService.updateUserDisplayName(from: preferences)
                 }
             ))
             .disabled(!sharingService.isCloudKitAvailable)
+            
+            if preferences.allowOthersToSeeMyName {
+                TextField("Display Name", text: Binding(
+                    get: { preferences.displayName ?? "" },
+                    set: { newValue in
+                        preferences.displayName = newValue.isEmpty ? nil : newValue
+                        preferences.dateModified = Date()
+                        try? modelContext.save()
+                        
+                        // Update CloudKitSharingService with new name
+                        sharingService.updateUserDisplayName(from: preferences)
+                    }
+                ))
+                .textContentType(.name)
+                .autocorrectionDisabled()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Text("This name will be shown when you share recipes and books with the community")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             
         } header: {
             Text("Sharing Preferences")
@@ -319,6 +347,16 @@ struct SharingSettingsView: View {
                 }
             } label: {
                 Label("Sync Community Books", systemImage: "books.vertical.circle")
+            }
+            .disabled(!sharingService.isCloudKitAvailable)
+            
+            // Diagnostics
+            Button {
+                Task {
+                    await diagnoseSharedBooks()
+                }
+            } label: {
+                Label("Diagnose Shared Books", systemImage: "stethoscope")
             }
             .disabled(!sharingService.isCloudKitAvailable)
             
@@ -685,6 +723,20 @@ struct SharingSettingsView: View {
             alertMessage = "Failed to sync community recipes: \(error.localizedDescription)"
             showingAlert = true
         }
+        
+        isSharing = false
+    }
+    
+    // MARK: - Diagnostic Actions
+    
+    private func diagnoseSharedBooks() async {
+        isSharing = true
+        sharingStatus = "Running diagnostics..."
+        
+        await sharingService.diagnoseSharedRecipeBooks(modelContext: modelContext)
+        
+        alertMessage = "✅ Diagnostic complete! Check the Xcode console for detailed results."
+        showingAlert = true
         
         isSharing = false
     }

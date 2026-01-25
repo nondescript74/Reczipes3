@@ -53,7 +53,7 @@ class CloudKitDuplicateMonitor: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.isSyncing = true
-                print("☁️ CloudKit import started")
+                logInfo("☁️ CloudKit import started", category: "cloudkit")
             }
             .store(in: &cancellables)
         
@@ -67,20 +67,20 @@ class CloudKitDuplicateMonitor: ObservableObject {
     }
     
     private func handleSyncWillReset(_ notification: Notification) {
-        print("⚠️ CloudKit sync will reset - change token expired")
-        print("⚠️ This may cause duplicate recipes to be synced")
+        logWarning("⚠️ CloudKit sync will reset - change token expired", category: "cloudkit")
+        logWarning("⚠️ This may cause duplicate recipes to be synced", category: "cloudkit")
         
         // Log the reason if available
         if let userInfo = notification.userInfo,
            let reason = userInfo["reason"] as? String {
-            print("⚠️ Reason: \(reason)")
+            logWarning("⚠️ Reason: \(reason)", category: "cloudkit")
         }
         
         isSyncing = true
     }
     
     private func handleSyncDidReset(_ notification: Notification) {
-        print("✅ CloudKit sync reset complete")
+        logInfo("✅ CloudKit sync reset complete", category: "cloudkit")
         lastSyncReset = Date()
         
         // Schedule duplicate detection after a delay to let sync finish
@@ -91,13 +91,13 @@ class CloudKitDuplicateMonitor: ObservableObject {
     }
     
     private func handleImportFinished(_ notification: Notification) {
-        print("✅ CloudKit import finished")
+        logInfo("✅ CloudKit import finished", category: "cloudkit")
         isSyncing = false
         
         // Check if there was an error
         if let userInfo = notification.userInfo,
            let error = userInfo[NSUnderlyingErrorKey] as? Error {
-            print("❌ Import finished with error: \(error.localizedDescription)")
+            logError("❌ Import finished with error: \(error.localizedDescription)", category: "cloudkit")
         }
         
         // Run duplicate check after import
@@ -110,17 +110,17 @@ class CloudKitDuplicateMonitor: ObservableObject {
     
     func checkForDuplicates() async {
         guard let context = modelContext else {
-            print("⚠️ ModelContext not configured for duplicate detection")
+            logWarning("⚠️ ModelContext not configured for duplicate detection", category: "cloudkit")
             return
         }
         
-        print("🔍 Checking for duplicates after sync...")
+        logInfo("🔍 Checking for duplicates after sync...", category: "cloudkit")
         
         do {
             let descriptor = FetchDescriptor<Recipe>(sortBy: [SortDescriptor(\.title)])
             let allRecipes = try context.fetch(descriptor)
             
-            print("📊 Total recipes: \(allRecipes.count)")
+            logInfo("📊 Total recipes: \(allRecipes.count)", category: "cloudkit")
             
             // Group by content fingerprint
             var recipesByFingerprint: [String: [Recipe]] = [:]
@@ -136,8 +136,8 @@ class CloudKitDuplicateMonitor: ObservableObject {
             duplicatesDetected = totalDuplicates
             
             if totalDuplicates > 0 {
-                print("⚠️ Found \(duplicateGroups.count) duplicate groups containing \(totalDuplicates) extra recipes")
-                print("💡 Open Settings → Duplicate Detector to clean up")
+                logWarning("⚠️ Found \(duplicateGroups.count) duplicate groups containing \(totalDuplicates) extra recipes", category: "cloudkit")
+                logInfo("💡 Open Settings → Duplicate Detector to clean up", category: "cloudkit")
                 
                 // Post notification to UI
                 NotificationCenter.default.post(
@@ -146,11 +146,11 @@ class CloudKitDuplicateMonitor: ObservableObject {
                     userInfo: ["count": totalDuplicates]
                 )
             } else {
-                print("✅ No duplicates detected")
+                logInfo("✅ No duplicates detected", category: "cloudkit")
             }
             
         } catch {
-            print("❌ Error checking for duplicates: \(error)")
+            logError("❌ Error checking for duplicates: \(error)", category: "cloudkit")
         }
     }
     
@@ -160,11 +160,11 @@ class CloudKitDuplicateMonitor: ObservableObject {
     /// This will delete duplicate recipes keeping only the oldest copy
     func autoCleanupDuplicates() async {
         guard let context = modelContext else {
-            print("⚠️ ModelContext not configured")
+            logWarning("⚠️ ModelContext not configured", category: "cloudkit")
             return
         }
         
-        print("🧹 Starting automatic duplicate cleanup...")
+        logInfo("🧹 Starting automatic duplicate cleanup...", category: "cloudkit")
         
         do {
             let descriptor = FetchDescriptor<Recipe>(sortBy: [SortDescriptor(\.title)])
@@ -189,9 +189,9 @@ class CloudKitDuplicateMonitor: ObservableObject {
                 let canonical = sorted.first!
                 let duplicates = sorted.dropFirst()
                 
-                print("   Keeping: \(canonical.title) (ID: \(canonical.id))")
+                logInfo("   Keeping: \(canonical.title) (ID: \(canonical.id))", category: "cloudkit")
                 for duplicate in duplicates {
-                    print("   🗑️ Deleting duplicate: \(duplicate.id)")
+                    logInfo("   🗑️ Deleting duplicate: \(duplicate.id)", category: "cloudkit")
                     context.delete(duplicate)
                     deletedCount += 1
                 }
@@ -199,14 +199,14 @@ class CloudKitDuplicateMonitor: ObservableObject {
             
             if deletedCount > 0 {
                 try context.save()
-                print("✅ Deleted \(deletedCount) duplicate recipes")
+                logInfo("✅ Deleted \(deletedCount) duplicate recipes", category: "cloudkit")
                 duplicatesDetected = 0
             } else {
-                print("✅ No duplicates to delete")
+                logInfo("✅ No duplicates to delete", category: "cloudkit")
             }
             
         } catch {
-            print("❌ Error during auto cleanup: \(error)")
+            logError("❌ Error during auto cleanup: \(error)", category: "cloudkit")
         }
     }
 }

@@ -74,6 +74,17 @@ struct RecipeBooksView: View {
             }
         }
         
+        // Deduplicate books by ID (just in case)
+        var seenIDs = Set<UUID>()
+        result = result.filter { book in
+            if seenIDs.contains(book.id) {
+                logWarning("⚠️ Duplicate book ID detected: \(book.id) (\(book.name))", category: "book")
+                return false
+            }
+            seenIDs.insert(book.id)
+            return true
+        }
+        
         return result
     }
     
@@ -139,6 +150,8 @@ struct RecipeBooksView: View {
                 RecipeBookImportView()
             }
             .sheet(item: $selectedBook) { book in
+                // For now, use the same detail view for all books
+                // TODO: Create a read-only version for books shared by others
                 RecipeBookDetailView(book: book)
             }
         }
@@ -248,14 +261,14 @@ struct RecipeBooksView: View {
     private var bookGridView: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(filteredBooks) { book in
+                ForEach(Array(filteredBooks.enumerated()), id: \.element.id) { index, book in
                     BookCardView(
                         book: book,
                         savedRecipes: savedRecipes,
                         sharedEntry: sharedBookEntry(for: book),
                         showSharedInfo: contentFilter != .mine
                     )
-                        .id("\(book.id)-\(refreshID)")
+                        .id("\(book.id)-\(refreshID)-\(index)")
                         .onTapGesture {
                             selectedBook = book
                         }
@@ -340,6 +353,7 @@ struct RecipeBooksView: View {
         
         do {
             try await CloudKitSharingService.shared.syncCommunityBooksToLocal(modelContext: modelContext)
+            
             await MainActor.run {
                 lastSyncDate = Date()
                 refreshID = UUID() // Force UI refresh
@@ -360,6 +374,7 @@ struct BookCardView: View {
     let showSharedInfo: Bool
     
     // Use computed properties to ensure we get fresh data
+    // Wrapped in try? to handle deleted/faulted objects gracefully
     private var coverImageName: String? {
         book.coverImageName
     }
@@ -373,7 +388,8 @@ struct BookCardView: View {
     }
     
     private var recipeCount: Int {
-        book.recipeCount
+        // Safe access - returns 0 if book is deleted/faulted
+        book.recipeIDs.count
     }
     
     private var bookDescription: String? {
