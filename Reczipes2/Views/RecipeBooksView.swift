@@ -150,9 +150,45 @@ struct RecipeBooksView: View {
                 RecipeBookImportView()
             }
             .sheet(item: $selectedBook) { book in
-                // For now, use the same detail view for all books
-                // TODO: Create a read-only version for books shared by others
-                RecipeBookDetailView(book: book)
+                // Use different views for own books vs. shared books
+                if let sharedEntry = sharedBookEntry(for: book),
+                   sharedEntry.sharedByUserID != CloudKitSharingService.shared.currentUserID {
+                    // Shared by someone else - use read-only view
+                    ReadOnlyRecipeBookDetailView(book: book, sharedEntry: sharedEntry)
+                } else {
+                    // Own book or not shared - use full editor
+                    RecipeBookDetailView(book: book)
+                }
+            }
+            .onChange(of: refreshID) { oldValue, newValue in
+                // When UI refreshes (e.g., after sync), check if selected book still exists
+                if let selected = selectedBook {
+                    let selectedID = selected.id
+                    let descriptor = FetchDescriptor<RecipeBook>(
+                        predicate: #Predicate<RecipeBook> { book in
+                            book.id == selectedID
+                        }
+                    )
+                    
+                    do {
+                        let fetchedBooks = try modelContext.fetch(descriptor)
+                        if fetchedBooks.isEmpty {
+                            // Book was deleted (likely by sync), dismiss sheet gracefully
+                            logInfo("📚 Dismissing sheet - book '\(selected.name)' was deleted", category: "book")
+                            selectedBook = nil
+                        }
+                    } catch {
+                        // If fetch fails, also dismiss to prevent crashes
+                        logError("❌ Failed to verify book existence: \(error)", category: "book")
+                        selectedBook = nil
+                    }
+                }
+            }
+            .onAppear {
+                // Sync community books when view appears to catch any unshared books
+                Task {
+                    await syncCommunityBooksIfNeeded()
+                }
             }
         }
     }
@@ -357,10 +393,12 @@ struct RecipeBooksView: View {
             await MainActor.run {
                 lastSyncDate = Date()
                 refreshID = UUID() // Force UI refresh
+                logInfo("✅ Community books sync completed successfully", category: "sharing")
             }
         } catch {
-            logError("Failed to sync community books: \(error)", category: "sharing")
-            // Don't show error to user - sync will retry next time
+            logError("❌ Failed to sync community books: \(error)", category: "sharing")
+            // Log the error but don't show it to the user
+            // The sync will automatically retry next time they switch tabs
         }
     }
 }
@@ -373,31 +411,54 @@ struct BookCardView: View {
     let sharedEntry: SharedRecipeBook?
     let showSharedInfo: Bool
     
-    // Use computed properties to ensure we get fresh data
-    // Wrapped in try? to handle deleted/faulted objects gracefully
+    // Cache book data on init to avoid faults
+    private let bookID: UUID
+    private let cachedCoverImageName: String?
+    private let cachedCoverImageData: Data?
+    private let cachedBookName: String
+    private let cachedRecipeCount: Int
+    private let cachedBookDescription: String?
+    private let cachedBookColor: String?
+    
+    init(book: RecipeBook, savedRecipes: [Recipe], sharedEntry: SharedRecipeBook?, showSharedInfo: Bool) {
+        self.book = book
+        self.savedRecipes = savedRecipes
+        self.sharedEntry = sharedEntry
+        self.showSharedInfo = showSharedInfo
+        
+        // Cache book properties to avoid faults when object is deleted
+        self.bookID = book.id
+        self.cachedCoverImageName = book.coverImageName
+        self.cachedCoverImageData = book.coverImageData
+        self.cachedBookName = book.name
+        self.cachedRecipeCount = book.recipeIDs.count
+        self.cachedBookDescription = book.bookDescription
+        self.cachedBookColor = book.color
+    }
+    
+    // Use cached properties instead of accessing the book object directly
     private var coverImageName: String? {
-        book.coverImageName
+        cachedCoverImageName
     }
     
     private var coverImageData: Data? {
-        book.coverImageData
+        cachedCoverImageData
     }
     
     private var bookName: String {
-        book.name
+        cachedBookName
     }
     
     private var recipeCount: Int {
-        // Safe access - returns 0 if book is deleted/faulted
-        book.recipeIDs.count
+        cachedRecipeCount
     }
     
     private var bookDescription: String? {
-        book.bookDescription
+        cachedBookDescription
     }
     
     private var bookColor: Color {
-        if let colorHex = book.color {
+        if let colorHex = cachedBookColor {
             return Color(hex: colorHex) ?? .blue
         }
         return .blue

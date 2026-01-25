@@ -59,31 +59,37 @@ class VersionHistoryManager {
             releaseDate: Date(),
             changes: [
                 // CloudKit Compatibility Fix (January 26, 2026)
-                "🐛 FIXED: Critical CloudKit sync crash - CloudKitRecipePreview model incompatibility",
-                "✅ Fixed: Added default values to all non-optional CloudKitRecipePreview properties for CloudKit compatibility",
-                "☁️ Fixed: App now launches successfully with CloudKit enabled and syncs recipe books from community",
-                "🔧 Enhanced: Recipe books view now prevents duplicate book IDs with deduplication logic",
-                "📊 Added: Warning logs when duplicate book entries are detected for debugging",
-                
-                // Logging Improvements
-                "📝 Enhanced: All CloudKitDuplicateMonitor print statements converted to structured logging (logInfo/logWarning/logError)",
-                "🔍 Improved: CloudKit sync events now properly logged with 'cloudkit' category for better diagnostics",
-                "⚡️ Added: Duplicate detection after sync now includes detailed logging and statistics",
-                
-                // Display Name Feature Implementation
-                "✨ Added: Display Name field in Sharing Settings for community content attribution",
-                "👤 Fixed: 'Show My Name' toggle now properly shows/hides user's name on shared recipes and books",
-                "🔧 Enhanced: CloudKitSharingService now reads display name from SharingPreferences model instead of just UserDefaults",
-                "📱 Added: TextField for entering display name appears when 'Show My Name' is enabled",
-                "🔄 Added: Automatic synchronization between SharingPreferences and CloudKitSharingService",
-                "🔒 Added: Privacy control - toggle OFF clears display name and shows 'Anonymous' on shares",
-                "💾 Enhanced: Display name properly persists in both SwiftData and UserDefaults for reliability",
-                "✅ Improved: Name changes apply to new shares going forward (existing shares retain original name)"
+                "🐛 CRITICAL FIX: Unshared recipe books now properly disappear from 'All' tab for other users",
+                "✅ Fixed: SharedRecipeBook tracking records are now deleted (not just marked inactive) when books are unshared",
+                "🔧 Enhanced: Sync cleanup now fully removes unshared community books from all views",
+                "📚 Fixed: Recipe books now disappear consistently across Mine/Shared/All tabs after being unshared",
+                "⚡️ Improved: Better error handling when RecipeBook entity is already deleted during sync cleanup"
             ]
         ))
         
         // PREVIOUS VERSIONS - Add historical entries below (hardcoded for history)
         // These represent past releases and should not change
+        // 15.4.106
+//        "🐛 FIXED: Critical CloudKit sync crash - CloudKitRecipePreview model incompatibility",
+//        "✅ Fixed: Added default values to all non-optional CloudKitRecipePreview properties for CloudKit compatibility",
+//        "☁️ Fixed: App now launches successfully with CloudKit enabled and syncs recipe books from community",
+//        "🔧 Enhanced: Recipe books view now prevents duplicate book IDs with deduplication logic",
+//        "📊 Added: Warning logs when duplicate book entries are detected for debugging",
+//        
+//        // Logging Improvements
+//        "📝 Enhanced: All CloudKitDuplicateMonitor print statements converted to structured logging (logInfo/logWarning/logError)",
+//        "🔍 Improved: CloudKit sync events now properly logged with 'cloudkit' category for better diagnostics",
+//        "⚡️ Added: Duplicate detection after sync now includes detailed logging and statistics",
+//        
+//        // Display Name Feature Implementation
+//        "✨ Added: Display Name field in Sharing Settings for community content attribution",
+//        "👤 Fixed: 'Show My Name' toggle now properly shows/hides user's name on shared recipes and books",
+//        "🔧 Enhanced: CloudKitSharingService now reads display name from SharingPreferences model instead of just UserDefaults",
+//        "📱 Added: TextField for entering display name appears when 'Show My Name' is enabled",
+//        "🔄 Added: Automatic synchronization between SharingPreferences and CloudKitSharingService",
+//        "🔒 Added: Privacy control - toggle OFF clears display name and shows 'Anonymous' on shares",
+//        "💾 Enhanced: Display name properly persists in both SwiftData and UserDefaults for reliability",
+//        "✅ Improved: Name changes apply to new shares going forward (existing shares retain original name)"
         // 15.4.105
         // Recipe Book Import Fixes (January 22, 2026)
 //        "🐛 CRITICAL FIX: Recipe book imports failing with 'book.json not found' error",

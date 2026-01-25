@@ -24,11 +24,23 @@ struct ReadOnlyRecipeBookDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var recipePreviews: [CloudKitRecipePreview]
     
-    let book: RecipeBook
+    // Cache book data to avoid faults when book is deleted during sync
+    let bookID: UUID
+    let bookName: String
+    let bookColorHex: String?
     let sharedEntry: SharedRecipeBook
     
     @State private var currentPage = 0
     @State private var selectedRecipe: RecipeWithPreview?
+    @State private var isBookDeleted = false
+    
+    /// Initialize with a RecipeBook - caches the necessary data
+    init(book: RecipeBook, sharedEntry: SharedRecipeBook) {
+        self.bookID = book.id
+        self.bookName = book.name
+        self.bookColorHex = book.color
+        self.sharedEntry = sharedEntry
+    }
     
     private var isPad: Bool {
         horizontalSizeClass == .regular
@@ -36,11 +48,11 @@ struct ReadOnlyRecipeBookDetailView: View {
     
     // Get recipe previews for this book
     private var bookRecipePreviews: [CloudKitRecipePreview] {
-        recipePreviews.filter { $0.bookID == book.id }
+        recipePreviews.filter { $0.bookID == bookID }
     }
     
     private var bookColor: Color {
-        if let colorHex = book.color {
+        if let colorHex = bookColorHex {
             return Color(hex: colorHex) ?? .blue
         }
         return .blue
@@ -55,7 +67,7 @@ struct ReadOnlyRecipeBookDetailView: View {
                     recipePageView
                 }
             }
-            .navigationTitle(book.name)
+            .navigationTitle(bookName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -86,6 +98,48 @@ struct ReadOnlyRecipeBookDetailView: View {
                         }
                 }
             }
+            .task {
+                // Monitor for book deletion using a background task
+                await monitorBookDeletion()
+            }
+            .alert("Book No Longer Shared", isPresented: $isBookDeleted) {
+                Button("OK") {
+                    dismiss()
+                }
+            } message: {
+                Text("This book has been unshared by the owner and is no longer available.")
+            }
+        }
+    }
+    
+    // MARK: - Book Deletion Detection
+    
+    private func monitorBookDeletion() async {
+        // Periodically check if the book still exists
+        while !Task.isCancelled {
+            checkIfBookDeleted()
+            
+            // Check every 2 seconds
+            try? await Task.sleep(for: .seconds(2))
+        }
+    }
+    
+    private func checkIfBookDeleted() {
+        // Check if any RecipeBook with this ID still exists
+        let descriptor = FetchDescriptor<RecipeBook>(
+            predicate: #Predicate<RecipeBook> { book in
+                book.id == bookID
+            }
+        )
+        
+        do {
+            let books = try modelContext.fetch(descriptor)
+            if books.isEmpty {
+                // Book has been deleted
+                isBookDeleted = true
+            }
+        } catch {
+            logError("Failed to check if book is deleted: \(error)", category: "sharing")
         }
     }
     

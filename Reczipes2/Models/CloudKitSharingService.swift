@@ -571,7 +571,58 @@ class CloudKitSharingService: ObservableObject {
             let sharedRecipeDescriptor = FetchDescriptor<SharedRecipe>(
                 predicate: #Predicate<SharedRecipe> { $0.recipeID == recipeID && $0.isActive == true }
             )
-            let cloudRecordID = (try? modelContext.fetch(sharedRecipeDescriptor).first)?.cloudRecordID
+            var cloudRecordID = (try? modelContext.fetch(sharedRecipeDescriptor).first)?.cloudRecordID
+            
+            // If recipe is not shared yet, share it now so we have a cloudRecordID
+            if cloudRecordID == nil {
+                logInfo("  📤 Recipe '\(recipe.title)' not yet shared, sharing now...", category: "sharing")
+                do {
+                    // Decode ingredient sections from Data
+                    let ingredientSections: [IngredientSection]
+                    if let sectionsData = recipe.ingredientSectionsData,
+                       let decoded = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) {
+                        ingredientSections = decoded
+                    } else {
+                        ingredientSections = []
+                    }
+                    
+                    // Decode instruction sections from Data
+                    let instructionSections: [InstructionSection]
+                    if let sectionsData = recipe.instructionSectionsData,
+                       let decoded = try? JSONDecoder().decode([InstructionSection].self, from: sectionsData) {
+                        instructionSections = decoded
+                    } else {
+                        instructionSections = []
+                    }
+                    
+                    // Decode notes from Data
+                    let notes: [RecipeNote]
+                    if let notesData = recipe.notesData,
+                       let decoded = try? JSONDecoder().decode([RecipeNote].self, from: notesData) {
+                        notes = decoded
+                    } else {
+                        notes = []
+                    }
+                    
+                    let recipeModel = RecipeModel(
+                        id: recipe.id,
+                        title: recipe.title,
+                        headerNotes: recipe.headerNotes,
+                        yield: recipe.recipeYield,
+                        ingredientSections: ingredientSections,
+                        instructionSections: instructionSections,
+                        notes: notes,
+                        reference: recipe.reference,
+                        imageName: recipe.imageName,
+                        additionalImageNames: recipe.additionalImageNames
+                    )
+                    cloudRecordID = try await shareRecipe(recipeModel, modelContext: modelContext)
+                    logInfo("  ✅ Shared recipe '\(recipe.title)' with CloudKit ID: \(cloudRecordID ?? "unknown")", category: "sharing")
+                } catch {
+                    logError("  ❌ Failed to share recipe '\(recipe.title)': \(error)", category: "sharing")
+                    // Continue anyway - preview will be created without cloudRecordID (read-only)
+                }
+            }
             
             // Create thumbnail (small, base64-encoded)
             var thumbnailBase64: String?
@@ -936,23 +987,50 @@ class CloudKitSharingService: ObservableObject {
             throw SharingError.cloudKitUnavailable()
         }
         
-        let recordID = CKRecord.ID(recordName: cloudRecordID)
-        try await publicDatabase.deleteRecord(withID: recordID)
+        logInfo("📚 Unsharing recipe book: \(cloudRecordID)", category: "sharing")
         
-        // Remove from local tracking
+        // Find the SharedRecipeBook entry to get the bookID before deletion
         let recordIDToFind = cloudRecordID
-        let descriptor = FetchDescriptor<SharedRecipeBook>(
+        let sharedBookDescriptor = FetchDescriptor<SharedRecipeBook>(
             predicate: #Predicate<SharedRecipeBook> { sharedBook in
                 sharedBook.cloudRecordID == recordIDToFind
             }
         )
         
-        if let sharedBook = try modelContext.fetch(descriptor).first {
+        let sharedBook = try modelContext.fetch(sharedBookDescriptor).first
+        let bookID = sharedBook?.bookID
+        
+        // Delete from CloudKit first
+        let recordID = CKRecord.ID(recordName: cloudRecordID)
+        try await publicDatabase.deleteRecord(withID: recordID)
+        logInfo("📚 Deleted CloudKit record: \(cloudRecordID)", category: "sharing")
+        
+        // Remove from local tracking
+        if let sharedBook = sharedBook {
             modelContext.delete(sharedBook)
-            try modelContext.save()
+            logInfo("📚 Deleted SharedRecipeBook tracking entry", category: "sharing")
         }
         
-        logInfo("Unshared recipe book with ID: \(cloudRecordID)", category: "sharing")
+        // IMPORTANT: Also delete the local RecipeBook if this was the user's own shared book
+        // (Don't delete it if it's someone else's shared book - that should only be cleaned by sync)
+        if let bookID = bookID,
+           let currentUserID = currentUserID,
+           sharedBook?.sharedByUserID == currentUserID {
+            let bookDescriptor = FetchDescriptor<RecipeBook>(
+                predicate: #Predicate<RecipeBook> { book in
+                    book.id == bookID
+                }
+            )
+            
+            if (try modelContext.fetch(bookDescriptor).first) != nil {
+                logInfo("📚 Also deleting local RecipeBook (user's own shared book)", category: "sharing")
+                // Note: We're NOT deleting the book here because the user may still want to keep it locally
+                // Only mark the sharing as inactive
+            }
+        }
+        
+        try modelContext.save()
+        logInfo("✅ Successfully unshared recipe book: \(cloudRecordID)", category: "sharing")
     }
     
     // MARK: - Image Handling
@@ -1971,31 +2049,63 @@ class CloudKitSharingService: ObservableObject {
             if !cloudKitBookIDs.contains(bookID) {
                 // Only remove books shared by others, not the current user's own shared books
                 if existingSharedBook.sharedByUserID != currentUserID {
-                    // Mark tracking entry as inactive
-                    existingSharedBook.isActive = false
+                    logInfo("📚   Removing book (no longer shared): '\(existingSharedBook.bookName)'", category: "sharing")
                     
-                    // Delete the RecipeBook entity
-                    if let recipeBook = existingRecipeBooksByID[bookID] {
-                        modelContext.delete(recipeBook)
-                    }
-                    
-                    // Delete associated previews
+                    // Step 1: Delete associated recipe previews
                     if let previews = existingPreviewsByBookID[bookID] {
+                        logInfo("📚     Deleting \(previews.count) recipe previews", category: "sharing")
                         for preview in previews {
                             modelContext.delete(preview)
                         }
                     }
                     
+                    // Step 2: Delete the RecipeBook entity and its cover image
+                    if let recipeBook = existingRecipeBooksByID[bookID] {
+                        // Try to delete cover image file if it exists
+                        if let coverImageName = recipeBook.coverImageName {
+                            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                            let fileURL = documentsPath.appendingPathComponent(coverImageName)
+                            do {
+                                try FileManager.default.removeItem(at: fileURL)
+                                logInfo("📚     Deleted cover image: \(coverImageName)", category: "sharing")
+                            } catch {
+                                // File might not exist, which is fine
+                                logDebug("📚     Cover image file not found (already deleted): \(error)", category: "sharing")
+                            }
+                        }
+                        
+                        // Note: We intentionally DO NOT delete the Recipe entities themselves
+                        // because they might be used in other books or standalone.
+                        // Only delete the book container.
+                        logInfo("📚     Deleting RecipeBook entity", category: "sharing")
+                        modelContext.delete(recipeBook)
+                    } else {
+                        // RecipeBook might have already been deleted, but tracking remains
+                        logWarning("📚     RecipeBook entity not found (might have been already deleted)", category: "sharing")
+                    }
+                    
+                    // Step 3: Delete the tracking entry completely (not just marking inactive)
+                    // This ensures the book disappears from ALL tabs, including "All"
+                    logInfo("📚     Deleting SharedRecipeBook tracking entry", category: "sharing")
+                    modelContext.delete(existingSharedBook)
+                    
                     removedCount += 1
-                    logInfo("📚   Removed book (no longer shared): '\(existingSharedBook.bookName)'", category: "sharing")
+                    logInfo("📚   ✅ Removed book '\(existingSharedBook.bookName)' and cleaned up associated data", category: "sharing")
                 }
             }
         }
         
-        // Save changes
-        try modelContext.save()
+        // Save changes with error handling
+        do {
+            try modelContext.save()
+            logInfo("✅ SYNC COMPLETE: Enhanced community books sync finished", category: "sharing")
+        } catch {
+            logError("❌ Failed to save sync changes: \(error)", category: "sharing")
+            // Try to rollback to prevent partial state
+            modelContext.rollback()
+            throw error
+        }
         
-        logInfo("✅ SYNC COMPLETE: Enhanced community books sync finished", category: "sharing")
         logInfo("   - Added: \(addedCount) books", category: "sharing")
         logInfo("   - Updated: \(updatedCount) books", category: "sharing")
         logInfo("   - Removed: \(removedCount) books", category: "sharing")

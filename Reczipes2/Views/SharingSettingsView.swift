@@ -1210,13 +1210,21 @@ struct SharedBooksBrowserView: View {
     @State private var showingBookDetail: CloudKitRecipeBook?
     
     var filteredBooks: [CloudKitRecipeBook] {
+        guard !sharedBooks.isEmpty else { return [] }
+        
         if searchText.isEmpty {
             return sharedBooks
         }
+        
         return sharedBooks.filter { book in
-            book.name.localizedCaseInsensitiveContains(searchText) ||
-            (book.sharedByUserName?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-            (book.bookDescription?.localizedCaseInsensitiveContains(searchText) ?? false)
+            // Safely access properties with fallbacks
+            let name = book.name
+            let userName = book.sharedByUserName ?? ""
+            let description = book.bookDescription ?? ""
+            
+            return name.localizedCaseInsensitiveContains(searchText) ||
+                   userName.localizedCaseInsensitiveContains(searchText) ||
+                   description.localizedCaseInsensitiveContains(searchText)
         }
     }
     
@@ -1279,7 +1287,9 @@ struct SharedBooksBrowserView: View {
         errorMessage = nil
         
         do {
+            logInfo("📚 Starting to fetch shared recipe books...", category: "sharing")
             let books = try await sharingService.fetchSharedRecipeBooks(excludeCurrentUser: true)
+            
             await MainActor.run {
                 sharedBooks = books
                 logInfo("📚 Loaded \(books.count) shared books from CloudKit", category: "sharing")
@@ -1287,20 +1297,24 @@ struct SharedBooksBrowserView: View {
             
             // Automatically sync to local SwiftData so books appear in RecipeBooksView
             do {
+                logInfo("📚 Starting sync to local SwiftData...", category: "sharing")
                 try await sharingService.syncCommunityBooksToLocal(modelContext: modelContext)
-                logInfo("📚 Synced community books to local SwiftData", category: "sharing")
+                logInfo("✅ Successfully synced community books to local SwiftData", category: "sharing")
             } catch {
-                logError("Failed to sync community books to local: \(error)", category: "sharing")
+                logError("❌ Failed to sync community books to local: \(error)", category: "sharing")
                 // Don't show error to user - the browse view still works
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Failed to load recipe books: \(error.localizedDescription)"
-                logError("Failed to load shared books: \(error)", category: "sharing")
+                let errorDetails = "\(error.localizedDescription) [\(type(of: error))]"
+                errorMessage = "Failed to load recipe books: \(errorDetails)"
+                logError("❌ Failed to load shared books: \(error)", category: "sharing")
             }
         }
         
-        isLoading = false
+        await MainActor.run {
+            isLoading = false
+        }
     }
 }
 
