@@ -398,25 +398,39 @@ class BatchImageExtractorViewModel: ObservableObject {
     private func saveRecipe(_ recipeModel: RecipeModel, withImage image: UIImage) async {
         logInfo("Saving recipe: \(recipeModel.title)", category: "batch")
         
-        // Convert to SwiftData Recipe
-        let recipe = Recipe(from: recipeModel)
+        // Convert to SwiftData RecipeX (NEW unified model)
+        let recipeX = RecipeX(from: recipeModel)
         
-        // NEW: Save image directly to SwiftData (CloudKit-synced)
-        recipe.setImage(image, isMainImage: true)
+        // Set owner info (get from CloudKit if available)
+        if let userID = CloudKitSharingService.shared.currentUserID {
+            recipeX.ownerUserID = userID
+        }
+        if let displayName = CloudKitSharingService.shared.currentUserName {
+            recipeX.ownerDisplayName = displayName
+        }
+        
+        // Set extraction source
+        recipeX.extractionSource = "batch"
+        
+        // Set device identifier
+        recipeX.lastModifiedDeviceID = UIDevice.current.identifierForVendor?.uuidString
+        
+        // Save image directly to SwiftData (CloudKit-synced)
+        recipeX.setImage(image, isMainImage: true)
+        
+        // Generate content fingerprint for duplicate detection
+        recipeX.updateContentFingerprint()
+        
+        // Mark for CloudKit sync (automatic sharing)
+        recipeX.needsCloudSync = true
         
         // Insert into SwiftData
-        modelContext.insert(recipe)
-        
-        // Create image assignment for compatibility (uses imageName which is set by setImage)
-        if let imageName = recipe.imageName {
-            let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
-            modelContext.insert(assignment)
-        }
+        modelContext.insert(recipeX)
         
         // Save context
         do {
             try modelContext.save()
-            logInfo("✅ Recipe saved to database with imageData (CloudKit-synced)", category: "batch")
+            logInfo("✅ Recipe saved to database as RecipeX (CloudKit-synced, auto-sharing enabled)", category: "batch")
         } catch {
             logError("Failed to save recipe to database: \(error)", category: "batch")
         }

@@ -39,9 +39,11 @@ struct SharingSettingsView: View {
     
     var body: some View {
         List {
+            // Info banner explaining iCloud sync vs public sharing
+            infoSection
+            
             // CloudKit Status
             cloudKitStatusSection
-            cloudKitRecipeManagementSection
             
             // Sharing Preferences
             sharingPreferencesSection
@@ -52,10 +54,10 @@ struct SharingSettingsView: View {
             // Quick Actions
             quickActionsSection
             
-            // Community Content
-            communitySection
+            // CloudKit Management (advanced)
+            cloudKitManagementSection
         }
-        .navigationTitle("Sharing & Community")
+        .navigationTitle("Public Sharing")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             // Initialize CloudKitSharingService with current preferences
@@ -114,6 +116,55 @@ struct SharingSettingsView: View {
     
     // MARK: - Sections
     
+    private var infoSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
+                        .font(.title3)
+                    Text("About Public Sharing & License")
+                        .font(.headline)
+                }
+                
+                Text("Your recipes and books are automatically synced to iCloud across all your devices. This page is for **publicly sharing** specific content with the wider community.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("iCloud Sync: Always On", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    
+                    Label("Public Sharing: Your Choice", systemImage: "person.3.fill")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundStyle(.green)
+                        Text("Sharing License")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Text("All recipes you publicly share are automatically licensed under **Creative Commons BY 4.0** (attribution required). You may choose to share or keep your content private at any time.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    // MARK: - Sections
+    
     private var cloudKitStatusSection: some View {
         Section {
             HStack {
@@ -121,7 +172,7 @@ struct SharingSettingsView: View {
                     .foregroundStyle(sharingService.isCloudKitAvailable ? .green : .red)
                 
                 VStack(alignment: .leading) {
-                    Text(sharingService.isCloudKitAvailable ? "Ready to Share" : "Not Available")
+                    Text(sharingService.isCloudKitAvailable ? "Ready to Share Publicly" : "Not Available")
                         .font(.headline)
                     
                     if let userName = sharingService.currentUserName {
@@ -129,18 +180,20 @@ struct SharingSettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else if !sharingService.isCloudKitAvailable {
-                        Text("Sign in to iCloud to enable sharing")
+                        Text("Sign in to iCloud to enable public sharing")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
         } header: {
-            Text("CloudKit Status")
+            Text("Public Sharing Status")
+        } footer: {
+            Text("Public sharing requires iCloud. Your private sync works regardless of these settings.")
         }
     }
     
-    private var cloudKitRecipeManagementSection: some View {
+    private var cloudKitManagementSection: some View {
         Section {
             NavigationLink {
                 CloudKitRecipeManagerView()
@@ -154,7 +207,7 @@ struct SharingSettingsView: View {
                 Label("Manage CloudKit Recipe Books", systemImage: "books.vertical")
             }
         } header: {
-            Text("CloudKit Management")
+            Text("Advanced CloudKit Management")
         } footer: {
             Text("View and manage all your content stored in CloudKit, including orphaned items that aren't tracked locally.")
         }
@@ -163,7 +216,7 @@ struct SharingSettingsView: View {
     
     private var sharingPreferencesSection: some View {
         Section {
-            Toggle("Share All Recipes", isOn: Binding(
+            Toggle("Auto-Share New Recipes", isOn: Binding(
                 get: { preferences.shareAllRecipes },
                 set: { newValue in
                     preferences.shareAllRecipes = newValue
@@ -183,7 +236,7 @@ struct SharingSettingsView: View {
             ))
             .disabled(!sharingService.isCloudKitAvailable)
             
-            Toggle("Share All Recipe Books", isOn: Binding(
+            Toggle("Auto-Share New Recipe Books", isOn: Binding(
                 get: { preferences.shareAllBooks },
                 set: { newValue in
                     preferences.shareAllBooks = newValue
@@ -203,7 +256,7 @@ struct SharingSettingsView: View {
             ))
             .disabled(!sharingService.isCloudKitAvailable)
             
-            Toggle("Show My Name", isOn: Binding(
+            Toggle("Show My Name Publicly", isOn: Binding(
                 get: { preferences.allowOthersToSeeMyName },
                 set: { newValue in
                     preferences.allowOthersToSeeMyName = newValue
@@ -232,15 +285,15 @@ struct SharingSettingsView: View {
                 .autocorrectionDisabled()
                 .disabled(!sharingService.isCloudKitAvailable)
                 
-                Text("This name will be shown when you share recipes and books with the community")
+                Text("This name will be shown when you publicly share recipes and books")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             
         } header: {
-            Text("Sharing Preferences")
+            Text("Public Sharing Preferences")
         } footer: {
-            Text("When 'Share All' is enabled, new recipes/books will automatically be shared with the community.")
+            Text("When auto-share is enabled, new recipes/books will be automatically shared with the community under Creative Commons BY 4.0 license (attribution required). Turn off to share items manually or keep them private. You retain full ownership and can stop sharing at any time.")
         }
     }
     
@@ -249,22 +302,24 @@ struct SharingSettingsView: View {
             HStack {
                 Label("\(sharedRecipes.filter { $0.isActive }.count) Recipes", systemImage: "book.fill")
                 Spacer()
-                Text("Shared")
+                Text("Publicly Shared")
                     .foregroundStyle(.secondary)
             }
             
             HStack {
                 Label("\(sharedBooks.filter { $0.isActive }.count) Recipe Books", systemImage: "books.vertical.fill")
                 Spacer()
-                Text("Shared")
+                Text("Publicly Shared")
                     .foregroundStyle(.secondary)
             }
             
-            NavigationLink("Manage Shared Content") {
+            NavigationLink("Manage Public Shares") {
                 ManageSharedContentView()
             }
         } header: {
-            Text("My Shared Content")
+            Text("My Public Shares")
+        } footer: {
+            Text("These items are shared publicly with the community under Creative Commons BY 4.0 license. They're separate from your private iCloud sync and you can stop sharing them at any time.")
         }
     }
     
@@ -284,114 +339,102 @@ struct SharingSettingsView: View {
             }
             .disabled(!sharingService.isCloudKitAvailable)
             
-            // Diagnostic & Cleanup Tools - Recipes
-            Button {
-                Task {
-                    await cleanupGhostRecipes()
+            // Advanced Tools (collapsed into disclosure group)
+            DisclosureGroup {
+                // Diagnostic & Cleanup Tools - Recipes
+                Button {
+                    Task {
+                        await cleanupGhostRecipes()
+                    }
+                } label: {
+                    Label("Clean Up Ghost Recipes", systemImage: "sparkles")
                 }
-            } label: {
-                Label("Clean Up Ghost Recipes", systemImage: "sparkles")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            Button {
-                Task {
-                    await syncLocalTracking()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Button {
+                    Task {
+                        await syncLocalTracking()
+                    }
+                } label: {
+                    Label("Sync Recipe Sharing Status", systemImage: "arrow.triangle.2.circlepath")
                 }
-            } label: {
-                Label("Sync Recipe Sharing Status", systemImage: "arrow.triangle.2.circlepath")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            Button {
-                Task {
-                    await repairRecipeCloudKitIDs()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Button {
+                    Task {
+                        await repairRecipeCloudKitIDs()
+                    }
+                } label: {
+                    Label("Repair Recipe CloudKit IDs", systemImage: "wrench.and.screwdriver")
                 }
-            } label: {
-                Label("Repair Recipe CloudKit IDs", systemImage: "wrench.and.screwdriver")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            // Diagnostic & Cleanup Tools - Recipe Books
-            Button {
-                Task {
-                    await cleanupGhostRecipeBooks()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Divider()
+                
+                // Diagnostic & Cleanup Tools - Recipe Books
+                Button {
+                    Task {
+                        await cleanupGhostRecipeBooks()
+                    }
+                } label: {
+                    Label("Clean Up Ghost Recipe Books", systemImage: "sparkles.rectangle.stack")
                 }
-            } label: {
-                Label("Clean Up Ghost Recipe Books", systemImage: "sparkles.rectangle.stack")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            Button {
-                Task {
-                    await syncLocalRecipeBookTracking()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Button {
+                    Task {
+                        await syncLocalRecipeBookTracking()
+                    }
+                } label: {
+                    Label("Sync Recipe Book Sharing Status", systemImage: "arrow.triangle.2.circlepath.circle")
                 }
-            } label: {
-                Label("Sync Recipe Book Sharing Status", systemImage: "arrow.triangle.2.circlepath.circle")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            Button {
-                Task {
-                    await repairRecipeBookCloudKitIDs()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Button {
+                    Task {
+                        await repairRecipeBookCloudKitIDs()
+                    }
+                } label: {
+                    Label("Repair Recipe Book CloudKit IDs", systemImage: "wrench.and.screwdriver.fill")
                 }
-            } label: {
-                Label("Repair Recipe Book CloudKit IDs", systemImage: "wrench.and.screwdriver.fill")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            // Community Sync
-            Button {
-                Task {
-                    await syncCommunityBooks()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Divider()
+                
+                // Community Sync
+                Button {
+                    Task {
+                        await syncCommunityBooks()
+                    }
+                } label: {
+                    Label("Sync Community Books", systemImage: "books.vertical.circle")
                 }
-            } label: {
-                Label("Sync Community Books", systemImage: "books.vertical.circle")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            // Diagnostics
-            Button {
-                Task {
-                    await diagnoseSharedBooks()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Button {
+                    Task {
+                        await syncCommunityRecipes()
+                    }
+                } label: {
+                    Label("Sync Community Recipes", systemImage: "book.circle")
                 }
-            } label: {
-                Label("Diagnose Shared Books", systemImage: "stethoscope")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            Button {
-                Task {
-                    await syncCommunityRecipes()
+                .disabled(!sharingService.isCloudKitAvailable)
+                
+                Button {
+                    Task {
+                        await diagnoseSharedBooks()
+                    }
+                } label: {
+                    Label("Diagnose Shared Books", systemImage: "stethoscope")
                 }
+                .disabled(!sharingService.isCloudKitAvailable)
             } label: {
-                Label("Sync Community Recipes", systemImage: "book.circle")
+                Label("Advanced Tools", systemImage: "gearshape.2")
             }
-            .disabled(!sharingService.isCloudKitAvailable)
         } header: {
             Text("Quick Actions")
         } footer: {
-            Text("Use 'Clean Up Ghost' buttons if you see content in Browse view that you've already unshared. Use 'Sync Status' buttons to fix tracking mismatches. Use 'Repair CloudKit IDs' if you see '⚠️ No CloudKit ID' warnings. Use 'Sync Community' to refresh shared content for viewing.")
-        }
-    }
-    
-    private var communitySection: some View {
-        Section {
-            NavigationLink {
-                SharedRecipesBrowserView()
-            } label: {
-                Label("Browse Shared Recipes", systemImage: "person.3.fill")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-            
-            NavigationLink {
-                SharedBooksBrowserView()
-            } label: {
-                Label("Browse Shared Recipe Books", systemImage: "books.vertical.circle.fill")
-            }
-            .disabled(!sharingService.isCloudKitAvailable)
-        } header: {
-            Text("Community")
+            Text("Use 'Share Specific' buttons to manually share content. Advanced tools help resolve issues with shared content.")
         }
     }
     

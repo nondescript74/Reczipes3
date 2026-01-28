@@ -149,13 +149,17 @@ struct SettingsView: View {
                     
                     
 
-                    Section("Community") {
-                        NavigationLink(destination: SharingSettingsView()) {
-                            Label("Sharing & Community", systemImage: "person.3.fill")
-                        }
-                        
+                    Section {
                         NavigationLink(destination: SharedRecipesBrowserView()) {
                             Label("Browse Community Recipes", systemImage: "tray.full.fill")
+                        }
+                        
+                        NavigationLink(destination: SharedBooksBrowserView()) {
+                            Label("Browse Community Books", systemImage: "books.vertical.circle.fill")
+                        }
+                        
+                        NavigationLink(destination: SharingSettingsView()) {
+                            Label("Public Sharing Settings", systemImage: "person.3.fill")
                         }
                         
                         NavigationLink(destination: CommunitySharingCleanupView()) {
@@ -167,6 +171,11 @@ struct SettingsView: View {
                                     .font(.caption)
                             }
                         }
+                    } header: {
+                        Text("Community")
+                    } footer: {
+                        Text("Your recipes and books are automatically synced to iCloud across your devices. Use Public Sharing to share specific content with the wider community.")
+                            .font(.caption)
                     }
                     
                     Section {

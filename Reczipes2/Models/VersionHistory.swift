@@ -58,6 +58,29 @@ class VersionHistoryManager {
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
             releaseDate: Date(),
             changes: [
+                // RecipeX Model Integration (January 26, 2026)
+                "✨ Added: RecipeX unified recipe model with automatic CloudKit sync capabilities",
+                "🔄 Added: Recipe model selector in Recipes tab - switch between Legacy and RecipeX",
+                "📊 Added: Side-by-side model support - both Recipe and RecipeX work simultaneously",
+                "💾 Added: RecipeX stores all data in SwiftData (no separate image files)",
+                "🔧 Added: RecipeX.toRecipeModel() conversion for seamless display compatibility",
+                "⚡️ Enhanced: Recipe cache system now supports both model types",
+                "🎨 Added: RecipeModelTypePicker UI component with model descriptions",
+                "📝 Added: Comprehensive RecipeX integration guide (RECIPEX_INTEGRATION_GUIDE.md)",
+                
+                // Unified Book Model (January 26, 2026)
+                "📚 Added: New unified Book model for recipe book CloudKit sync to Public Database",
+                "☁️ Added: BookSyncService for uploading, downloading, searching, and deleting books from CloudKit",
+                "✨ Added: Community book sharing - share entire recipe books with all app users",
+                "🔍 Added: Search books by name, category, and cuisine in CloudKit Public Database",
+                "📥 Added: Download and import books shared by other users",
+                "🔄 Added: Automatic sync for books marked as shared with configurable privacy levels",
+                "📊 Added: Book content includes recipes, images, instructions, glossaries, and custom content",
+                "👤 Added: User attribution for book ownership with display name and CloudKit user ID",
+                "🎨 Added: Book sharing configuration with image quality and content inclusion options",
+                "💾 Added: Book model integrated into ModelContainer schema (5 locations)",
+                "⚡️ Enhanced: Background book sync with CloudKit subscriptions and remote notifications",
+                
                 // CloudKit Compatibility Fix (January 26, 2026)
                 "🐛 CRITICAL FIX: Unshared recipe books now properly disappear from 'All' tab for other users",
                 "✅ Fixed: SharedRecipeBook tracking records are now deleted (not just marked inactive) when books are unshared",

@@ -19,7 +19,7 @@ struct LicenseHelper {
     
     /// Update this version number whenever the license terms change
     /// Users who accepted older versions may need to re-accept
-    static let currentLicenseVersion = "2.1"
+    static let currentLicenseVersion = "2.2"
     
     // MARK: - License Status
     
@@ -61,8 +61,8 @@ struct LicenseHelper {
     static let licenseText = """
     END USER LICENSE AGREEMENT
     
-    Last Updated: December 24, 2025
-    Version 2.1
+    Last Updated: January 28, 2026
+    Version 2.2
     
     PLEASE READ THIS LICENSE AGREEMENT CAREFULLY BEFORE USING RECZIPES.
     
@@ -100,7 +100,20 @@ struct LicenseHelper {
     • The application developer assumes no liability for your use of third-party content
     • You should respect the intellectual property rights of cookbook authors, chefs, food bloggers, and other content creators
     
-    4. AI-POWERED EXTRACTION AND ACCURACY
+    4. PUBLIC SHARING AND LICENSING
+    
+    You understand and agree that:
+    
+    • Public sharing is OPTIONAL - you have full control over what you share
+    • When you choose to publicly share recipes or recipe books through this application, they are automatically licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
+    • This means others can use, share, and adapt your shared content, provided they give you appropriate credit
+    • You retain ownership of your content and can stop sharing at any time
+    • Once content has been shared publicly, others may have already downloaded or saved copies under the CC BY 4.0 license terms
+    • You confirm that you have the legal right to share any content under this license
+    • Private recipes stored on your device or synced via iCloud remain private and are NOT automatically shared
+    • You control which specific recipes or books to share publicly through the app's sharing settings
+    
+    5. AI-POWERED EXTRACTION AND ACCURACY
     
     You understand that:
     
@@ -111,7 +124,7 @@ struct LicenseHelper {
     • The application developer is not liable for any issues arising from inaccurate recipe extraction, including but not limited to missed allergens, incorrect ingredients, or wrong measurements
     • You should always cross-reference recipe information with the original source
     
-    5. ALLERGEN DETECTION AND FOOD SAFETY
+    6. ALLERGEN DETECTION AND FOOD SAFETY
     
     You specifically acknowledge that:
     
@@ -121,7 +134,7 @@ struct LicenseHelper {
     • This application is NOT a replacement for careful ingredient verification
     • The developer is NOT LIABLE for any allergic reactions, health issues, or medical emergencies resulting from missed or misidentified allergens
     
-    6. DIABETIC-FRIENDLY ANALYSIS AND NUTRITIONAL INFORMATION
+    7. DIABETIC-FRIENDLY ANALYSIS AND NUTRITIONAL INFORMATION
     
     You specifically acknowledge that:
     
@@ -138,7 +151,7 @@ struct LicenseHelper {
     • The "last updated" timestamp indicates when the analysis was performed, not when the underlying medical guidelines were published
     • You understand that individual responses to foods vary significantly based on factors including but not limited to: overall health, medications, activity level, portion sizes, food combinations, and individual metabolism
     
-    7. PRIVACY AND DATA HANDLING
+    8. PRIVACY AND DATA HANDLING
     
     • Your recipes and images are stored locally on your device
     • When using the recipe extraction feature, images and text are sent to Anthropic's Claude API for processing
@@ -148,8 +161,9 @@ struct LicenseHelper {
     • Diabetic analysis results are cached locally for 30 days to improve performance and reduce API costs
     • No personal health information, diabetic status, or analysis history is tracked, stored, or shared with third parties
     • All dietary preference settings (FODMAP, diabetic analysis) are stored locally on your device only
+    • Publicly shared recipes are stored in iCloud and visible to all users who browse community content
     
-    8. NO WARRANTY
+    9. NO WARRANTY
     
     This application is provided "as is" without warranty of any kind, either express or implied, including but not limited to:
     
@@ -160,7 +174,7 @@ struct LicenseHelper {
     • Data integrity or security
     • Suitability for any medical, dietary, nutritional, or health-related purpose
     
-    9. LIMITATION OF LIABILITY
+    10. LIMITATION OF LIABILITY
     
     To the maximum extent permitted by law, the application developer shall not be liable for any:
     
@@ -172,8 +186,9 @@ struct LicenseHelper {
     • Damages resulting from AI errors, omissions, inaccuracies, or incorrect nutritional analyses
     • Blood sugar complications, diabetic emergencies, or health issues resulting from reliance on diabetic-friendly analysis
     • Damages resulting from the use or inability to use this application
+    • Issues arising from content shared under the Creative Commons BY 4.0 license
     
-    9. THIRD-PARTY CONTENT AND SOURCES
+    11. THIRD-PARTY CONTENT AND SOURCES
     
     • All recipes and information displayed are sourced from the web or provided by users
     • The application developer does not create, verify, endorse, or guarantee the accuracy of any recipe content
@@ -183,7 +198,7 @@ struct LicenseHelper {
     • Source URLs and citations are provided for transparency and user verification, not as endorsement or guarantee of accuracy
     • You use all recipe information and health analysis at your own risk
     
-    10. ACCEPTANCE
+    12. ACCEPTANCE
     
     By clicking "I Accept" below, you acknowledge that:
     
@@ -195,6 +210,9 @@ struct LicenseHelper {
     • You understand the AI features can make mistakes in recipe extraction, allergen detection, and nutritional analysis
     • You will verify all recipe information independently, especially regarding allergens, dietary restrictions, and blood sugar management
     • You understand glycemic load and carbohydrate calculations are estimates and may not reflect your individual metabolic response
+    • You understand that publicly sharing content licenses it under Creative Commons BY 4.0 (attribution required)
+    • You have the legal right to share any content you choose to make public
+    • You can choose to keep your recipes private or share them publicly at your discretion
     • You will use this application in compliance with all applicable laws and regulations
     
     If you do not agree to these terms, you may not use this application.

@@ -17,6 +17,9 @@ struct CloudKitSyncStatusMonitorView: View {
     @StateObject private var syncLogger = SyncStatusLogger()
     
     @State private var recipeCount: Int = 0
+    @State private var recipeXCount: Int = 0
+    @State private var bookCount: Int = 0
+    @State private var totalRecipeCount: Int = 0
     @State private var userRecordID: String = "Checking..."
     @State private var isRefreshing: Bool = false
     @State private var lastRefreshTime: Date?
@@ -60,14 +63,45 @@ struct CloudKitSyncStatusMonitorView: View {
             // Data Status
             Section("Local Data") {
                 HStack {
-                    Label("\(recipeCount)", systemImage: "book.fill")
+                    Label("\(totalRecipeCount)", systemImage: "book.fill")
                         .font(.title2.bold())
                     Spacer()
-                    Text("Recipes")
+                    Text("Total Recipes")
                         .foregroundColor(.secondary)
                 }
                 
-                if recipeCount > 0 {
+                // Show breakdown if both model types exist
+                if recipeCount > 0 || recipeXCount > 0 {
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .foregroundColor(.secondary)
+                        Text("Legacy Recipe")
+                        Spacer()
+                        Text("\(recipeCount)")
+                            .foregroundColor(.secondary)
+                    }
+                    .font(.caption)
+                    
+                    HStack {
+                        Image(systemName: "doc.badge.gearshape")
+                            .foregroundColor(.green)
+                        Text("RecipeX (CloudKit)")
+                        Spacer()
+                        Text("\(recipeXCount)")
+                            .foregroundColor(.green)
+                    }
+                    .font(.caption)
+                }
+                
+                HStack {
+                    Label("\(bookCount)", systemImage: "books.vertical.fill")
+                        .font(.title3.bold())
+                    Spacer()
+                    Text("Books")
+                        .foregroundColor(.secondary)
+                }
+                
+                if totalRecipeCount > 0 || bookCount > 0 {
                     HStack {
                         Image(systemName: "icloud.and.arrow.up")
                         Text("Ready to sync to other devices")
@@ -205,11 +239,25 @@ struct CloudKitSyncStatusMonitorView: View {
         // Refresh account status
         await monitor.checkAccountStatus()
         
-        // Count recipes
-        let descriptor = FetchDescriptor<Recipe>()
-        if let recipes = try? modelContext.fetch(descriptor) {
+        // Count recipes (legacy model)
+        let recipeDescriptor = FetchDescriptor<Recipe>()
+        if let recipes = try? modelContext.fetch(recipeDescriptor) {
             recipeCount = recipes.count
         }
+        
+        // Count RecipeX (new unified model)
+        let recipeXDescriptor = FetchDescriptor<RecipeX>()
+        if let recipesX = try? modelContext.fetch(recipeXDescriptor) {
+            recipeXCount = recipesX.count
+        }
+        
+        // Count Books (new unified model)
+        let bookDescriptor = FetchDescriptor<Book>()
+        if let booksArray = try? modelContext.fetch(bookDescriptor) {
+            bookCount = booksArray.count
+        }
+        
+        totalRecipeCount = recipeCount + recipeXCount
         
         // Get user record ID
         do {
@@ -219,7 +267,7 @@ struct CloudKitSyncStatusMonitorView: View {
             let idPrefix = String(recordID.recordName.prefix(12))
             userRecordID = "\(idPrefix)..."
             
-            syncLogger.addEvent("Status refreshed: \(recipeCount) recipes")
+            syncLogger.addEvent("Status refreshed: \(totalRecipeCount) recipes (\(recipeCount) legacy + \(recipeXCount) RecipeX), \(bookCount) books")
         } catch {
             userRecordID = "Unable to fetch"
             syncLogger.addEvent("Error fetching user ID: \(error.localizedDescription)", type: .error)
@@ -244,19 +292,54 @@ struct CloudKitSyncStatusMonitorView: View {
         for await _ in notifications {
             syncLogger.addEvent("Remote data change detected", type: .sync)
             
-            // Refresh recipe count
-            let descriptor = FetchDescriptor<Recipe>()
-            if let recipes = try? modelContext.fetch(descriptor) {
-                let oldCount = recipeCount
+            // Store old counts
+            let oldRecipeCount = recipeCount
+            let oldRecipeXCount = recipeXCount
+            let oldBookCount = bookCount
+            
+            // Refresh all counts
+            let recipeDescriptor = FetchDescriptor<Recipe>()
+            if let recipes = try? modelContext.fetch(recipeDescriptor) {
                 recipeCount = recipes.count
-                
-                if recipeCount != oldCount {
-                    let diff = recipeCount - oldCount
-                    if diff > 0 {
-                        syncLogger.addEvent("Downloaded \(diff) new recipe(s)", type: .success)
-                    } else {
-                        syncLogger.addEvent("Removed \(abs(diff)) recipe(s)", type: .info)
-                    }
+            }
+            
+            let recipeXDescriptor = FetchDescriptor<RecipeX>()
+            if let recipesX = try? modelContext.fetch(recipeXDescriptor) {
+                recipeXCount = recipesX.count
+            }
+            
+            let bookDescriptor = FetchDescriptor<Book>()
+            if let booksArray = try? modelContext.fetch(bookDescriptor) {
+                bookCount = booksArray.count
+            }
+            
+            totalRecipeCount = recipeCount + recipeXCount
+            
+            // Log changes for each model type
+            if recipeCount != oldRecipeCount {
+                let diff = recipeCount - oldRecipeCount
+                if diff > 0 {
+                    syncLogger.addEvent("Downloaded \(diff) new Recipe(s) (legacy)", type: .success)
+                } else {
+                    syncLogger.addEvent("Removed \(abs(diff)) Recipe(s) (legacy)", type: .info)
+                }
+            }
+            
+            if recipeXCount != oldRecipeXCount {
+                let diff = recipeXCount - oldRecipeXCount
+                if diff > 0 {
+                    syncLogger.addEvent("Downloaded \(diff) new RecipeX(s)", type: .success)
+                } else {
+                    syncLogger.addEvent("Removed \(abs(diff)) RecipeX(s)", type: .info)
+                }
+            }
+            
+            if bookCount != oldBookCount {
+                let diff = bookCount - oldBookCount
+                if diff > 0 {
+                    syncLogger.addEvent("Downloaded \(diff) new Book(s)", type: .success)
+                } else {
+                    syncLogger.addEvent("Removed \(abs(diff)) Book(s)", type: .info)
                 }
             }
         }
@@ -267,8 +350,13 @@ struct CloudKitSyncStatusMonitorView: View {
         text += "Date: \(Date())\n"
         text += "Sync Status: \(monitor.isSyncEnabled ? "Active" : "Inactive")\n"
         text += "iCloud Account: \(accountStatusText)\n"
-        text += "User ID: \(userRecordID)\n"
-        text += "Local Recipes: \(recipeCount)\n\n"
+        text += "User ID: \(userRecordID)\n\n"
+        
+        text += "=== Local Data ===\n"
+        text += "Total Recipes: \(totalRecipeCount)\n"
+        text += "  - Legacy Recipe: \(recipeCount)\n"
+        text += "  - RecipeX (new): \(recipeXCount)\n"
+        text += "Books: \(bookCount)\n\n"
         
         text += "=== Activity Log ===\n"
         for event in syncLogger.events.reversed() {

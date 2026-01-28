@@ -7,11 +7,11 @@
 
 import Foundation
 
-/// Enum representing the three content filter modes for recipes and books
+/// Enum representing the two content filter modes for recipes and books (Mine/Shared)
+/// "All" option has been removed - users can switch between Mine and Shared views
 enum ContentFilterMode: String, CaseIterable, Identifiable {
     case mine = "Mine"
     case shared = "Shared"
-    case all = "All"
     
     var id: String { rawValue }
     
@@ -21,8 +21,6 @@ enum ContentFilterMode: String, CaseIterable, Identifiable {
             return "person.fill"
         case .shared:
             return "person.2.fill"
-        case .all:
-            return "person.3.fill"
         }
     }
     
@@ -32,8 +30,6 @@ enum ContentFilterMode: String, CaseIterable, Identifiable {
             return "My Content"
         case .shared:
             return "Shared by Others"
-        case .all:
-            return "All Content"
         }
     }
 }

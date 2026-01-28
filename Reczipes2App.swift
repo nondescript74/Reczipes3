@@ -113,6 +113,11 @@ struct Reczipes2App: App {
                                 await migrateBookCoverImages()
                             }
                             
+                            // Check for legacy data migration
+                            Task {
+                                await checkLegacyMigration()
+                            }
+                            
                             // Check for App Clip data
                             checkForAppClipData()
                         }
@@ -359,6 +364,44 @@ struct Reczipes2App: App {
                     )
                 ]
             )
+        }
+    }
+    
+    // MARK: - Legacy Model Migration
+    
+    @MainActor
+    private func checkLegacyMigration() async {
+        let modelContext = sharedModelContainer.mainContext
+        let manager = LegacyToNewMigrationManager(modelContext: modelContext)
+        
+        // Check if migration is needed
+        let needsMigration = await manager.needsMigration()
+        
+        if needsMigration {
+            let stats = await manager.getMigrationStats()
+            logInfo("📦 Legacy data detected: \(stats.legacyRecipeCount) recipes, \(stats.legacyBookCount) books", category: "migration")
+            
+            logUserDiagnostic(
+                .info,
+                category: .storage,
+                title: "New Models Available",
+                message: "Upgrade to new RecipeX and Book models for automatic iCloud sync.",
+                technicalDetails: "Legacy items: \(stats.totalLegacyItems)",
+                suggestedActions: [
+                    DiagnosticAction(
+                        title: "Migrate Now",
+                        description: "Tap the migration badge in the Recipes tab",
+                        actionType: .retryOperation
+                    ),
+                    DiagnosticAction(
+                        title: "Learn More",
+                        description: "See LEGACY_MIGRATION_GUIDE.md for details",
+                        actionType: .openSettings(.general)
+                    )
+                ]
+            )
+        } else {
+            logInfo("No legacy migration needed", category: "migration")
         }
     }
     

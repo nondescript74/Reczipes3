@@ -48,8 +48,6 @@ struct ContentFilterPicker: View {
             return "Showing only your \(contentType.lowercased())"
         case .shared:
             return "Showing \(contentType.lowercased()) shared by others"
-        case .all:
-            return "Showing all \(contentType.lowercased())"
         }
     }
 }
@@ -64,11 +62,6 @@ struct ContentFilterPicker: View {
         ContentFilterPicker(
             selectedFilter: .constant(.shared),
             contentType: "Books"
-        )
-        
-        ContentFilterPicker(
-            selectedFilter: .constant(.all),
-            contentType: "Recipes"
         )
     }
 }

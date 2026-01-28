@@ -10,41 +10,59 @@ import SwiftData
 
 struct RecipeBooksView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \RecipeBook.dateModified, order: .reverse) private var books: [RecipeBook]
+    
+    // Legacy books
+    @Query(sort: \RecipeBook.dateModified, order: .reverse) private var legacyBooks: [RecipeBook]
     @Query private var savedRecipes: [Recipe]
+    
+    // New books
+    @Query(sort: \Book.dateModified, order: .reverse) private var newBooks: [Book]
+    @Query private var savedRecipesX: [RecipeX]
+    
     @Query private var sharedBooks: [SharedRecipeBook]
     
     @State private var showingEditor = false
-    @State private var selectedBook: RecipeBook?
-    @State private var editingBook: RecipeBook?
+    @State private var selectedLegacyBook: RecipeBook?
+    @State private var selectedNewBook: Book?
+    @State private var editingLegacyBook: RecipeBook?
+    @State private var editingNewBook: Book?
     @State private var searchText = ""
     @State private var showingImport = false
     @State private var refreshID = UUID()
-    @State private var contentFilter: ContentFilterMode = .all
+    @State private var contentFilter: ContentFilterMode = .mine
     @State private var lastSyncDate: Date?
+    @State private var viewMode: BookViewMode = .new
     
     // Sync interval: 5 minutes
     private let syncInterval: TimeInterval = 300
+    
+    // Get the books based on current view mode
+    private var books: [Any] {
+        switch viewMode {
+        case .legacy:
+            return legacyBooks
+        case .new:
+            return newBooks
+        }
+    }
     
     // Grid layout
     private let columns = [
         GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
     ]
     
-    /// Returns the SharedRecipeBook entry for a book if it exists
+    /// Returns the SharedRecipeBook entry for a legacy book if it exists
     private func sharedBookEntry(for book: RecipeBook) -> SharedRecipeBook? {
         sharedBooks.first { $0.bookID == book.id && $0.isActive }
     }
     
-    private var filteredBooks: [RecipeBook] {
-        var result = books
+    private var filteredLegacyBooks: [RecipeBook] {
+        var result = legacyBooks
         let currentUserID = CloudKitSharingService.shared.currentUserID
         
-        // Apply content filter (mine/shared/all)
+        // Apply content filter (mine/shared)
         switch contentFilter {
         case .mine:
-            // Show ALL user's own books (including ones they've shared)
-            // Filter OUT books shared by OTHER users
             let sharedByOthersIDs = Set(
                 sharedBooks
                     .filter { $0.isActive && $0.sharedByUserID != currentUserID }
@@ -53,17 +71,12 @@ struct RecipeBooksView: View {
             result = result.filter { !sharedByOthersIDs.contains($0.id) }
             
         case .shared:
-            // Only show books shared by OTHER users
             let sharedByOthersIDs = Set(
                 sharedBooks
                     .filter { $0.isActive && $0.sharedByUserID != currentUserID }
                     .compactMap { $0.bookID }
             )
             result = result.filter { sharedByOthersIDs.contains($0.id) }
-            
-        case .all:
-            // Show all books (user's own + shared by others)
-            break
         }
         
         // Apply search filter
@@ -74,7 +87,7 @@ struct RecipeBooksView: View {
             }
         }
         
-        // Deduplicate books by ID (just in case)
+        // Deduplicate
         var seenIDs = Set<UUID>()
         result = result.filter { book in
             if seenIDs.contains(book.id) {
@@ -88,10 +101,69 @@ struct RecipeBooksView: View {
         return result
     }
     
+    private var filteredNewBooks: [Book] {
+        var result = newBooks
+        let currentUserID = CloudKitSharingService.shared.currentUserID
+        
+        // Apply content filter (mine/shared)
+        switch contentFilter {
+        case .mine:
+            // For new Book models, use ownerUserID
+            result = result.filter { book in
+                book.ownerUserID == nil || book.ownerUserID == currentUserID
+            }
+            
+        case .shared:
+            // Show books owned by others
+            result = result.filter { book in
+                book.ownerUserID != nil && book.ownerUserID != currentUserID
+            }
+        }
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            result = result.filter { book in
+                (book.name ?? "").localizedCaseInsensitiveContains(searchText) ||
+                (book.bookDescription ?? "").localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        // Deduplicate
+        var seenIDs = Set<UUID>()
+        result = result.filter { book in
+            guard let bookID = book.id else { return false }
+            if seenIDs.contains(bookID) {
+                logWarning("⚠️ Duplicate book ID detected: \(bookID) (\(book.name ?? "Untitled"))", category: "book")
+                return false
+            }
+            seenIDs.insert(bookID)
+            return true
+        }
+        
+        return result
+    }
+    
+    private var filteredBooks: [Any] {
+        switch viewMode {
+        case .legacy:
+            return filteredLegacyBooks
+        case .new:
+            return filteredNewBooks
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Content filter picker (Mine/Shared/All) - ALWAYS visible
+                // View mode picker (Legacy/New) with migration badge
+                ViewModePicker(
+                    selectedMode: $viewMode,
+                    legacyCount: legacyBooks.count,
+                    newCount: newBooks.count,
+                    contentType: "Books"
+                )
+                
+                // Content filter picker (Mine/Shared/All)
                 ContentFilterPicker(
                     selectedFilter: $contentFilter,
                     contentType: "Books"
@@ -107,7 +179,7 @@ struct RecipeBooksView: View {
                 
                 // Main content
                 if filteredBooks.isEmpty {
-                    if books.isEmpty {
+                    if (viewMode == .legacy && legacyBooks.isEmpty) || (viewMode == .new && newBooks.isEmpty) {
                         emptyStateView
                     } else {
                         // Books exist but none match the filter
@@ -139,17 +211,25 @@ struct RecipeBooksView: View {
                 }
             }
             .sheet(isPresented: $showingEditor) {
-                RecipeBookEditorView(book: editingBook)
-                    .onDisappear {
-                        editingBook = nil
-                        // Force refresh to ensure images reload
-                        refreshID = UUID()
-                    }
+                // Create legacy or new book based on view mode
+                if viewMode == .legacy {
+                    RecipeBookEditorView(book: editingLegacyBook)
+                        .onDisappear {
+                            editingLegacyBook = nil
+                            refreshID = UUID()
+                        }
+                } else {
+                    BookEditorView(book: editingNewBook)
+                        .onDisappear {
+                            editingNewBook = nil
+                            refreshID = UUID()
+                        }
+                }
             }
             .sheet(isPresented: $showingImport) {
                 RecipeBookImportView()
             }
-            .sheet(item: $selectedBook) { book in
+            .sheet(item: $selectedLegacyBook) { book in
                 // Use different views for own books vs. shared books
                 if let sharedEntry = sharedBookEntry(for: book),
                    sharedEntry.sharedByUserID != CloudKitSharingService.shared.currentUserID {
@@ -160,9 +240,12 @@ struct RecipeBooksView: View {
                     RecipeBookDetailView(book: book)
                 }
             }
+            .sheet(item: $selectedNewBook) { book in
+                BookDetailView(book: book)
+            }
             .onChange(of: refreshID) { oldValue, newValue in
-                // When UI refreshes (e.g., after sync), check if selected book still exists
-                if let selected = selectedBook {
+                // Check if selected books still exist after refresh
+                if let selected = selectedLegacyBook {
                     let selectedID = selected.id
                     let descriptor = FetchDescriptor<RecipeBook>(
                         predicate: #Predicate<RecipeBook> { book in
@@ -173,14 +256,32 @@ struct RecipeBooksView: View {
                     do {
                         let fetchedBooks = try modelContext.fetch(descriptor)
                         if fetchedBooks.isEmpty {
-                            // Book was deleted (likely by sync), dismiss sheet gracefully
                             logInfo("📚 Dismissing sheet - book '\(selected.name)' was deleted", category: "book")
-                            selectedBook = nil
+                            selectedLegacyBook = nil
                         }
                     } catch {
-                        // If fetch fails, also dismiss to prevent crashes
                         logError("❌ Failed to verify book existence: \(error)", category: "book")
-                        selectedBook = nil
+                        selectedLegacyBook = nil
+                    }
+                }
+                
+                if let selected = selectedNewBook {
+                    guard let selectedID = selected.id else { return }
+                    let descriptor = FetchDescriptor<Book>(
+                        predicate: #Predicate<Book> { book in
+                            book.id == selectedID
+                        }
+                    )
+                    
+                    do {
+                        let fetchedBooks = try modelContext.fetch(descriptor)
+                        if fetchedBooks.isEmpty {
+                            logInfo("📚 Dismissing sheet - book was deleted", category: "book")
+                            selectedNewBook = nil
+                        }
+                    } catch {
+                        logError("❌ Failed to verify book existence: \(error)", category: "book")
+                        selectedNewBook = nil
                     }
                 }
             }
@@ -240,8 +341,6 @@ struct RecipeBooksView: View {
             return "No Recipe Books"
         case .shared:
             return "No Shared Books"
-        case .all:
-            return "No Books"
         }
     }
     
@@ -251,8 +350,6 @@ struct RecipeBooksView: View {
             return "Create a book to organize your recipes"
         case .shared:
             return "No books have been shared by the community yet. Check back later or create and share your own books!"
-        case .all:
-            return "Create your first book to get started"
         }
     }
     
@@ -266,7 +363,7 @@ struct RecipeBooksView: View {
                 Text(emptyFilterDescription)
             } actions: {
                 Button {
-                    contentFilter = .all
+                    contentFilter = .mine
                 } label: {
                     Label("Show All Books", systemImage: "square.grid.2x2.fill")
                 }
@@ -287,8 +384,6 @@ struct RecipeBooksView: View {
             return "You don't have any personal books yet"
         case .shared:
             return "No books have been shared with you"
-        case .all:
-            return "No books found"
         }
     }
     
@@ -297,33 +392,63 @@ struct RecipeBooksView: View {
     private var bookGridView: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Array(filteredBooks.enumerated()), id: \.element.id) { index, book in
-                    BookCardView(
-                        book: book,
-                        savedRecipes: savedRecipes,
-                        sharedEntry: sharedBookEntry(for: book),
-                        showSharedInfo: contentFilter != .mine
-                    )
-                        .id("\(book.id)-\(refreshID)-\(index)")
-                        .onTapGesture {
-                            selectedBook = book
-                        }
-                        .contextMenu {
-                            Button {
-                                editingBook = book
-                                showingEditor = true
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
+                if viewMode == .legacy {
+                    ForEach(Array(filteredLegacyBooks.enumerated()), id: \.element.id) { index, book in
+                        BookCardView(
+                            book: book,
+                            savedRecipes: savedRecipes,
+                            sharedEntry: sharedBookEntry(for: book),
+                            showSharedInfo: contentFilter != .mine
+                        )
+                            .id("\(book.id)-\(refreshID)-\(index)")
+                            .onTapGesture {
+                                selectedLegacyBook = book
                             }
-                            
-                            Divider()
-                            
-                            Button(role: .destructive) {
-                                deleteBook(book)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                            .contextMenu {
+                                Button {
+                                    editingLegacyBook = book
+                                    showingEditor = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                
+                                Divider()
+                                
+                                Button(role: .destructive) {
+                                    deleteLegacyBook(book)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
-                        }
+                    }
+                } else {
+                    ForEach(Array(filteredNewBooks.enumerated()), id: \.element.id) { index, book in
+                        NewBookCardView(
+                            book: book,
+                            savedRecipes: savedRecipesX,
+                            showSharedInfo: contentFilter != .mine
+                        )
+                            .id("\(book.id ?? UUID())-\(refreshID)-\(index)")
+                            .onTapGesture {
+                                selectedNewBook = book
+                            }
+                            .contextMenu {
+                                Button {
+                                    editingNewBook = book
+                                    showingEditor = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                
+                                Divider()
+                                
+                                Button(role: .destructive) {
+                                    deleteNewBook(book)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                    }
                 }
             }
             .padding()
@@ -332,7 +457,7 @@ struct RecipeBooksView: View {
     
     // MARK: - Helper Methods
     
-    private func deleteBook(_ book: RecipeBook) {
+    private func deleteLegacyBook(_ book: RecipeBook) {
         withAnimation {
             // Delete all recipes in this book
             let recipeIDsToDelete = book.recipeIDs
@@ -373,6 +498,40 @@ struct RecipeBooksView: View {
         }
     }
     
+    private func deleteNewBook(_ book: Book) {
+        withAnimation {
+            // Delete all recipes in this book
+            let recipeIDsToDelete = book.recipeIDs ?? []
+            logInfo("Deleting book '\(book.name ?? "Untitled")' and \(recipeIDsToDelete.count) associated recipes", category: "book")
+            
+            // Fetch and delete each recipe
+            for recipeID in recipeIDsToDelete {
+                let descriptor = FetchDescriptor<RecipeX>(
+                    predicate: #Predicate<RecipeX> { recipe in
+                        recipe.id == recipeID
+                    }
+                )
+                
+                if let recipes = try? modelContext.fetch(descriptor),
+                   let recipe = recipes.first {
+                    logDebug("Deleting recipe '\(recipe.title ?? "Untitled")' (ID: \(recipeID))", category: "book")
+                    modelContext.delete(recipe)
+                }
+            }
+            
+            // Delete the book itself (cover image is stored as Data, not file)
+            modelContext.delete(book)
+            
+            // Save changes
+            do {
+                try modelContext.save()
+                logInfo("Successfully deleted book '\(book.name ?? "Untitled")' and its recipes", category: "book")
+            } catch {
+                logError("Failed to save after deleting book: \(error)", category: "book")
+            }
+        }
+    }
+    
     /// Sync community books from CloudKit to local SwiftData
     /// Only syncs if enough time has passed since the last sync
     private func syncCommunityBooksIfNeeded() async {
@@ -399,6 +558,22 @@ struct RecipeBooksView: View {
             logError("❌ Failed to sync community books: \(error)", category: "sharing")
             // Log the error but don't show it to the user
             // The sync will automatically retry next time they switch tabs
+        }
+    }
+}
+
+// MARK: - View Mode
+
+enum BookViewMode: String, CaseIterable, Identifiable {
+    case legacy = "Legacy"
+    case new = "New"
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .legacy: return "books.vertical"
+        case .new: return "books.vertical.fill"
         }
     }
 }
@@ -541,6 +716,135 @@ struct BookCardView: View {
             
             // Description
             if let description = bookDescription, !description.isEmpty {
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - New Book Card View
+
+struct NewBookCardView: View {
+    let book: Book
+    let savedRecipes: [RecipeX]
+    let showSharedInfo: Bool
+    
+    // Cache book data on init to avoid faults
+    private let bookID: UUID?
+    private let cachedCoverImageData: Data?
+    private let cachedBookName: String
+    private let cachedRecipeCount: Int
+    private let cachedBookDescription: String?
+    private let cachedBookColor: String?
+    private let cachedOwnerDisplayName: String?
+    private let cachedOwnerUserID: String?
+    
+    init(book: Book, savedRecipes: [RecipeX], showSharedInfo: Bool) {
+        self.book = book
+        self.savedRecipes = savedRecipes
+        self.showSharedInfo = showSharedInfo
+        
+        // Cache book properties to avoid faults when object is deleted
+        self.bookID = book.id
+        self.cachedCoverImageData = book.coverImageData
+        self.cachedBookName = book.name ?? "Untitled"
+        self.cachedRecipeCount = book.recipeIDs?.count ?? 0
+        self.cachedBookDescription = book.bookDescription
+        self.cachedBookColor = book.color
+        self.cachedOwnerDisplayName = book.ownerDisplayName
+        self.cachedOwnerUserID = book.ownerUserID
+    }
+    
+    private var bookColor: Color {
+        if let colorHex = cachedBookColor {
+            return Color(hex: colorHex) ?? .blue
+        }
+        return .blue
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Cover image or placeholder
+            ZStack {
+                if let imageData = cachedCoverImageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 160, height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [bookColor, bookColor.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(height: 220)
+                        .overlay {
+                            VStack(spacing: 8) {
+                                Image(systemName: "book.closed.fill")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.white)
+                                
+                                Text(cachedBookName)
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(3)
+                                    .padding(.horizontal, 8)
+                            }
+                        }
+                }
+                
+                // Recipe count badge
+                VStack {
+                    HStack {
+                        Spacer()
+                        Text("\(cachedRecipeCount)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(8)
+                    }
+                    Spacer()
+                }
+            }
+            .frame(height: 220)
+            
+            // Book name (if we have cover image)
+            if cachedCoverImageData != nil {
+                Text(cachedBookName)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+            
+            // Show who owns this book if it's shared
+            if showSharedInfo, 
+               let ownerName = cachedOwnerDisplayName,
+               let ownerID = cachedOwnerUserID,
+               ownerID != CloudKitSharingService.shared.currentUserID {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                    Text("By \(ownerName)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            // Description
+            if let description = cachedBookDescription, !description.isEmpty {
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)

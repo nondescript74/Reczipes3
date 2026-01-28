@@ -52,20 +52,52 @@ class RecipeExtractorViewModel: ObservableObject {
     }
     
     private func saveRecipeDirectly(_ recipeModel: RecipeModel, modelContext: ModelContext) {
-        let recipe = Recipe(from: recipeModel)
+        // Create RecipeX (unified CloudKit-compatible model)
+        let recipe = RecipeX(from: recipeModel)
+        
+        // Set extraction source
+        recipe.extractionSource = "camera" // or "photos" or "files"
         
         // Generate and store image hash
         if let image = selectedImage,
            let hash = imageHashService.generateHash(for: image) {
             recipe.imageHash = hash
+            
+            // Also save the image data directly in RecipeX
+            recipe.setImage(image, isMainImage: true)
         }
         
-        recipe.extractionSource = "camera" // or "photos" or "files"
+        // Initialize CloudKit sync properties
+        recipe.needsCloudSync = true
+        recipe.syncRetryCount = 0
+        recipe.lastSyncError = nil
+        recipe.cloudRecordID = nil
+        recipe.lastSyncedToCloud = nil
         
-        // ... rest of save logic ...
+        // Set timestamps
+        let now = Date()
+        recipe.dateAdded = now
+        recipe.dateCreated = now
+        recipe.lastModified = now
+        
+        // Set initial version
+        recipe.version = 1
+        
+        // Set device identifier for attribution
+        recipe.lastModifiedDeviceID = UIDevice.current.identifierForVendor?.uuidString
+        
+        // Calculate content fingerprint for duplicate detection
+        recipe.updateContentFingerprint()
         
         modelContext.insert(recipe)
-        try? modelContext.save()
+        
+        do {
+            try modelContext.save()
+            logInfo("Recipe saved successfully: \(recipe.safeTitle) (RecipeX with CloudKit sync)", category: "extraction")
+        } catch {
+            logError("Failed to save recipe: \(error)", category: "extraction")
+            errorMessage = "Failed to save recipe: \(error.localizedDescription)"
+        }
     }
     
     func handleKeepBoth(modelContext: ModelContext) {
@@ -96,7 +128,7 @@ class RecipeExtractorViewModel: ObservableObject {
         let existingRecipe = match.existingRecipe
         let encoder = JSONEncoder()
         
-        // Update existing recipe with new data
+        // Update existing RecipeX with new data
         existingRecipe.title = newRecipe.title
         existingRecipe.headerNotes = newRecipe.headerNotes
         existingRecipe.recipeYield = newRecipe.yield
@@ -104,12 +136,12 @@ class RecipeExtractorViewModel: ObservableObject {
         
         // Encode and update ingredient sections
         if let ingredientsData = try? encoder.encode(newRecipe.ingredientSections) {
-            existingRecipe.ingredientSectionsData = ingredientsData
+            existingRecipe.updateIngredients(ingredientsData)
         }
         
         // Encode and update instruction sections
         if let instructionsData = try? encoder.encode(newRecipe.instructionSections) {
-            existingRecipe.instructionSectionsData = instructionsData
+            existingRecipe.updateInstructions(instructionsData)
         }
         
         // Encode and update notes
@@ -117,12 +149,24 @@ class RecipeExtractorViewModel: ObservableObject {
             existingRecipe.notesData = notesData
         }
         
-        // Update version tracking
-        existingRecipe.lastModified = Date()
-        existingRecipe.version = (existingRecipe.version ?? 1) + 1
-        existingRecipe.ingredientsHash = Recipe.calculateIngredientsHash(from: existingRecipe.ingredientSectionsData)
+        // Update the image if available
+        if let image = selectedImage {
+            existingRecipe.setImage(image, isMainImage: true)
+        }
         
-        try? modelContext.save()
+        // Mark as modified (this updates version, timestamp, and triggers CloudKit sync)
+        existingRecipe.markAsModified()
+        
+        // Update content fingerprint
+        existingRecipe.updateContentFingerprint()
+        
+        do {
+            try modelContext.save()
+            logInfo("Recipe replaced successfully: \(existingRecipe.safeTitle)", category: "extraction")
+        } catch {
+            logError("Failed to replace recipe: \(error)", category: "extraction")
+            errorMessage = "Failed to replace recipe: \(error.localizedDescription)"
+        }
     }
     
     func handleKeepOriginal() {

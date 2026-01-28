@@ -10,11 +10,11 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Recipe.dateAdded, order: .reverse) private var savedRecipes: [Recipe]
-    @Query private var imageAssignments: [RecipeImageAssignment]
+    @Query(sort: \RecipeX.dateAdded, order: .reverse) private var savedRecipesX: [RecipeX]
     @Query private var allergenProfiles: [UserAllergenProfile]
     @Query(sort: \RecipeBook.dateModified, order: .reverse) private var books: [RecipeBook]
     @Query private var cachedRecipes: [CachedSharedRecipe]
+    @Query private var imageAssignments: [RecipeImageAssignment]
     
     @EnvironmentObject private var appState: AppStateManager
     
@@ -26,19 +26,25 @@ struct ContentView: View {
     @State private var showingImport = false
     @State private var showingSearch = false
     @State private var showingSavedLinks = false
+    @State private var showingLegacyMigration = false
     @State private var filterMode: RecipeFilterMode = .none
     @State private var showOnlySafe = false
     @State private var isProcessingFilter = false
-    @State private var cachedAllRecipes: [RecipeModel] = [] // NEW: Cache for all recipes
+    @State private var cachedAllRecipes: [RecipeModel] = [] // Cache for all recipes
     @State private var cachedFilteredRecipes: [RecipeModel] = []
     @State private var cachedAllergenScores: [UUID: RecipeAllergenScore] = [:]
     @State private var cachedDiabetesScores: [UUID: DiabetesScore] = [:]
     @State private var cachedCombinedScores: [UUID: CombinedRecipeScore] = [:]
     @State private var cachedNutritionalScores: [UUID: NutritionalScore] = [:]
     
-    // Content filter for showing mine/shared/all
-    @State private var contentFilter: ContentFilterMode = .all
+    // Content filter for showing mine/shared (default to mine)
+    @State private var contentFilter: ContentFilterMode = .mine
     @Query private var sharedRecipes: [SharedRecipe]
+    
+    // Computed property for accessing savedRecipesX as savedRecipes (for backward compatibility)
+    private var savedRecipes: [RecipeX] {
+        savedRecipesX
+    }
     
     // Auto-sync tracking for shared recipes
     @State private var lastCommunitySync: Date?
@@ -47,11 +53,6 @@ struct ContentView: View {
     // Active allergen profile
     private var activeProfile: UserAllergenProfile? {
         allergenProfiles.first { $0.isActive == true }
-    }
-    
-    // Helper to get image name for a recipe
-    private func imageName(for recipeID: UUID) -> String? {
-        imageAssignments.first { $0.recipeID == recipeID }?.imageName
     }
     
     // Combined scores for recipes (now cached)
@@ -68,11 +69,11 @@ struct ContentView: View {
     private var availableRecipes: [RecipeModel] {
         let baseRecipes = filterMode != .none ? cachedFilteredRecipes : cachedAllRecipes
         
-        // Apply content filter (mine/shared/all)
+        // Apply content filter (mine/shared)
         return applyContentFilter(to: baseRecipes)
     }
     
-    /// Applies the content filter (mine/shared/all) to recipes
+    /// Applies the content filter (mine/shared) to recipes
     private func applyContentFilter(to recipes: [RecipeModel]) -> [RecipeModel] {
         let currentUserID = CloudKitSharingService.shared.currentUserID
         
@@ -95,44 +96,29 @@ struct ContentView: View {
                     .compactMap { $0.recipeID }
             )
             return recipes.filter { sharedByOthersIDs.contains($0.id) }
-            
-        case .all:
-            // Show all recipes (user's own + shared by others)
-            return recipes
         }
     }
     
     // MARK: - Recipe Loading
     
-    /// Load and cache all recipes from SwiftData
+    /// Load and cache all recipes from SwiftData (RecipeX only)
     private func refreshRecipeCache() {
-        logDebug("🔄 Refreshing recipe cache", category: "recipe")
-        logDebug("Saved recipes count: \(savedRecipes.count)", category: "recipe")
+        logDebug("🔄 Refreshing recipe cache (RecipeX model)", category: "recipe")
+        logDebug("Saved recipes (RecipeX) count: \(savedRecipesX.count)", category: "recipe")
         
-        let allRecipes = RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
+        // Convert RecipeX to RecipeModel for display
+        let allRecipes = savedRecipesX.compactMap { recipeX in
+            recipeX.toRecipeModel()
+        }
+        
         logDebug("Available recipes count: \(allRecipes.count)", category: "recipe")
         
-        let recipes = allRecipes.map { recipe in
-            // First check if the recipe model itself has an imageName (directly from Recipe object)
-            if recipe.imageName != nil {
-                return recipe
-            }
-            // Fallback to checking RecipeImageAssignment (for legacy support)
-            else if let assignedImageName = imageName(for: recipe.id) {
-                logDebug("Found image assignment '\(assignedImageName)' for '\(recipe.title)' (ID: \(recipe.id))", category: "recipe")
-                return recipe.withImageName(assignedImageName)
-            } else {
-                return recipe
-            }
-        }
-        logDebug("Total assignments in DB: \(imageAssignments.count)", category: "storage")
-        
         // Update cache
-        cachedAllRecipes = recipes
+        cachedAllRecipes = allRecipes
         
         // If not filtering, update filtered cache too
         if filterMode == .none {
-            cachedFilteredRecipes = recipes
+            cachedFilteredRecipes = allRecipes
         }
     }
     
@@ -279,7 +265,7 @@ struct ContentView: View {
             
             NavigationSplitView {
                 VStack(spacing: 0) {
-                    // Content filter picker (Mine/Shared/All) - ALWAYS visible
+                    // Content filter picker (Mine/Shared) - ALWAYS visible
                     ContentFilterPicker(
                         selectedFilter: $contentFilter,
                         contentType: "Recipes"
@@ -348,6 +334,13 @@ struct ContentView: View {
                     processFilter()
                 }
             }
+            .onChange(of: savedRecipesX.count) { _, _ in
+                // RecipeX changed, refresh cache and reprocess filter if needed
+                refreshRecipeCache()
+                if filterMode != .none {
+                    processFilter()
+                }
+            }
             .onChange(of: selectedRecipe) { _, newRecipe in
                 // Save selected recipe to app state when it changes
                 appState.selectedRecipeId = newRecipe?.id
@@ -403,8 +396,6 @@ struct ContentView: View {
             return "No Recipes Yet"
         case .shared:
             return "No Shared Recipes"
-        case .all:
-            return "No Recipes"
         }
     }
     
@@ -414,8 +405,6 @@ struct ContentView: View {
             return "Extract recipes from text or images using the Claude API to get started"
         case .shared:
             return "No recipes have been shared by the community yet. Check back later or create and share your own recipes!"
-        case .all:
-            return "No recipes found. Extract your first recipe to get started!"
         }
     }
     
@@ -551,6 +540,14 @@ struct ContentView: View {
                             Label("Saved Links", systemImage: "link.circle")
                         }
                         
+                        Divider()
+                        
+                        Button {
+                            showingLegacyMigration = true
+                        } label: {
+                            Label("Migrate to New Models", systemImage: "arrow.triangle.2.circlepath.circle")
+                        }
+                        
                         #if DEBUG
                         Divider()
                         
@@ -613,6 +610,10 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     CloudKitSyncBadge()
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    MigrationBadgeView()
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -696,6 +697,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSavedLinks) {
                 SavedLinksView()
+            }
+            .sheet(isPresented: $showingLegacyMigration) {
+                LegacyMigrationView()
             }
         }
     }
@@ -843,13 +847,14 @@ struct ContentView: View {
     }
     
     private func isRecipeSaved(_ recipe: RecipeModel) -> Bool {
-        RecipeCollection.shared.isRecipeSaved(recipe, savedRecipes: savedRecipes)
+        // Check if the recipe ID exists in savedRecipes (RecipeX)
+        return savedRecipes.contains { $0.id == recipe.id }
     }
     
     private func deleteRecipe(_ recipe: RecipeModel) {
         withAnimation {
             if let savedRecipe = savedRecipes.first(where: { $0.id == recipe.id }) {
-                logInfo("Deleting recipe: \(savedRecipe.title) (ID: \(savedRecipe.id))", category: "recipe")
+                logInfo("Deleting recipe: \(savedRecipe.title ?? "Untitled") (ID: \(savedRecipe.id ?? UUID()))", category: "recipe")
                 
                 // Delete associated image file if it exists
                 if let imageName = savedRecipe.imageName {
@@ -888,17 +893,23 @@ struct ContentView: View {
                 recipeToSave = recipe.withImageName(assignedImage)
             }
             
-            let newRecipe = Recipe(from: recipeToSave)
+            // Save as RecipeX (new unified model)
+            let newRecipe = RecipeX(from: recipeToSave)
             modelContext.insert(newRecipe)
             
             // Save the context
             do {
                 try modelContext.save()
-                logInfo("Recipe saved: \(newRecipe.title)", category: "recipe")
+                logInfo("Recipe saved: \(newRecipe.title ?? "Untitled")", category: "recipe")
             } catch {
                 logError("Failed to save recipe: \(error)", category: "storage")
             }
         }
+    }
+    
+    /// Helper to get assigned image name for a recipe
+    private func imageName(for recipeID: UUID) -> String? {
+        return imageAssignments.first(where: { $0.recipeID == recipeID })?.imageName
     }
     
     private func getAPIKey() -> String {
@@ -910,7 +921,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Recipe.self, RecipeImageAssignment.self, UserAllergenProfile.self, RecipeBook.self, SavedLink.self], inMemory: true)
+        .modelContainer(for: [RecipeX.self, RecipeImageAssignment.self, UserAllergenProfile.self, RecipeBook.self, SavedLink.self], inMemory: true)
         .environmentObject(AppStateManager.shared)
 }
 // MARK: - Recipe Book Badge View

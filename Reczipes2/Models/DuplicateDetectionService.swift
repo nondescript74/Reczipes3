@@ -22,12 +22,12 @@ class DuplicateDetectionService {
     // MARK: - Image-Based Detection
     
     /// Find recipes with similar images
-    func findSimilarByImage(_ image: UIImage, threshold: Double = 0.95) async -> [Recipe] {
+    func findSimilarByImage(_ image: UIImage, threshold: Double = 0.95) async -> [RecipeX] {
         guard let imageHash = imageHashService.generateHash(for: image) else {
             return []
         }
         
-        let descriptor = FetchDescriptor<Recipe>(
+        let descriptor = FetchDescriptor<RecipeX>(
             predicate: #Predicate { recipe in
                 recipe.imageHash != nil
             }
@@ -50,7 +50,7 @@ class DuplicateDetectionService {
     
     /// Find recipes with similar content
     func findSimilarByContent(_ recipe: RecipeModel, threshold: Double = 0.8) async -> [DuplicateMatch] {
-        let descriptor = FetchDescriptor<Recipe>()
+        let descriptor = FetchDescriptor<RecipeX>()
         
         guard let allRecipes = try? modelContext.fetch(descriptor) else {
             return []
@@ -77,8 +77,8 @@ class DuplicateDetectionService {
     
     // MARK: - Similarity Calculation
     
-    func calculateSimilarity(newRecipe: RecipeModel, existingRecipe: Recipe) -> DuplicateMatchScore {
-        let titleSim = titleSimilarity(newRecipe.title, existingRecipe.title)
+    func calculateSimilarity(newRecipe: RecipeModel, existingRecipe: RecipeX) -> DuplicateMatchScore {
+        let titleSim = titleSimilarity(newRecipe.title, existingRecipe.safeTitle)
         let ingredientSim = ingredientSimilarity(newRecipe: newRecipe, existingRecipe: existingRecipe)
         
         // Weighted average: title 40%, ingredients 60%
@@ -108,7 +108,7 @@ class DuplicateDetectionService {
         return 1.0 - (Double(distance) / Double(maxLength))
     }
     
-    private func ingredientSimilarity(newRecipe: RecipeModel, existingRecipe: Recipe) -> Double {
+    private func ingredientSimilarity(newRecipe: RecipeModel, existingRecipe: RecipeX) -> Double {
         let newIngredients = extractIngredients(from: newRecipe)
         let existingIngredients = extractIngredients(from: existingRecipe)
         
@@ -129,7 +129,7 @@ class DuplicateDetectionService {
         }
     }
     
-    private func extractIngredients(from recipe: Recipe) -> [String] {
+    private func extractIngredients(from recipe: RecipeX) -> [String] {
         // Decode the ingredientSections from stored Data
         guard let sectionsData = recipe.ingredientSectionsData,
               let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
@@ -237,7 +237,7 @@ class DuplicateDetectionService {
 // MARK: - Supporting Types
 
 struct DuplicateMatch {
-    let existingRecipe: Recipe
+    let existingRecipe: RecipeX
     let confidence: Double
     let matchType: MatchType
     let reasons: [String]

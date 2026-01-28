@@ -342,34 +342,57 @@ class BatchExtractionManager: ObservableObject {
     }
     
     private func saveRecipe(_ recipeModel: RecipeModel, images: [UIImage], link: SavedLink, modelContext: ModelContext) async throws {
-        // Convert RecipeModel to SwiftData Recipe
-        let recipe = Recipe(from: recipeModel)
+        // Convert RecipeModel to SwiftData RecipeX (unified CloudKit-compatible model)
+        let recipe = RecipeX(from: recipeModel)
         recipe.reference = link.url
+        recipe.extractionSource = "web"
+        recipe.originalFileName = nil
         
-        // Save images using new setImage() method (CloudKit-synced)
+        // Initialize CloudKit sync properties
+        recipe.needsCloudSync = true
+        recipe.syncRetryCount = 0
+        recipe.lastSyncError = nil
+        recipe.cloudRecordID = nil
+        recipe.lastSyncedToCloud = nil
+        
+        // Set timestamps
+        let now = Date()
+        recipe.dateAdded = now
+        recipe.dateCreated = now
+        recipe.lastModified = now
+        
+        // Set initial version
+        recipe.version = 1
+        
+        // Get current user info for attribution (if available)
+        // Note: CloudKit user info will be populated by the sync service
+        // For now, just mark that this recipe was created locally
+        recipe.ownerUserID = nil // Will be set by CloudKit sync service
+        recipe.ownerDisplayName = nil // Will be set by CloudKit sync service
+        recipe.lastModifiedDeviceID = UIDevice.current.identifierForVendor?.uuidString
+        
+        // Save images using setImage() method (CloudKit-synced)
         for (index, image) in images.enumerated() {
             if index == 0 {
                 // First image is the main thumbnail
                 recipe.setImage(image, isMainImage: true)
-                
-                // Create image assignment for compatibility
-                if let imageName = recipe.imageName {
-                    let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
-                    modelContext.insert(assignment)
-                }
             } else {
                 // Additional images
                 recipe.setImage(image, isMainImage: false)
             }
         }
         
+        // Calculate content fingerprint for duplicate detection
+        recipe.updateContentFingerprint()
+        
         logInfo("✅ Saved \(images.count) image(s) using setImage() (CloudKit-synced)", category: "batch-extraction")
         
+        // Insert recipe into SwiftData
         modelContext.insert(recipe)
-        link.extractedRecipeID = recipe.id
+        link.extractedRecipeID = recipe.safeID
         
         try modelContext.save()
-        logInfo("Recipe saved: \(recipe.title)", category: "batch-extraction")
+        logInfo("Recipe saved: \(recipe.safeTitle) (RecipeX with CloudKit sync enabled)", category: "batch-extraction")
     }
     
     // MARK: - Deprecated Image Methods (kept for reference)

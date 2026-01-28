@@ -147,11 +147,11 @@ struct RecipeExtractorView: View {
                         let recipeID = recipe.id
                         
                         // Query to check if recipe exists in context
-                        let descriptor = FetchDescriptor<Recipe>(
+                        let descriptor = FetchDescriptor<RecipeX>(
                             predicate: #Predicate { $0.id == recipeID }
                         )
                         if let savedRecipe = try? modelContext.fetch(descriptor).first {
-                            logInfo("Verified recipe in DB: '\(savedRecipe.title)'", category: "storage")
+                            logInfo("Verified recipe in DB: '\(savedRecipe.safeTitle)'", category: "storage")
                             logInfo("Recipe imageName in DB: '\(savedRecipe.imageName ?? "nil")'", category: "storage")
                         } else {
                             logWarning("Could not find recipe in DB after save", category: "storage")
@@ -965,6 +965,7 @@ struct RecipeExtractorView: View {
         }
     }
     
+    @MainActor
     private func saveRecipe() {
         logInfo("Save button tapped", category: "recipe")
         
@@ -985,71 +986,38 @@ struct RecipeExtractorView: View {
             imagesToSave = []
         }
         
-        // Convert RecipeModel to SwiftData Recipe first
-        let recipe = Recipe(from: recipeModel)
+        // Convert RecipeModel to SwiftData RecipeX (new unified model)
+        let recipe = RecipeX(from: recipeModel)
         
-        // Generate image filename for the first image (main thumbnail) and set it directly
-        if !imagesToSave.isEmpty {
-            let imageName = "recipe_\(recipeModel.id.uuidString).jpg"
-            recipe.imageName = imageName  // ✅ Set the image name directly on the Recipe object
-            logInfo("Will save \(imagesToSave.count) image(s), main image: \(imageName)", category: "recipe")
-            logInfo("Recipe.imageName is now: \(recipe.imageName ?? "nil")", category: "recipe")
+        // Save all images using RecipeX's setImage method
+        for (index, image) in imagesToSave.enumerated() {
+            if index == 0 {
+                // First image is the main thumbnail
+                recipe.setImage(image, isMainImage: true)
+                logInfo("Set main image for recipe: \(recipe.safeTitle)", category: "recipe")
+            } else {
+                // Additional images
+                recipe.setImage(image, isMainImage: false)
+                logInfo("Added additional image \(index) for recipe: \(recipe.safeTitle)", category: "recipe")
+            }
         }
         
         // Insert into SwiftData context
         modelContext.insert(recipe)
-        logDebug("Recipe inserted into context", category: "storage")
-        logDebug("Recipe ID: \(recipe.id)", category: "storage")
-        logDebug("Recipe imageName before save: \(recipe.imageName ?? "nil")", category: "storage")
-        
-        // Save all images and build additionalImageNames array
-        var additionalImageFilenames: [String] = []
-        for (index, image) in imagesToSave.enumerated() {
-            let filename: String
-            if index == 0 {
-                // First image is the main thumbnail
-                filename = "recipe_\(recipe.id.uuidString).jpg"
-                recipe.setImage(image, isMainImage: true)
-//                saveImageToDisk(image, filename: filename)
-                
-                // Create image assignment for compatibility
-                let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
-                modelContext.insert(assignment)
-            } else {
-                // Additional images
-                filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
-                recipe.setImage(image, isMainImage: false)
-//                saveImageToDisk(image, filename: filename)
-                additionalImageFilenames.append(filename)
-            }
-        }
-        
-        // Set additionalImageNames on the recipe BEFORE saving context
-        if !additionalImageFilenames.isEmpty {
-            recipe.additionalImageNames = additionalImageFilenames
-            logInfo("Set recipe.additionalImageNames to \(additionalImageFilenames.count) images: \(additionalImageFilenames)", category: "storage")
-        }
+        logDebug("RecipeX inserted into context", category: "storage")
+        logDebug("Recipe ID: \(recipe.safeID)", category: "storage")
+        logDebug("Recipe imageName: \(recipe.imageName ?? "nil")", category: "storage")
+        logDebug("Recipe imageData size: \(recipe.imageData?.count ?? 0) bytes", category: "storage")
         
         // Save the context
         do {
             try modelContext.save()
-            logInfo("Recipe saved successfully to SwiftData", category: "storage")
-            logDebug("Recipe ID: \(recipe.id)", category: "storage")
-            logDebug("Recipe Title: \(recipe.title)", category: "storage")
+            logInfo("RecipeX saved successfully to SwiftData", category: "storage")
+            logDebug("Recipe ID: \(recipe.safeID)", category: "storage")
+            logDebug("Recipe Title: \(recipe.safeTitle)", category: "storage")
             logDebug("Recipe imageName (after context save): \(recipe.imageName ?? "nil")", category: "storage")
-            
-            // Verify the image file exists
-            if let imageName = recipe.imageName {
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let fileURL = documentsPath.appendingPathComponent(imageName)
-                if FileManager.default.fileExists(atPath: fileURL.path) {
-                    logInfo("Image file verified to exist at: \(fileURL.path)", category: "storage")
-                } else {
-                    logWarning("Image file NOT found at: \(fileURL.path)", category: "storage")
-                }
-            } else {
-                logWarning("Recipe has no imageName after save", category: "storage")
-            }
+            logDebug("Recipe imageData size (after save): \(recipe.imageData?.count ?? 0) bytes", category: "storage")
+            logDebug("Recipe has \(recipe.imageCount) image(s)", category: "storage")
             
             // Small delay to ensure SwiftData propagates the change
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -1059,82 +1027,6 @@ struct RecipeExtractorView: View {
             logError("Failed to save recipe: \(error)", category: "storage")
             logError("Error details: \(error.localizedDescription)", category: "storage")
             // Optionally show an error alert here
-        }
-    }
-    
-    // MARK: - Image Management
-    
-//    private func saveImageToDisk(_ image: UIImage, filename: String) {
-//        // Reduce image size to 500KB max before saving
-//        let preprocessor = ImagePreprocessor()
-//        guard let imageData = preprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
-//            logError("Failed to reduce image size", category: "storage")
-//            return
-//        }
-//        
-//        logInfo("Saving image with size: \(imageData.count) bytes", category: "storage")
-//        
-//        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-//        let fileURL = documentsPath.appendingPathComponent(filename)
-//        
-//        do {
-//            try imageData.write(to: fileURL)
-//            logInfo("Saved recipe image to: \(fileURL.path)", category: "storage")
-//        } catch {
-//            logError("Error saving recipe image: \(error)", category: "storage")
-//        }
-//    }
-    
-    private func saveRecipeImage(_ image: UIImage, for recipeID: UUID, isMainImage: Bool = false, imageIndex: Int = 0) {
-        // Generate a unique filename
-        let filename: String
-        if isMainImage {
-            filename = "recipe_\(recipeID.uuidString).jpg"
-        } else {
-            filename = "recipe_\(recipeID.uuidString)_\(imageIndex).jpg"
-        }
-        
-        // Reduce image size to 500KB max before saving
-        let preprocessor = ImagePreprocessor()
-        guard let imageData = preprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
-            logError("Failed to reduce image size", category: "storage")
-            return
-        }
-        
-        logInfo("Saving image with size: \(imageData.count) bytes", category: "storage")
-        
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        
-        do {
-            try imageData.write(to: fileURL)
-            logInfo("Saved recipe image to: \(fileURL.path)", category: "storage")
-            
-            // Create image assignment (only for main image to maintain compatibility)
-            if isMainImage {
-                let assignment = RecipeImageAssignment(recipeID: recipeID, imageName: filename)
-                modelContext.insert(assignment)
-                logDebug("Created image assignment for recipe: \(recipeID)", category: "storage")
-            } else {
-                logDebug("Saved additional image \(imageIndex) for recipe: \(recipeID)", category: "storage")
-                
-                // ✅ FIX: Add the filename to the recipe's additionalImageNames array
-                // Find the recipe we just inserted
-                let descriptor = FetchDescriptor<Recipe>(
-                    predicate: #Predicate { $0.id == recipeID }
-                )
-                if let recipe = try? modelContext.fetch(descriptor).first {
-                    var additionalImages = recipe.additionalImageNames ?? []
-                    additionalImages.append(filename)
-                    recipe.additionalImageNames = additionalImages
-                    logInfo("Added '\(filename)' to recipe.additionalImageNames (now \(additionalImages.count) additional images)", category: "storage")
-                } else {
-                    logError("Could not find recipe \(recipeID) to update additionalImageNames", category: "storage")
-                }
-            }
-            
-        } catch {
-            logError("Error saving recipe image: \(error)", category: "storage")
         }
     }
     
