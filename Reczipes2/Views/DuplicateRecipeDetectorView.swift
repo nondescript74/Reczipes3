@@ -11,147 +11,21 @@ import SwiftData
 
 struct DuplicateRecipeDetectorView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Recipe.title) private var allRecipes: [Recipe]
+    @Query(sort: \RecipeX.title) private var allRecipes: [RecipeX]
+    @Query private var recipeXEntities: [RecipeX]
     @StateObject private var monitor = CloudKitDuplicateMonitor.shared
     
-    @State private var duplicateGroups: [String: [Recipe]] = [:]
+    @State private var duplicateGroups: [String: [RecipeX]] = [:]
     @State private var isAnalyzing = false
     @State private var showingConfirmation = false
     @State private var selectedGroup: String?
-    @State private var selectedRecipe: Recipe?
+    @State private var selectedRecipe: RecipeX?
     
     var body: some View {
         List {
-            // Summary Section
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Total Recipes")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("\(allRecipes.count)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Duplicate Groups")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("\(duplicateGroups.count)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(duplicateGroups.isEmpty ? .green : .red)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Extra Copies")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("\(totalDuplicateCount)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(totalDuplicateCount == 0 ? .green : .orange)
-                    }
-                }
-                .padding(.vertical, 8)
-            } header: {
-                Text("Statistics")
-            }
-            
-            // Actions Section
-            Section {
-                Button {
-                    findDuplicates()
-                } label: {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                        Text("Scan for Duplicates")
-                        if isAnalyzing {
-                            Spacer()
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                        }
-                    }
-                }
-                .disabled(isAnalyzing)
-                
-                if !duplicateGroups.isEmpty {
-                    Button {
-                        showingConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("Delete All Duplicates")
-                            Text("(\(totalDuplicateCount))")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.red)
-                }
-            } header: {
-                Text("Actions")
-            } footer: {
-                if !duplicateGroups.isEmpty {
-                    Text("This will keep the oldest copy of each recipe and delete the rest.")
-                        .font(.caption)
-                }
-            }
-            
-            // Duplicate Groups
-            if !duplicateGroups.isEmpty {
-                Section {
-                    ForEach(Array(duplicateGroups.keys.sorted()), id: \.self) { fingerprint in
-                        if let recipes = duplicateGroups[fingerprint], recipes.count > 1 {
-                            DisclosureGroup {
-                                ForEach(recipes.sorted(by: { r1, r2 in
-                                    r1.dateAdded < r2.dateAdded
-                                })) { recipe in
-                                    recipeRow(recipe, isCanonical: recipe == recipes.first)
-                                }
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(recipes.first?.title ?? "Unknown")
-                                            .font(.headline)
-                                        Text("\(recipes.count) copies found")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Duplicate Groups (\(duplicateGroups.count))")
-                }
-            } else if isAnalyzing {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView("Analyzing recipes...")
-                        Spacer()
-                    }
-                    .padding()
-                }
-            } else {
-                Section {
-                    ContentUnavailableView(
-                        "No Duplicates Found",
-                        systemImage: "checkmark.circle.fill",
-                        description: Text("Tap 'Scan for Duplicates' to check for duplicate recipes")
-                    )
-                }
-            }
+            statisticsSection
+            actionsSection
+            duplicateGroupsSection
         }
         .navigationTitle("Duplicate Detector")
         .navigationBarTitleDisplayMode(.inline)
@@ -181,10 +55,151 @@ struct DuplicateRecipeDetectorView: View {
         }
     }
     
+    // MARK: - Section Views
+    
+    private var statisticsSection: some View {
+        Section {
+            HStack {
+                statisticView(title: "Total Recipes", value: "\(allRecipes.count)", color: nil)
+                Spacer()
+                statisticView(title: "Duplicate Groups", value: "\(duplicateGroups.count)", color: duplicateGroups.isEmpty ? .green : .red)
+                Spacer()
+                statisticView(title: "Extra Copies", value: "\(totalDuplicateCount)", color: totalDuplicateCount == 0 ? .green : .orange)
+            }
+            .padding(.vertical, 8)
+        } header: {
+            Text("Statistics")
+        }
+    }
+    
+    private func statisticView(title: String, value: String, color: Color?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(color ?? Color.primary)
+        }
+    }
+    
+    private var actionsSection: some View {
+        Section {
+            scanButton
+            if !duplicateGroups.isEmpty {
+                deleteAllButton
+            }
+        } header: {
+            Text("Actions")
+        } footer: {
+            if !duplicateGroups.isEmpty {
+                Text("This will keep the oldest copy of each recipe and delete the rest.")
+                    .font(.caption)
+            }
+        }
+    }
+    
+    private var scanButton: some View {
+        Button {
+            findDuplicates()
+        } label: {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                Text("Scan for Duplicates")
+                if isAnalyzing {
+                    Spacer()
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                }
+            }
+        }
+        .disabled(isAnalyzing)
+    }
+    
+    private var deleteAllButton: some View {
+        Button {
+            showingConfirmation = true
+        } label: {
+            HStack {
+                Image(systemName: "trash")
+                Text("Delete All Duplicates")
+                Text("(\(totalDuplicateCount))")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .foregroundStyle(.red)
+    }
+    
+    @ViewBuilder
+    private var duplicateGroupsSection: some View {
+        if !duplicateGroups.isEmpty {
+            Section {
+                ForEach(Array(duplicateGroups.keys.sorted()), id: \.self) { fingerprint in
+                    if let recipes = duplicateGroups[fingerprint], recipes.count > 1 {
+                        duplicateGroupRow(recipes: recipes)
+                    }
+                }
+            } header: {
+                Text("Duplicate Groups (\(duplicateGroups.count))")
+            }
+        } else if isAnalyzing {
+            Section {
+                HStack {
+                    Spacer()
+                    ProgressView("Analyzing recipes...")
+                    Spacer()
+                }
+                .padding()
+            }
+        } else {
+            Section {
+                ContentUnavailableView(
+                    "No Duplicates Found",
+                    systemImage: "checkmark.circle.fill",
+                    description: Text("Tap 'Scan for Duplicates' to check for duplicate recipes")
+                )
+            }
+        }
+    }
+    
+    private func duplicateGroupRow(recipes: [RecipeX]) -> some View {
+        DisclosureGroup {
+            ForEach(recipes.sorted(by: { r1, r2 in
+                (r1.dateAdded ?? Date.distantPast) < (r2.dateAdded ?? Date.distantPast)
+            })) { recipe in
+                recipeRow(recipe, isCanonical: recipe == recipes.first)
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(recipes.first?.title ?? "Unknown")
+                        .font(.headline)
+                    Text("\(recipes.count) copies found")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+    
     // MARK: - Row Views
     
     @ViewBuilder
-    private func recipeRow(_ recipe: Recipe, isCanonical: Bool) -> some View {
+    private func recipeRow(_ recipe: RecipeX, isCanonical: Bool) -> some View {
+        let recipeIDPreview: String = {
+            if let id = recipe.id {
+                return String(id.uuidString.prefix(8))
+            } else {
+                return "unknown"
+            }
+        }()
+        
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -205,12 +220,12 @@ struct DuplicateRecipeDetectorView: View {
                     }
                 }
                 
-                Text("ID: \(recipe.id.uuidString.prefix(8))...")
+                Text("ID: \(recipeIDPreview)...")
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
                 
                 Label {
-                    Text(recipe.dateAdded, style: .date)
+                    Text(recipe.dateAdded ?? Date(), style: .date)
                 } icon: {
                     Image(systemName: "calendar")
                 }
@@ -242,7 +257,7 @@ struct DuplicateRecipeDetectorView: View {
                 selectedRecipe = nil
             }
         } message: {
-            Text("This will permanently delete this copy of '\(recipe.title)'")
+            Text("This will permanently delete this copy of '\(recipe.title ?? "Unknown Recipe")'")
         }
     }
     
@@ -264,9 +279,9 @@ struct DuplicateRecipeDetectorView: View {
             try? await Task.sleep(for: .milliseconds(100))
             
             // Group recipes by content fingerprint
-            var groups: [String: [Recipe]] = [:]
+            var groups: [String: [RecipeX]] = [:]
             for recipe in allRecipes {
-                let fingerprint = recipe.contentFingerprint
+                let fingerprint = recipe.contentFingerprint ?? recipe.id?.uuidString ?? UUID().uuidString
                 groups[fingerprint, default: []].append(recipe)
             }
             
@@ -285,12 +300,12 @@ struct DuplicateRecipeDetectorView: View {
         }
     }
     
-    private func deleteRecipe(_ recipe: Recipe) {
+    private func deleteRecipe(_ recipe: RecipeX) {
         modelContext.delete(recipe)
         
         do {
             try modelContext.save()
-            print("✅ Deleted recipe: \(recipe.title) (ID: \(recipe.id))")
+            print("✅ Deleted recipe: \(String(describing: recipe.title)) (ID: \(String(describing: recipe.id)))")
             
             // Refresh analysis
             findDuplicates()
@@ -307,15 +322,16 @@ struct DuplicateRecipeDetectorView: View {
         for (_, recipes) in duplicateGroups where recipes.count > 1 {
             // Sort by creation date, keep oldest
             let sorted = recipes.sorted { recipe1, recipe2 in
-                recipe1.dateAdded < recipe2.dateAdded
+                let dateA = Date()
+                return (recipe1.dateAdded ?? dateA) < (recipe2.dateAdded ?? dateA)
             }
             
             let canonical = sorted.first!
             let duplicates = sorted.dropFirst()
             
-            print("   Keeping: \(canonical.title) (ID: \(canonical.id))")
+            print("   Keeping: \(String(describing: canonical.title)) (ID: \(String(describing: canonical.id)))")
             for duplicate in duplicates {
-                print("   🗑️ Deleting: \(duplicate.id)")
+                print("   🗑️ Deleting: \(String(describing: duplicate.title)) (ID: \(String(describing: duplicate.id)))")
                 modelContext.delete(duplicate)
                 deletedCount += 1
             }
@@ -345,6 +361,6 @@ struct DuplicateRecipeDetectorView: View {
 #Preview {
     NavigationStack {
         DuplicateRecipeDetectorView()
-            .modelContainer(for: Recipe.self, inMemory: true)
+            .modelContainer(for: RecipeX.self, inMemory: true)
     }
 }

@@ -17,14 +17,14 @@ struct RecipeBookImportView: View {
     @State private var isImporting = false
     @State private var showFileImporter = false
     @State private var showPreview = false
-    @State private var previewPackage: RecipeBookExportPackage?
+    @State private var previewPackage: RecipeBookImportService.BookExportPackage?
     @State private var importURL: URL?
     @State private var errorMessage: String?
     @State private var showError = false
-    @State private var importMode: RecipeBookImportMode = .keepBoth
-    @State private var existingBook: RecipeBook?
+    @State private var importMode: RecipeBookImportService.BookImportMode = .replace
+    @State private var existingBook: Book?
     @State private var showSuccessAlert = false
-    @State private var importResult: RecipeBookImportResult?
+    @State private var importResult: RecipeBookImportService.BookImportResult?
     @State private var isMultiBookImport = false
     @State private var multiBookCount = 0
     @State private var multiBookSummary: String?
@@ -150,7 +150,7 @@ struct RecipeBookImportView: View {
     }
     
     @ViewBuilder
-    private func previewContent(_ package: RecipeBookExportPackage) -> some View {
+    private func previewContent(_ package: RecipeBookImportService.BookExportPackage) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Book info
@@ -166,7 +166,7 @@ struct RecipeBookImportView: View {
                     
                     InfoRow(label: "Recipes", value: "\(package.recipes.count)")
                     InfoRow(label: "Images", value: "\(package.imageManifest.count)")
-                    InfoRow(label: "Exported", value: package.exportDate.formatted(date: .abbreviated, time: .shortened))
+                    InfoRow(label: "Packaged", value: package.summary)
                 }
                 .padding()
                 .background(Color(.systemGray6))
@@ -184,9 +184,9 @@ struct RecipeBookImportView: View {
                             .foregroundStyle(.secondary)
                         
                         Picker("Import Mode", selection: $importMode) {
-                            Text("Keep Both").tag(RecipeBookImportMode.keepBoth)
-                            Text("Replace Existing").tag(RecipeBookImportMode.replace)
-                            Text("Merge Recipes").tag(RecipeBookImportMode.merge)
+                            Text("Keep Both").tag(RecipeBookImportService.BookImportMode.keepBoth)
+                            Text("Replace Existing").tag(RecipeBookImportService.BookImportMode.replace)
+                            Text("Merge Recipes").tag(RecipeBookImportService.BookImportMode.merge)
                         }
                         .pickerStyle(.segmented)
                         
@@ -205,7 +205,7 @@ struct RecipeBookImportView: View {
                     Text("Recipes to Import")
                         .font(.headline)
                     
-                    ForEach(package.recipes) { recipe in
+                    ForEach(package.recipes, id: \.id) { recipe in
                         HStack {
                             Image(systemName: recipe.imageName != nil ? "photo" : "doc.text")
                                 .foregroundStyle(.secondary)
@@ -313,7 +313,7 @@ struct RecipeBookImportView: View {
         if isMultiBookImport {
             return multiBookSummary ?? "No books were imported"
         } else if let result = importResult {
-            return "Imported '\(result.book.name)'\n\(result.summary)"
+            return "Imported '\(result.book.name ?? "Untitled")'\n\(result.recipesImported) recipes, \(result.imagesImported) images"
         } else {
             return "No books were imported"
         }
@@ -410,7 +410,7 @@ struct RecipeBookImportView: View {
             }
             
         } catch {
-            errorMessage = (error as? RecipeBookImportError)?.errorDescription ?? error.localizedDescription
+            errorMessage = (error as? RecipeBookImportService.ImportError)?.errorDescription ?? error.localizedDescription
             showError = true
             dismiss()
         }
@@ -436,11 +436,11 @@ struct RecipeBookImportView: View {
             isImporting = false
             showSuccessAlert = true
             
-            logInfo("Successfully imported book: \(result.book.name)", category: "book-import")
+            logInfo("Successfully imported book: \(result.book.name ?? "Untitled")", category: "book-import")
             
         } catch {
             isImporting = false
-            errorMessage = (error as? RecipeBookImportError)?.errorDescription ?? error.localizedDescription
+            errorMessage = (error as? RecipeBookImportService.ImportError)?.errorDescription ?? error.localizedDescription
             showError = true
             logError("Import failed: \(error)", category: "book-import")
         }
@@ -514,5 +514,5 @@ private struct InfoRow_RBIV: View {
 
 #Preview {
     RecipeBookImportView()
-        .modelContainer(for: [Recipe.self, RecipeBook.self], inMemory: true)
+        .modelContainer(for: [RecipeX.self, Book.self], inMemory: true)
 }

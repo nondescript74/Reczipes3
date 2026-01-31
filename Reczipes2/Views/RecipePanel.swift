@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct RecipePanel: View {
-    let recipe: Recipe?
+    let recipe: RecipeX?
     let slot: Int
     let viewModel: CookingViewModel
     
@@ -17,23 +17,11 @@ struct RecipePanel: View {
     
     var body: some View {
         Group {
-            if let recipe = recipe,
-               let recipeModel = recipe.toRecipeModel() {
-                RecipeDetailView(
-                    recipe: recipeModel,
-                    isSaved: true,
-                    onSave: { /* Already saved, no action needed */ }
-                )
-                .overlay(alignment: .topTrailing) {
-                    recipeControls
-                }
-            } else if recipe != nil {
-                // Recipe exists but couldn't be converted to RecipeModel
-                ContentUnavailableView(
-                    "Recipe Unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("This recipe could not be loaded. Try removing and re-adding it.")
-                )
+            if let recipe = recipe {
+                RecipeDetailView(recipe: recipe)
+                    .overlay(alignment: .topTrailing) {
+                        recipeControls
+                    }
             } else {
                 EmptyRecipeSlot {
                     showRecipePicker = true
@@ -113,19 +101,28 @@ struct EmptyRecipeSlot: View {
 
 #Preview("With Recipe") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Recipe.self, configurations: config)
+    let container = try! ModelContainer(for: RecipeX.self, configurations: config)
     let context = ModelContext(container)
     
+    // Create a sample RecipeX for preview
+    let sampleRecipe = RecipeX(
+        title: "Sample Recipe",
+        ingredientSectionsData: Data("[]".utf8),
+        instructionSectionsData: Data("[]".utf8)
+    )
+    context.insert(sampleRecipe)
+    
     return RecipePanel(
-        recipe: Recipe.preview,
+        recipe: sampleRecipe,
         slot: 0,
         viewModel: CookingViewModel(modelContext: context)
     )
+    .modelContainer(container)
 }
 
 #Preview("Empty Slot") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Recipe.self, configurations: config)
+    let container = try! ModelContainer(for: RecipeX.self, configurations: config)
     let context = ModelContext(container)
     
     return RecipePanel(
@@ -133,4 +130,5 @@ struct EmptyRecipeSlot: View {
         slot: 0,
         viewModel: CookingViewModel(modelContext: context)
     )
+    .modelContainer(container)
 }

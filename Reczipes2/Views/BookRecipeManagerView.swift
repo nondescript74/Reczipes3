@@ -12,6 +12,7 @@ struct BookRecipeManagerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var allRecipes: [RecipeX]
+    @Query private var recipeXEntities: [RecipeX]
     
     let book: Book
     

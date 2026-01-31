@@ -493,11 +493,11 @@ class RecipeBookExportService {
     ///   - includeImages: Whether to include images in the export
     /// - Returns: URL to the exported file with proper UTType
     static func exportBook(
-        _ book: RecipeBook,
-        recipes: [RecipeModel],
+        _ book: Book,
+        recipes: [RecipeX],
         includeImages: Bool = true
     ) async throws -> URL {
-        logInfo("Starting export of book: \(book.name)", category: "book-export")
+        logInfo("Starting export of book: \(String(describing: book.name))", category: "book-export")
         
         // Create temporary directory for export
         let tempDir = FileManager.default.temporaryDirectory
@@ -521,7 +521,7 @@ class RecipeBookExportService {
                     entry: ImageManifestEntry(
                         fileName: coverImageName,
                         type: .bookCover,
-                        associatedID: book.id
+                        associatedID: book.id ?? UUID()
                     ),
                     manifest: &imageManifest
                 )
@@ -537,7 +537,7 @@ class RecipeBookExportService {
                         entry: ImageManifestEntry(
                             fileName: imageName,
                             type: .recipePrimary,
-                            associatedID: recipe.id
+                            associatedID: recipe.id ?? UUID()
                         ),
                         manifest: &imageManifest
                     )
@@ -552,7 +552,7 @@ class RecipeBookExportService {
                             entry: ImageManifestEntry(
                                 fileName: imageName,
                                 type: .recipeAdditional,
-                                associatedID: recipe.id
+                                associatedID: recipe.id ?? UUID()
                             ),
                             manifest: &imageManifest
                         )
@@ -561,10 +561,64 @@ class RecipeBookExportService {
             }
         }
         
+        // Convert Book to ExportableBook
+        let exportableBook = ExportableBook(
+            id: book.id ?? UUID(),
+            name: book.name ?? "Untitled Book",
+            bookDescription: book.bookDescription,
+            coverImageName: book.coverImageName,
+            dateCreated: book.dateCreated ?? Date(),
+            dateModified: book.dateModified ?? Date(),
+            recipeIDs: book.recipeIDs ?? [],
+            color: book.color
+        )
+        
+        // Convert RecipeX to ExportableRecipe
+        let exportableRecipes = try recipes.map { recipe -> ExportableRecipe in
+            // Decode ingredient sections
+            let ingredientSections: [IngredientSection]
+            if let data = recipe.ingredientSectionsData {
+                ingredientSections = try JSONDecoder().decode([IngredientSection].self, from: data)
+            } else {
+                ingredientSections = []
+            }
+            
+            // Decode instruction sections
+            let instructionSections: [InstructionSection]
+            if let data = recipe.instructionSectionsData {
+                instructionSections = try JSONDecoder().decode([InstructionSection].self, from: data)
+            } else {
+                instructionSections = []
+            }
+            
+            // Decode notes
+            let notes: [RecipeNote]
+            if let data = recipe.notesData {
+                notes = try JSONDecoder().decode([RecipeNote].self, from: data)
+            } else {
+                notes = []
+            }
+            
+            return ExportableRecipe(
+                id: recipe.id ?? UUID(),
+                title: recipe.title ?? "Untitled Recipe",
+                headerNotes: recipe.headerNotes,
+                yield: recipe.recipeYield,
+                ingredientSections: ingredientSections,
+                instructionSections: instructionSections,
+                notes: notes,
+                reference: recipe.reference,
+                imageName: recipe.imageName,
+                additionalImageNames: recipe.additionalImageNames,
+                imageURLs: nil
+            )
+        }
+        
         // Create export package
         let exportPackage = RecipeBookExportPackage(
-            book: ExportableRecipeBook(from: book),
-            recipes: recipes,
+            version: "2.0",
+            book: exportableBook,
+            recipes: exportableRecipes,
             imageManifest: imageManifest
         )
         
@@ -578,7 +632,7 @@ class RecipeBookExportService {
         try jsonData.write(to: jsonURL)
         
         // Create ZIP archive using FileManager's native zipping
-        let fileName = sanitizeFileName(book.name)
+        let fileName = sanitizeFileName(book.name ?? "Book")
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(fileName)_\(Date().timeIntervalSince1970).\(RecipeBookPackageType.fileExtension)")
         
@@ -596,12 +650,12 @@ class RecipeBookExportService {
     ///   - url: URL to the .recipebook file
     ///   - modelContext: SwiftData model context
     ///   - replaceExisting: If true, replaces existing book with same ID
-    /// - Returns: The imported RecipeBook
+    /// - Returns: The imported Book
     static func importBook(
         from url: URL,
         modelContext: ModelContext,
         replaceExisting: Bool = false
-    ) async throws -> RecipeBook {
+    ) async throws -> Book {
         logInfo("Starting import from: \(url.lastPathComponent)", category: "book-import")
         
         // Create temporary extraction directory
@@ -633,8 +687,8 @@ class RecipeBookExportService {
         
         // Check for existing book
         let bookID = exportPackage.book.id
-        let descriptor = FetchDescriptor<RecipeBook>(
-            predicate: #Predicate { book in
+        let descriptor = FetchDescriptor<Book>(
+            predicate: #Predicate<Book> { book in
                 book.id == bookID
             }
         )
@@ -678,17 +732,17 @@ class RecipeBookExportService {
             }
         }
         
-        // Create RecipeBook with cover image data
-        let newBook = RecipeBook(
+        // Create Book with cover image data
+        let newBook = Book(
             id: exportPackage.book.id,
             name: exportPackage.book.name,
             bookDescription: exportPackage.book.bookDescription,
-            coverImageName: exportPackage.book.coverImageName,
             coverImageData: bookCoverImageData,
-            dateCreated: exportPackage.book.dateCreated,
-            dateModified: Date(), // Update to current date
+            coverImageName: exportPackage.book.coverImageName,
+            color: exportPackage.book.color,
             recipeIDs: exportPackage.book.recipeIDs,
-            color: exportPackage.book.color
+            dateCreated: exportPackage.book.dateCreated,
+            dateModified: Date() // Update to current date
         )
         
         modelContext.insert(newBook)
@@ -700,7 +754,7 @@ class RecipeBookExportService {
         
         try modelContext.save()
         
-        logInfo("Successfully imported book: \(newBook.name)", category: "book-import")
+        logInfo("Successfully imported book: \(newBook.name ?? "Untitled")", category: "book-import")
         
         return newBook
     }
@@ -727,7 +781,7 @@ class RecipeBookExportService {
         _ exportPackage: RecipeBookExportPackage,
         tempDir: URL,
         modelContext: ModelContext
-    ) async throws -> RecipeBook {
+    ) async throws -> Book {
         // Find the actual content directory (may be nested)
         let jsonURL = try findBookJSON(in: tempDir)
         let contentDir = jsonURL.deletingLastPathComponent()
@@ -765,14 +819,14 @@ class RecipeBookExportService {
         }
         
         // Create new recipes with new IDs
-        var newRecipes: [RecipeModel] = []
+        var newRecipes: [ExportableRecipe] = []
         for recipe in exportPackage.recipes {
             let newRecipeID = UUID()
             recipeIDMapping[recipe.id] = newRecipeID
             
             // Note: You'll need to create new image names for recipes too
             // For simplicity, keeping the same image names here
-            let newRecipe = RecipeModel(
+            let newRecipe = ExportableRecipe(
                 id: newRecipeID,
                 title: recipe.title,
                 headerNotes: recipe.headerNotes,
@@ -789,16 +843,16 @@ class RecipeBookExportService {
         }
         
         // Create new book with cover image data
-        let newBook = RecipeBook(
+        let newBook = Book(
             id: newBookID,
             name: "\(exportPackage.book.name) (Imported)",
             bookDescription: exportPackage.book.bookDescription,
-            coverImageName: newCoverImageName,
             coverImageData: newCoverImageData,
-            dateCreated: Date(),
-            dateModified: Date(),
+            coverImageName: newCoverImageName,
+            color: exportPackage.book.color,
             recipeIDs: newRecipes.map { $0.id },
-            color: exportPackage.book.color
+            dateCreated: Date(),
+            dateModified: Date()
         )
         
         modelContext.insert(newBook)
@@ -813,11 +867,11 @@ class RecipeBookExportService {
         return newBook
     }
     
-    private static func importRecipe(_ recipeModel: RecipeModel, modelContext: ModelContext) async throws {
+    private static func importRecipe(_ recipeModel: ExportableRecipe, modelContext: ModelContext) async throws {
         // Check if recipe already exists
         let recipeID = recipeModel.id
-        let descriptor = FetchDescriptor<Recipe>(
-            predicate: #Predicate { recipe in
+        let descriptor = FetchDescriptor<RecipeX>(
+            predicate: #Predicate<RecipeX> { recipe in
                 recipe.id == recipeID
             }
         )
@@ -825,49 +879,65 @@ class RecipeBookExportService {
         let existingRecipes = try modelContext.fetch(descriptor)
         
         if existingRecipes.isEmpty {
-            // Create new recipe from RecipeModel
-            let newRecipe = Recipe(from: recipeModel)
+            // Create new recipe from ExportableRecipe
+            let encoder = JSONEncoder()
+            
+            let ingredientSectionsData = try encoder.encode(recipeModel.ingredientSections)
+            let instructionSectionsData = try encoder.encode(recipeModel.instructionSections)
+            let notesData = try encoder.encode(recipeModel.notes)
             
             // Load and assign image data from Documents directory
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            
+            var imageData: Data?
+            var additionalImagesData: Data?
             
             // Assign main image data
             if let imageName = recipeModel.imageName {
                 let imageURL = documentsPath.appendingPathComponent(imageName)
                 if FileManager.default.fileExists(atPath: imageURL.path),
-                   let imageData = try? Data(contentsOf: imageURL) {
-                    newRecipe.imageData = imageData
-                    logDebug("Loaded main image data (\(imageData.count / 1024)KB) for recipe: \(newRecipe.title)", category: "book-import")
+                   let loadedImageData = try? Data(contentsOf: imageURL) {
+                    imageData = loadedImageData
+                    logDebug("Loaded main image data (\(loadedImageData.count / 1024)KB) for recipe: \(recipeModel.title)", category: "book-import")
                 }
             }
             
             // Assign additional images data
             if let additionalImageNames = recipeModel.additionalImageNames, !additionalImageNames.isEmpty {
-                var additionalImagesData: [[String: Data]] = []
+                var additionalImages: [[String: Data]] = []
                 
                 for imageName in additionalImageNames {
                     let imageURL = documentsPath.appendingPathComponent(imageName)
                     if FileManager.default.fileExists(atPath: imageURL.path),
-                       let imageData = try? Data(contentsOf: imageURL) {
-                        additionalImagesData.append(["data": imageData, "name": Data(imageName.utf8)])
+                       let loadedImageData = try? Data(contentsOf: imageURL) {
+                        additionalImages.append(["data": loadedImageData, "name": Data(imageName.utf8)])
                     }
                 }
                 
-                if !additionalImagesData.isEmpty {
-                    if let encoded = try? JSONEncoder().encode(additionalImagesData) {
-                        newRecipe.additionalImagesData = encoded
-                        logDebug("Loaded \(additionalImagesData.count) additional images for recipe: \(newRecipe.title)", category: "book-import")
+                if !additionalImages.isEmpty {
+                    if let encoded = try? encoder.encode(additionalImages) {
+                        additionalImagesData = encoded
+                        logDebug("Loaded \(additionalImages.count) additional images for recipe: \(recipeModel.title)", category: "book-import")
                     }
                 }
             }
             
-            // Ensure version tracking is set
-            if newRecipe.version == nil {
-                newRecipe.version = 1
-            }
-            if newRecipe.lastModified == nil {
-                newRecipe.lastModified = Date()
-            }
+            let newRecipe = RecipeX(
+                id: recipeModel.id,
+                title: recipeModel.title,
+                headerNotes: recipeModel.headerNotes,
+                recipeYield: recipeModel.yield,
+                reference: recipeModel.reference,
+                ingredientSectionsData: ingredientSectionsData,
+                instructionSectionsData: instructionSectionsData,
+                notesData: notesData,
+                imageData: imageData,
+                additionalImagesData: additionalImagesData,
+                imageName: recipeModel.imageName,
+                additionalImageNames: recipeModel.additionalImageNames,
+                lastModified: Date(),
+                version: 1
+            )
             
             modelContext.insert(newRecipe)
             logInfo("Imported new recipe: \(recipeModel.title)", category: "book-import")
@@ -886,9 +956,9 @@ class RecipeBookExportService {
         }
     }
     
-    /// Updates an existing recipe with data from a RecipeModel if the model is newer
+    /// Updates an existing recipe with data from an ExportableRecipe if the model is newer
     /// - Returns: True if the recipe was updated
-    private static func updateRecipeIfNewer(_ recipe: Recipe, with model: RecipeModel) throws -> Bool {
+    private static func updateRecipeIfNewer(_ recipe: RecipeX, with model: ExportableRecipe) throws -> Bool {
         // For imported recipes, we'll update the content but preserve local version tracking
         // This ensures users don't lose their local changes
         
@@ -927,7 +997,7 @@ class RecipeBookExportService {
             if FileManager.default.fileExists(atPath: imageURL.path),
                let imageData = try? Data(contentsOf: imageURL) {
                 recipe.imageData = imageData
-                logDebug("Updated main image data (\(imageData.count / 1024)KB) for recipe: \(recipe.title)", category: "book-import")
+                logDebug("Updated main image data (\(imageData.count / 1024)KB) for recipe: \(model.title)", category: "book-import")
             }
         }
         
@@ -948,7 +1018,7 @@ class RecipeBookExportService {
             if !additionalImagesData.isEmpty {
                 if let encoded = try? encoder.encode(additionalImagesData) {
                     recipe.additionalImagesData = encoded
-                    logDebug("Updated \(additionalImagesData.count) additional images for recipe: \(recipe.title)", category: "book-import")
+                    logDebug("Updated \(additionalImagesData.count) additional images for recipe: \(model.title)", category: "book-import")
                 }
             }
         }
@@ -978,12 +1048,12 @@ class RecipeBookExportService {
     ///   - url: URL to the ZIP file containing multiple .recipebook files
     ///   - modelContext: SwiftData model context
     ///   - replaceExisting: If true, replaces existing books with same ID
-    /// - Returns: Array of imported RecipeBooks and summary information
+    /// - Returns: Array of imported Books and summary information
     static func importMultipleBooks(
         from url: URL,
         modelContext: ModelContext,
         replaceExisting: Bool = false
-    ) async throws -> (books: [RecipeBook], summary: String) {
+    ) async throws -> (books: [Book], summary: String) {
         logInfo("Starting bulk import from: \(url.lastPathComponent)", category: "book-import")
         
         // Create temporary extraction directory
@@ -1020,7 +1090,7 @@ class RecipeBookExportService {
         logInfo("Found \(recipeBookFiles.count) recipe books to import", category: "book-import")
         
         // Import each book
-        var importedBooks: [RecipeBook] = []
+        var importedBooks: [Book] = []
         var successCount = 0
         var errorCount = 0
         var failedBooks: [String] = []
@@ -1034,7 +1104,7 @@ class RecipeBookExportService {
                 )
                 importedBooks.append(book)
                 successCount += 1
-                logInfo("Successfully imported: \(book.name)", category: "book-import")
+                logInfo("Successfully imported: \(book.name ?? "Untitled")", category: "book-import")
             } catch {
                 errorCount += 1
                 let bookName = bookFile.deletingPathExtension().lastPathComponent

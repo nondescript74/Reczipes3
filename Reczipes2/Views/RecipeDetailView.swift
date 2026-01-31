@@ -9,16 +9,12 @@ import SwiftUI
 import SwiftData
 
 struct RecipeDetailView: View {
-    let recipe: RecipeModel
-    let isSaved: Bool
-    let onSave: () -> Void
-    let previewImage: UIImage? // Optional image for unsaved recipes being previewed
+    let recipe: RecipeX  // ✅ Now only accepts RecipeX
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppStateManager
     
-    @Query private var savedRecipes: [Recipe]
     @Query private var allergenProfiles: [UserAllergenProfile]
     
     @StateObject private var fodmapSettings = UserFODMAPSettings.shared
@@ -41,6 +37,7 @@ struct RecipeDetailView: View {
     @State private var currentServings: Int = 1
     @State private var showingSafariView = false
     @State private var safariURL: URL?
+    @State private var showingDataInspector = false
     
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
@@ -50,24 +47,13 @@ struct RecipeDetailView: View {
     
     private let remindersService = RemindersService()
     
-    // FODMAP analysis
+    // FODMAP analysis - now uses RecipeX directly
     private var fodmapAnalysis: RecipeFODMAPSubstitutions {
         FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
     }
     
-    init(recipe: RecipeModel, 
-         isSaved: Bool, 
-         onSave: @escaping () -> Void,
-         previewImage: UIImage? = nil) {
+    init(recipe: RecipeX) {
         self.recipe = recipe
-        self.isSaved = isSaved
-        self.onSave = onSave
-        self.previewImage = previewImage
-    }
-    
-    // Get the saved Recipe entity for editing
-    private var savedRecipe: Recipe? {
-        savedRecipes.first { $0.id == recipe.id }
     }
     
     // Active allergen profile
@@ -75,10 +61,15 @@ struct RecipeDetailView: View {
         allergenProfiles.first { $0.isActive == true }
     }
     
-    // Allergen score for this recipe
+    // Allergen score for this recipe - now simplified!
     private var allergenScore: RecipeAllergenScore? {
         guard let profile = activeProfile else { return nil }
         return AllergenAnalyzer.shared.analyzeRecipe(recipe, profile: profile)
+    }
+    
+    // Whether recipe is saved - RecipeX instances are always saved in SwiftData
+    private var isSaved: Bool {
+        return true
     }
     
     // MARK: - View Components
@@ -98,7 +89,7 @@ struct RecipeDetailView: View {
                     RecipeAllergenBadge(score: score)
                 }
                 
-                Text("Based on \(String(describing: profile.name))")
+                Text("Based on \(profile.name ?? "Profile")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
@@ -207,7 +198,7 @@ struct RecipeDetailView: View {
         
         // Show profile note if analysis is triggered by profile diabetes status
         if let profile = activeProfile, profile.hasDiabetesConcern {
-            Text("Analysis based on \(String(describing: profile.name)) - \(profile.diabetesStatus.description)")
+            Text("Analysis based on \(profile.name ?? "Profile") - \(profile.diabetesStatus.description)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -270,11 +261,11 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private var nutritionalSection: some View {
-        // Nutritional Analysis Section
+        // Nutritional Analysis Section - now simplified!
         if activeProfile?.nutritionalGoals != nil || activeProfile != nil {
             VStack(alignment: .leading, spacing: 12) {
                 RecipeNutritionalSection(
-                    recipe: recipe,
+                    recipe: recipe,  // ✅ Direct use of RecipeX
                     profile: activeProfile,
                     servings: currentServings
                 )
@@ -372,8 +363,8 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private func instructionStepView(_ step: InstructionStep) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            if let stepNum = step.stepNumber {
-                Text("\(stepNum)")
+            if step.stepNumber > 0 {
+                Text("\(step.stepNumber)")
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
@@ -564,55 +555,56 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private var recipeImageSection: some View {
-        // Recipe Image (if available)
-        // For unsaved recipes in preview, show the previewImage
-        // For saved recipes, use the imageName from the recipe model
-        if let previewImage = previewImage {
-            // Show the temporary preview image (for extracted recipes not yet saved)
-            Image(uiImage: previewImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .frame(maxHeight: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                .padding(.horizontal)
-        } else if let imageName = recipe.imageName {
-            // Get all image names (main + additional + imageURLs)
-            let allImageNames = getAllImageNames(for: recipe)
-            
-            if allImageNames.count > 1 {
-                // Show scrollable gallery for multiple images
-                TabView {
-                    ForEach(allImageNames, id: \.self) { imageNameItem in
-                        RecipeImageView(
-                            imageName: imageNameItem,
-                            size: nil,
-                            aspectRatio: .fit,
-                            cornerRadius: 16
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(maxHeight: 200)
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        .padding(.horizontal)
-                    }
+        // Recipe Image - now simplified!
+        // RecipeX has both imageData (modern) and imageName (legacy)
+        let allImageNames = getAllImageNames(for: recipe)
+        
+        if allImageNames.count > 1 {
+            // Show scrollable gallery for multiple images
+            TabView {
+                ForEach(allImageNames, id: \.self) { imageNameItem in
+                    RecipeImageView(
+                        imageName: imageNameItem,
+                        imageData: recipe.imageData,
+                        size: nil,
+                        aspectRatio: .fit,
+                        cornerRadius: 16
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 200)
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .frame(height: 220)
-                .indexViewStyle(.page(backgroundDisplayMode: .always))
-            } else {
-                // Show single image (saved recipes)
-                RecipeImageView(
-                    imageName: imageName,
-                    size: nil,
-                    aspectRatio: .fit,
-                    cornerRadius: 16
-                )
-                .frame(maxWidth: .infinity)
-                .frame(maxHeight: 200)
-                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                .padding(.horizontal)
             }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .frame(height: 220)
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+        } else if let imageName = recipe.imageName {
+            // Show single image
+            RecipeImageView(
+                imageName: imageName,
+                imageData: recipe.imageData,
+                size: nil,
+                aspectRatio: .fit,
+                cornerRadius: 16
+            )
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: 200)
+            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            .padding(.horizontal)
+        } else if let imageData = recipe.imageData {
+            // Direct imageData display
+            RecipeImageView(
+                imageName: nil,
+                imageData: imageData,
+                size: nil,
+                aspectRatio: .fit,
+                cornerRadius: 16
+            )
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: 200)
+            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            .padding(.horizontal)
         }
     }
     
@@ -621,7 +613,7 @@ struct RecipeDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(recipe.title)
+                    Text(recipe.title ?? "Untitled Recipe")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
@@ -646,16 +638,8 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var saveButtonSection: some View {
         VStack(spacing: 8) {
-            if !isSaved {
-                Button(action: { 
-                    saveRecipeWithTips()
-                }) {
-                    Label("Save Recipe", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-            } else if !pendingTips.isEmpty {
+            // RecipeX is always saved, so just show save tips button if there are pending tips
+            if !pendingTips.isEmpty {
                 Button(action: { 
                     savePendingTipsToExistingRecipe()
                 }) {
@@ -723,46 +707,64 @@ struct RecipeDetailView: View {
         }
     }
     
+    @ViewBuilder
+    private var mainContentSection: some View {
+        Group {
+            recipeImageSection
+            
+            headerSection
+            
+            Divider()
+        }
+        
+        Group {
+            allergenSection
+            
+            fodmapSection
+            
+            diabeticSection
+            
+            nutritionalSection
+        }
+    }
+    
+    @ViewBuilder
+    private var recipeSectionsContent: some View {
+        Group {
+            ingredientsSection
+            
+            Divider()
+            
+            instructionsSection
+        }
+        
+        Group {
+            Divider()
+            
+            notesSection
+            
+            referenceSection
+        }
+    }
+    
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                recipeImageSection
+            LazyVStack(alignment: .leading, spacing: 24) {
+                mainContentSection
                 
-                headerSection
-                
-                Divider()
-                
-                allergenSection
-                
-                fodmapSection
-                
-                diabeticSection
-                
-                nutritionalSection
-                
-                ingredientsSection
-                
-                Divider()
-                
-                instructionsSection
-                
-                Divider()
-                
-                notesSection
-                
-                referenceSection
+                recipeSectionsContent
             }
             .padding()
         }
-        .navigationTitle(recipe.title)
+        .navigationTitle(recipe.title ?? "Recipe")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .toolbar {
-            // CloudKit Sync Badge
-            ToolbarItem(placement: .navigationBarTrailing) {
-                CloudKitSyncBadge()
-            }
+//            // CloudKit Sync Badge
+//            ToolbarItem(placement: .navigationBarTrailing) {
+//                CloudKitSyncBadge()
+//            }
             
             // Cooking Mode button
             ToolbarItem(placement: .primaryAction) {
@@ -772,28 +774,28 @@ struct RecipeDetailView: View {
                     Label("Cooking Mode", systemImage: "frying.pan")
                 }
             }
-            
-            // Share button (for email, text, etc.)
-            ToolbarItem(placement: .primaryAction) {
-                RecipeShareButton(recipe: recipe)
-            }
-            
-            // Community Share button (CloudKit required)
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    // Check CloudKit before community sharing
-                    if case .ready = onboarding.onboardingState {
-                        shareToCloudKitCommunity()
-                    } else {
-                        showCloudKitWarning = true
-                    }
-                } label: {
-                    Label("Share to Community", systemImage: "person.2.fill")
-                }
-            }
+//            
+//            // Share button (for email, text, etc.)
+//            ToolbarItem(placement: .primaryAction) {
+//                RecipeShareButton(recipe: recipe)
+//            }
+//            
+//            // Community Share button (CloudKit required)
+//            ToolbarItem(placement: .primaryAction) {
+//                Button {
+//                    // Check CloudKit before community sharing
+//                    if case .ready = onboarding.onboardingState {
+//                        shareToCloudKitCommunity()
+//                    } else {
+//                        showCloudKitWarning = true
+//                    }
+//                } label: {
+//                    Label("Share to Community", systemImage: "person.2.fill")
+//                }
+//            }
             
             // Export to Reminders button
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task {
                         await exportIngredientsToReminders()
@@ -817,6 +819,15 @@ struct RecipeDetailView: View {
                 }
             }
             
+            // Data Inspector button (for debugging)
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    showingDataInspector = true
+                } label: {
+                    Label("Inspect Recipe Data", systemImage: "magnifyingglass.circle")
+                }
+            }
+            
             // Edit button (only for saved recipes)
             if isSaved {
                 ToolbarItem(placement: .secondaryAction) {
@@ -829,9 +840,7 @@ struct RecipeDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditor) {
-            if let savedRecipe = savedRecipe {
-                RecipeEditorView(recipe: savedRecipe)
-            }
+            RecipeEditorView(recipe: recipe)
         }
         .sheet(isPresented: $showingCookingMode) {
             NavigationStack {
@@ -845,6 +854,11 @@ struct RecipeDetailView: View {
         }
         .sheet(isPresented: $showingFODMAPGuide) {
             FODMAPQuickReferenceView()
+        }
+        .sheet(isPresented: $showingDataInspector) {
+            NavigationStack {
+                RecipeDataInspectorView(recipe: recipe)
+            }
         }
         .sheet(isPresented: $showingAddTip) {
             AddTipSheet(
@@ -865,23 +879,23 @@ struct RecipeDetailView: View {
                     .ignoresSafeArea()
             }
         }
-        .alert("Reminders", isPresented: $showingRemindersAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(remindersAlertMessage)
-        }
-        .alert("Community Sharing Not Available", isPresented: $showCloudKitWarning) {
-            Button("Set Up Now") {
-                showCloudKitOnboarding = true
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("CloudKit needs to be set up before you can share to the community. This enables recipe syncing across your devices and sharing with others.")
-        }
-        .sheet(isPresented: $showCloudKitOnboarding) {
-            CloudKitOnboardingView()
-                .environmentObject(onboarding)
-        }
+//        .alert("Reminders", isPresented: $showingRemindersAlert) {
+//            Button("OK", role: .cancel) { }
+//        } message: {
+//            Text(remindersAlertMessage)
+//        }
+//        .alert("Community Sharing Not Available", isPresented: $showCloudKitWarning) {
+//            Button("Set Up Now") {
+//                showCloudKitOnboarding = true
+//            }
+//            Button("Cancel", role: .cancel) {}
+//        } message: {
+//            Text("CloudKit needs to be set up before you can share to the community. This enables recipe syncing across your devices and sharing with others.")
+//        }
+//        .sheet(isPresented: $showCloudKitOnboarding) {
+//            CloudKitOnboardingView()
+//                .environmentObject(onboarding)
+//        }
         .onAppear {
             checkForPendingAnalysis()
             
@@ -923,7 +937,7 @@ struct RecipeDetailView: View {
             // Count total ingredients
             let totalIngredients = recipe.ingredientSections.reduce(0) { $0 + $1.ingredients.count }
             
-            remindersAlertMessage = "Successfully added \(totalIngredients) ingredient\(totalIngredients == 1 ? "" : "s") to your Reminders app in a list called '\(recipe.title)'."
+            remindersAlertMessage = "Successfully added \(totalIngredients) ingredient\(totalIngredients == 1 ? "" : "s") to your Reminders app in a list called '\(String(describing: recipe.title))'."
             showingRemindersAlert = true
         } catch RemindersError.permissionDenied {
             remindersAlertMessage = "Permission to access Reminders was denied. Please enable it in Settings > Privacy & Security > Reminders to use this feature."
@@ -949,7 +963,7 @@ struct RecipeDetailView: View {
         do {
             // Progress: Preparing request
             analysisProgress = 0.1
-            logInfo("Starting diabetic analysis for recipe: \(recipe.title)", category: "diabetic")
+            logInfo("Starting diabetic analysis for recipe: \(recipe.safeTitle)", category: "diabetic")
             
             // Get the model container from the context
             let modelContainer = modelContext.container
@@ -957,25 +971,14 @@ struct RecipeDetailView: View {
             // Progress: Container ready
             analysisProgress = 0.2
             
-            // For saved recipes, use the saved Recipe entity
-            if let savedRecipe = savedRecipe {
-                analysisProgress = 0.3
-                logInfo("Analyzing saved recipe", category: "diabetic")
-                
-                diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
-                    for: savedRecipe,
-                    modelContainer: modelContainer
-                )
-            } else {
-                analysisProgress = 0.3
-                logInfo("Analyzing unsaved recipe", category: "diabetic")
-                
-                // For unsaved recipes, use RecipeModel
-                diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
-                    for: recipe,
-                    modelContainer: modelContainer
-                )
-            }
+            // Analyze using RecipeX directly
+            analysisProgress = 0.3
+            logInfo("Analyzing RecipeX", category: "diabetic")
+            
+            diabeticInfo = try await DiabeticAnalyzer.shared.analyzeDiabeticInfo(
+                for: recipe,
+                modelContainer: modelContainer
+            )
             
             // Progress: Analysis complete
             analysisProgress = 1.0
@@ -993,7 +996,7 @@ struct RecipeDetailView: View {
         // Clear existing analysis
         diabeticInfo = nil
         
-        logInfo("Rerunning diabetic analysis for recipe: \(recipe.title)", category: "diabetic")
+        logInfo("Rerunning diabetic analysis for recipe: \(recipe.safeTitle)", category: "diabetic")
         
         // Rerun the analysis
         await loadDiabeticInfo()
@@ -1005,8 +1008,8 @@ struct RecipeDetailView: View {
         // Check if there's a pending analysis task for this recipe
         if let task = appState.activeTask,
            task.taskType == .diabeticAnalysis,
-           task.recipeId == recipe.id {
-            logInfo("Found pending diabetic analysis for recipe: \(recipe.title)", category: "state")
+           task.recipeId == recipe.safeID {
+            logInfo("Found pending diabetic analysis for recipe: \(recipe.safeTitle)", category: "state")
             showPendingAnalysisAlert = true
         }
     }
@@ -1014,7 +1017,7 @@ struct RecipeDetailView: View {
     private func resumeAnalysis() async {
         // Resume from saved progress
         guard let task = appState.activeTask,
-              task.recipeId == recipe.id else { 
+              task.recipeId == recipe.safeID else { 
             appState.completeTask()
             return 
         }
@@ -1044,55 +1047,21 @@ struct RecipeDetailView: View {
         pendingTips.removeAll { $0.id == tip.id }
     }
     
-    private func saveRecipeWithTips() {
-        // If there are pending tips, we need to create an updated recipe with them
-        if !pendingTips.isEmpty {
-            // Create a new RecipeModel with the pending tips included
-            let updatedNotes = recipe.notes + pendingTips
-            
-            // Create updated recipe model
-            let updatedRecipe = RecipeModel(
-                id: recipe.id,
-                title: recipe.title,
-                headerNotes: recipe.headerNotes,
-                yield: recipe.yield,
-                ingredientSections: recipe.ingredientSections,
-                instructionSections: recipe.instructionSections,
-                notes: updatedNotes,
-                reference: recipe.reference,
-                imageName: recipe.imageName,
-                additionalImageNames: recipe.additionalImageNames,
-                imageURLs: recipe.imageURLs
-            )
-            
-            // Save the updated recipe to SwiftData
-            let savedRecipe = Recipe(from: updatedRecipe)
-            modelContext.insert(savedRecipe)
-            
-            // Clear pending tips after saving
-            pendingTips.removeAll()
-            
-            // Call the original onSave callback (for UI updates)
-            onSave()
-        } else {
-            // No pending tips, just call the original save
-            onSave()
-        }
-    }
+    // saveRecipeWithTips removed - RecipeX is always saved
     
     private func savePendingTipsToExistingRecipe() {
-        guard let savedRecipe = savedRecipe, !pendingTips.isEmpty else {
-            logWarning("Cannot save tips - recipe not found or no pending tips", category: "tips")
+        guard !pendingTips.isEmpty else {
+            logWarning("Cannot save tips - no pending tips", category: "tips")
             return
         }
         
         // Store count before clearing for the success message
         let tipCount = pendingTips.count
         
-        // Get existing notes from the saved recipe
+        // Get existing notes from the RecipeX
         let decoder = JSONDecoder()
         var existingNotes: [RecipeNote] = []
-        if let notesData = savedRecipe.notesData,
+        if let notesData = recipe.notesData,
            let notes = try? decoder.decode([RecipeNote].self, from: notesData) {
             existingNotes = notes
         }
@@ -1103,16 +1072,18 @@ struct RecipeDetailView: View {
         // Encode and save
         let encoder = JSONEncoder()
         if let encodedNotes = try? encoder.encode(updatedNotes) {
-            savedRecipe.notesData = encodedNotes
+            recipe.notesData = encodedNotes
             
             // Update version tracking
-            savedRecipe.version = savedRecipe.currentVersion + 1
-            savedRecipe.lastModified = Date()
+            if let currentVersion = recipe.version {
+                recipe.version = currentVersion + 1
+            }
+            recipe.lastModified = Date()
             
             // Try to save context
             do {
                 try modelContext.save()
-                logInfo("Successfully saved \(tipCount) tip(s) to recipe: \(recipe.title)", category: "tips")
+                logInfo("Successfully saved \(tipCount) tip(s) to recipe: \(recipe.safeTitle)", category: "tips")
                 
                 // Clear pending tips after successful save
                 pendingTips.removeAll()
@@ -1128,37 +1099,17 @@ struct RecipeDetailView: View {
         }
     }
     
-    private func getAllImageNames(for recipe: RecipeModel) -> [String] {
+    private func getAllImageNames(for recipe: RecipeX) -> [String] {
         var names: [String] = []
         
-        // If this is a saved recipe, get images from the live SwiftData entity
-        // This ensures we see newly added images from the editor
-        if let savedRecipe = savedRecipe {
-            // Add main image
-            if let imageName = savedRecipe.imageName {
-                names.append(imageName)
-            }
-            
-            // Add additionalImageNames from the live entity
-            if let additionalNames = savedRecipe.additionalImageNames {
-                names.append(contentsOf: additionalNames)
-            }
-        } else {
-            // For unsaved recipes, use the RecipeModel data
-            // Add main image
-            if let imageName = recipe.imageName {
-                names.append(imageName)
-            }
-            
-            // Add additionalImageNames if available
-            if let additionalNames = recipe.additionalImageNames {
-                names.append(contentsOf: additionalNames)
-            }
-            
-            // Add imageURLs if available (these might be local file names)
-            if let imageURLs = recipe.imageURLs {
-                names.append(contentsOf: imageURLs)
-            }
+        // Add main image
+        if let imageName = recipe.imageName {
+            names.append(imageName)
+        }
+        
+        // Add additionalImageNames
+        if let additionalNames = recipe.additionalImageNames {
+            names.append(contentsOf: additionalNames)
         }
         
         // Remove duplicates while preserving order
@@ -1169,12 +1120,12 @@ struct RecipeDetailView: View {
         }
         
         // Debug: Log image count
-        logDebug("Recipe '\(recipe.title)' has \(uniqueNames.count) images: \(uniqueNames)", category: "images")
+        logDebug("Recipe '\(recipe.safeTitle)' has \(uniqueNames.count) images: \(uniqueNames)", category: "images")
         
         return uniqueNames
     }
     
-    private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
+    private func iconForNoteType(_ type: RecipeNoteType) -> String {
         switch type {
         case .tip: return "lightbulb.fill"
         case .substitution: return "arrow.left.arrow.right"
@@ -1184,7 +1135,7 @@ struct RecipeDetailView: View {
         }
     }
     
-    private func colorForNoteType(_ type: RecipeNote.NoteType) -> Color {
+    private func colorForNoteType(_ type: RecipeNoteType) -> Color {
         switch type {
         case .tip: return .blue
         case .substitution: return .orange
@@ -1199,7 +1150,7 @@ struct RecipeDetailView: View {
     private func shareToCloudKitCommunity() {
         // TODO: Implement CloudKit community sharing
         // This will create a SharedRecipe entity and share it via CloudKit
-        logInfo("Community sharing initiated for recipe: \(recipe.title)", category: "cloudkit")
+        logInfo("Community sharing initiated for recipe: \(recipe.safeTitle)", category: "cloudkit")
         
         // For now, show a coming soon alert
         remindersAlertMessage = "Community sharing is coming soon! Once enabled, you'll be able to share your recipes with other users and discover new recipes from the community."
@@ -1207,41 +1158,41 @@ struct RecipeDetailView: View {
     }
 }
 
-// MARK: - SafariView Wrapper
-
-import SafariServices
-
-struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-    let entersReaderIfAvailable: Bool
-    
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        let configuration = SFSafariViewController.Configuration()
-        configuration.entersReaderIfAvailable = entersReaderIfAvailable
-        configuration.barCollapsingEnabled = true
-        
-        let safariVC = SFSafariViewController(url: url, configuration: configuration)
-        safariVC.dismissButtonStyle = .done
-        
-        return safariVC
-    }
-    
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
-        // No updates needed
-    }
-}
-
-// Alternative: Use the standard SwiftUI approach
-extension View {
-    func safariView(url: Binding<URL?>, isPresented: Binding<Bool>) -> some View {
-        self.sheet(isPresented: isPresented) {
-            if let url = url.wrappedValue {
-                SafariView(url: url, entersReaderIfAvailable: true)
-                    .ignoresSafeArea()
-            }
-        }
-    }
-}
+//// MARK: - SafariView Wrapper
+//
+//import SafariServices
+//
+//struct SafariView: UIViewControllerRepresentable {
+//    let url: URL
+//    let entersReaderIfAvailable: Bool
+//    
+//    func makeUIViewController(context: Context) -> SFSafariViewController {
+//        let configuration = SFSafariViewController.Configuration()
+//        configuration.entersReaderIfAvailable = entersReaderIfAvailable
+//        configuration.barCollapsingEnabled = true
+//        
+//        let safariVC = SFSafariViewController(url: url, configuration: configuration)
+//        safariVC.dismissButtonStyle = .done
+//        
+//        return safariVC
+//    }
+//    
+//    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
+//        // No updates needed
+//    }
+//}
+//
+//// Alternative: Use the standard SwiftUI approach
+//extension View {
+//    func safariView(url: Binding<URL?>, isPresented: Binding<Bool>) -> some View {
+//        self.sheet(isPresented: isPresented) {
+//            if let url = url.wrappedValue {
+//                SafariView(url: url, entersReaderIfAvailable: true)
+//                    .ignoresSafeArea()
+//            }
+//        }
+//    }
+//}
 
 // MARK: - Add Tip Sheet
 
@@ -1341,35 +1292,45 @@ struct AddTipSheet: View {
 
 #Preview {
     NavigationStack {
-        RecipeDetailView(
-            recipe: RecipeModel(
-                title: "Lassi",
-                headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
-                yield: "Serves 1 to 2",
-                ingredientSections: [
-                    IngredientSection(
-                        ingredients: [
-                            Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt", metricQuantity: "175", metricUnit: "mL"),
-                            Ingredient(quantity: "1", unit: "cup", name: "water", metricQuantity: "250", metricUnit: "mL"),
-                            Ingredient(quantity: "⅛", unit: "tsp.", name: "salt", metricQuantity: "0.5", metricUnit: "mL"),
-                            Ingredient(quantity: "⅛", unit: "tsp.", name: "ground black pepper", metricQuantity: "0.5", metricUnit: "mL"),
-                            Ingredient(quantity: "⅛", unit: "tsp.", name: "cumin powder", metricQuantity: "0.5", metricUnit: "mL"),
-                            Ingredient(quantity: "", unit: "", name: "ice cubes")
-                        ]
-                    )
-                ],
-                instructionSections: [
-                    InstructionSection(
-                        steps: [
-                            InstructionStep(text: "Combine all ingredients in the blender and blend until smooth. Sugar can be added instead of salt and pepper, if preferred.")
-                        ]
-                    )
-                ],
-                notes: [],
-                reference: "See photograph, page 48."
-            ),
-            isSaved: false,
-            onSave: {}
+        // Create a temporary RecipeX for preview
+        let previewRecipe = RecipeX(
+            id: UUID(),
+            title: "Lassi",
+            headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
+            recipeYield: "Serves 1 to 2",
+            reference: "See photograph, page 48.",
+            ingredientSectionsData: try? JSONEncoder().encode([
+                IngredientSection(
+                    ingredients: [
+                        Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt", metricQuantity: "175", metricUnit: "mL"),
+                        Ingredient(quantity: "1", unit: "cup", name: "water", metricQuantity: "250", metricUnit: "mL"),
+                        Ingredient(quantity: "⅛", unit: "tsp.", name: "salt", metricQuantity: "0.5", metricUnit: "mL"),
+                        Ingredient(quantity: "⅛", unit: "tsp.", name: "ground black pepper", metricQuantity: "0.5", metricUnit: "mL"),
+                        Ingredient(quantity: "⅛", unit: "tsp.", name: "cumin powder", metricQuantity: "0.5", metricUnit: "mL"),
+                        Ingredient(quantity: "", unit: "", name: "ice cubes")
+                    ]
+                )
+            ]),
+            instructionSectionsData: try? JSONEncoder().encode([
+                InstructionSection(
+                    steps: [
+                        InstructionStep(stepNumber: 1, text: "Combine all ingredients in the blender and blend until smooth. Sugar can be added instead of salt and pepper, if preferred.")
+                    ]
+                )
+            ]),
+            notesData: nil,
+            imageData: nil,
+            additionalImagesData: nil,
+            imageName: nil,
+            additionalImageNames: nil,
+            dateAdded: Date(),
+            dateCreated: Date(),
+            lastModified: Date(),
+            version: 1
         )
+        
+        RecipeDetailView(recipe: previewRecipe)
+            .modelContainer(for: [RecipeX.self, UserAllergenProfile.self], inMemory: true)
+            .environmentObject(AppStateManager.shared)
     }
 }

@@ -67,7 +67,7 @@ extension AllergenAnalyzer {
     /// Analyze a recipe using Claude API for enhanced detection
     /// This method should be called from your ClaudeAPIClient
     func analyzeRecipeWithClaude(
-        _ recipe: RecipeModel,
+        _ recipe: RecipeX,
         profile: UserAllergenProfile,
         apiKey: String
     ) async throws -> EnhancedAllergenScore {
@@ -168,7 +168,7 @@ struct EnhancedAllergenScore: Identifiable {
     let id = UUID()
     let basicScore: RecipeAllergenScore
     let claudeAnalysis: ClaudeAllergenAnalysis
-    let recipe: RecipeModel
+    let recipe: RecipeX
     
     /// Combined safety assessment
     var overallSafety: SafetyLevel {
@@ -406,53 +406,3 @@ struct EnhancedAllergenDetailView: View {
 }
 #endif
 
-// MARK: - Usage Example
-
-/*
- 
- // In your view or view model:
- 
- @State private var isAnalyzing = false
- @State private var enhancedScore: EnhancedAllergenScore?
- 
- func analyzeWithClaude() {
-     guard let apiKey = APIKeyHelper.getAPIKey(),
-           let profile = activeProfile else { return }
-     
-     isAnalyzing = true
-     
-     Task {
-         do {
-             let score = try await AllergenAnalyzer.shared.analyzeRecipeWithClaude(
-                 recipe,
-                 profile: profile,
-                 apiKey: apiKey
-             )
-             
-             await MainActor.run {
-                 enhancedScore = score
-                 isAnalyzing = false
-             }
-         } catch {
-             logError("Enhanced analysis failed: \(error)", category: "allergen")
-             isAnalyzing = false
-         }
-     }
- }
- 
- // In your view:
- 
- Button {
-     analyzeWithClaude()
- } label: {
-     if isAnalyzing {
-         ProgressView()
-     } else {
-         Label("Analyze with AI", systemImage: "sparkles")
-     }
- }
- .sheet(item: $enhancedScore) { score in
-     EnhancedAllergenDetailView(score: score)
- }
- 
- */

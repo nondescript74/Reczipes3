@@ -42,7 +42,7 @@ final class CachedDiabeticAnalysis {
     }
     
     /// Check if ingredients have changed since this analysis
-    func isIngredientsOutdated(recipe: Recipe) -> Bool {
+    func isIngredientsOutdated(recipe: RecipeX) -> Bool {
         // Check version mismatch
         if recipe.currentVersion != recipeVersion {
             return true
@@ -63,7 +63,7 @@ final class CachedDiabeticAnalysis {
     }
     
     /// Check if cache is still valid (not stale and ingredients haven't changed)
-    func isValid(for recipe: Recipe) -> Bool {
+    func isValid(for recipe: RecipeX) -> Bool {
         return !isStale && !isIngredientsOutdated(recipe: recipe)
     }
     
@@ -75,13 +75,13 @@ final class CachedDiabeticAnalysis {
     }
     
     /// Create a cached analysis from DiabeticInfo
-    @MainActor static func create(from info: DiabeticInfo, recipe: Recipe) throws -> CachedDiabeticAnalysis {
+    @MainActor static func create(from info: DiabeticInfo, recipe: RecipeX) throws -> CachedDiabeticAnalysis {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(info)
         
         return CachedDiabeticAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipe.id!,
             analysisData: data,
             cachedAt: Date(),
             recipeVersion: recipe.currentVersion,

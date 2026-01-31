@@ -78,7 +78,7 @@ struct RecipeBookImportSheet: View {
     @ObservedObject var handler: RecipeBookDocumentHandler
     
     @State private var isImporting = false
-    @State private var importedBook: RecipeBook?
+    @State private var importedBook: Book?
     @State private var importError: Error?
     @State private var replaceExisting = false
     
@@ -110,7 +110,7 @@ struct RecipeBookImportSheet: View {
                         .font(.title2)
                         .bold()
                     
-                    Text("Imported **\(book.name)** with \(book.recipeIDs.count) recipes.")
+                    Text("Imported **\(String(describing: book.name))** with \(book.recipeIDs!.count) recipes.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
@@ -238,14 +238,14 @@ struct RecipeBookImportSheet: View {
             
             importedBook = book
             
-            logInfo("Successfully imported recipe book: \(book.name)", category: "book-import")
+            logInfo("Successfully imported recipe book: \(String(describing: book.name))", category: "book-import")
             
             // Log user diagnostic
             logUserDiagnostic(
                 .info,
                 category: .sharing,
                 title: "Recipe Book Imported",
-                message: "Successfully imported \(book.name) with \(book.recipeIDs.count) recipes.",
+                message: "Successfully imported \(String(describing: book.name)) with \(book.recipeIDs!.count) recipes.",
                 technicalDetails: "Import completed from \(url.lastPathComponent)"
             )
             

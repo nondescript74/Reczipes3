@@ -14,7 +14,7 @@ struct SharedRecipeBookListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    let book: RecipeBook
+    let book: Book
     let sharedEntry: SharedRecipeBook
     
     @Query private var allPreviews: [CloudKitRecipePreview]
@@ -48,9 +48,9 @@ struct SharedRecipeBookListView: View {
         switch sortOrder {
         case .original:
             // Maintain order from book.recipeIDs
-            return book.recipeIDs.compactMap { recipeID in
+            return book.recipeIDs?.compactMap { recipeID in
                 searchFiltered.first { $0.id == recipeID }
-            }
+            } ?? []
         case .alphabetical:
             return searchFiltered.sorted { $0.title < $1.title }
         case .yieldAscending:
@@ -75,7 +75,7 @@ struct SharedRecipeBookListView: View {
                 recipeListView
             }
         }
-        .navigationTitle(book.name)
+        .navigationTitle(book.name ?? "No Name")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search recipes")
         .toolbar {
@@ -179,7 +179,7 @@ struct SharedRecipeBookListView: View {
                 }
                 
                 HStack(spacing: 16) {
-                    Label("\(book.recipeIDs.count)", systemImage: "list.bullet")
+                    Label("\(String(describing: book.recipeIDs?.count))", systemImage: "list.bullet")
                     
                     if let sharedByName = sharedEntry.sharedByUserName {
                         Label(sharedByName, systemImage: "person.crop.circle")
@@ -306,34 +306,34 @@ struct RecipePreviewRow: View {
 // MARK: - Preview
 
 #Preview("Shared Book with Previews") {
-    let container = try! ModelContainer(for: RecipeBook.self, SharedRecipeBook.self, CloudKitRecipePreview.self)
+    let container = try! ModelContainer(for: Book.self, SharedRecipeBook.self, CloudKitRecipePreview.self)
     let context = container.mainContext
     
     // Create test book
-    let book = RecipeBook(
+    let book = Book(
         id: UUID(),
         name: "Italian Classics",
         bookDescription: "Traditional Italian recipes from my grandmother",
         coverImageName: nil,
-        dateCreated: Date(),
-        dateModified: Date(),
+        color: "#FF5733",
         recipeIDs: [UUID(), UUID(), UUID()],
-        color: "#FF5733"
+        dateCreated: Date(),
+        dateModified: Date()
     )
     
     let sharedEntry = SharedRecipeBook(
-        bookID: book.id,
+        bookID: book.id ?? UUID(),
         cloudRecordID: "test-record",
         sharedByUserID: "test-user",
         sharedByUserName: "Maria Rossi",
         sharedDate: Date(),
-        bookName: book.name,
+        bookName: book.name ?? "Italian Classics",
         bookDescription: book.bookDescription,
         coverImageName: nil
     )
     
     // Create test previews
-    for (index, recipeID) in book.recipeIDs.enumerated() {
+    for (index, recipeID) in (book.recipeIDs ?? []).enumerated() {
         let preview = CloudKitRecipePreview(
             id: recipeID,
             title: ["Pasta Carbonara", "Margherita Pizza", "Tiramisu"][index],
@@ -359,27 +359,27 @@ struct RecipePreviewRow: View {
 }
 
 #Preview("Empty Shared Book") {
-    let container = try! ModelContainer(for: RecipeBook.self, SharedRecipeBook.self, CloudKitRecipePreview.self)
+    let container = try! ModelContainer(for: Book.self, SharedRecipeBook.self, CloudKitRecipePreview.self)
     let context = container.mainContext
     
-    let book = RecipeBook(
+    let book = Book(
         id: UUID(),
         name: "Empty Book",
         bookDescription: "This book has no recipes yet",
         coverImageName: nil,
-        dateCreated: Date(),
-        dateModified: Date(),
+        color: "#3498db",
         recipeIDs: [],
-        color: "#3498db"
+        dateCreated: Date(),
+        dateModified: Date()
     )
     
     let sharedEntry = SharedRecipeBook(
-        bookID: book.id,
+        bookID: book.id ?? UUID(),
         cloudRecordID: "test-record",
         sharedByUserID: "test-user",
         sharedByUserName: "John Doe",
         sharedDate: Date(),
-        bookName: book.name,
+        bookName: book.name ?? "Empty Book",
         bookDescription: book.bookDescription,
         coverImageName: nil
     )

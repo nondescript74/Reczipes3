@@ -112,7 +112,7 @@ class RecipeBackupManager {
     // MARK: - Export
     
     /// Creates a backup package of all recipes with their images
-    func createBackup(from recipes: [Recipe]) async throws -> URL {
+    func createBackup(from recipes: [RecipeX]) async throws -> URL {
         guard !recipes.isEmpty else {
             throw RecipeBackupError.noRecipesToBackup
         }
@@ -120,13 +120,9 @@ class RecipeBackupManager {
         logInfo("Starting backup of \(recipes.count) recipe(s)", category: "backup")
         
         var recipeBackups: [RecipeBackup] = []
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        _ = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         
         for recipe in recipes {
-            guard let recipeModel = recipe.toRecipeModel() else {
-                logWarning("Skipping recipe '\(recipe.title)' - could not convert to RecipeModel", category: "backup")
-                continue
-            }
             
             // Load main image if exists
             var mainImageBackup: RecipeBackup.ImageBackup?
@@ -135,17 +131,7 @@ class RecipeBackupManager {
             if let imageData = recipe.imageData {
                 let fileName = recipe.imageName ?? "image_\(UUID().uuidString).jpg"
                 mainImageBackup = RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData)
-                logDebug("Loaded main image from SwiftData for '\(recipe.title)'", category: "backup")
-            }
-            // Priority 2 - Fall back to file-based (legacy recipes)
-            else if let mainImageName = recipe.imageName {
-                let imageURL = documentsPath.appendingPathComponent(mainImageName)
-                if let imageData = try? Data(contentsOf: imageURL) {
-                    mainImageBackup = RecipeBackup.ImageBackup(fileName: mainImageName, imageData: imageData)
-                    logDebug("Loaded main image from file '\(mainImageName)' for '\(recipe.title)'", category: "backup")
-                } else {
-                    logWarning("Could not load main image '\(mainImageName)' for '\(recipe.title)'", category: "backup")
-                }
+                logDebug("Loaded main image from SwiftData for '\(String(describing: recipe.title))'", category: "backup")
             }
             
             // Load additional images if exist
@@ -158,32 +144,20 @@ class RecipeBackupManager {
                 for (index, imageData) in decodedImages.enumerated() {
                     let fileName = "additional_\(index)_\(UUID().uuidString).jpg"
                     imageBackups.append(RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData))
-                    logDebug("Loaded additional image \(index) from SwiftData for '\(recipe.title)'", category: "backup")
-                }
-                if !imageBackups.isEmpty {
-                    additionalImageBackups = imageBackups
-                }
-            }
-            // Priority 2 - Fall back to file-based (legacy recipes)
-            else if let additionalImageNames = recipe.additionalImageNames, !additionalImageNames.isEmpty {
-                var imageBackups: [RecipeBackup.ImageBackup] = []
-                for imageName in additionalImageNames {
-                    let imageURL = documentsPath.appendingPathComponent(imageName)
-                    if let imageData = try? Data(contentsOf: imageURL) {
-                        imageBackups.append(RecipeBackup.ImageBackup(fileName: imageName, imageData: imageData))
-                        logDebug("Loaded additional image from file '\(imageName)' for '\(recipe.title)'", category: "backup")
-                    } else {
-                        logWarning("Could not load additional image '\(imageName)' for '\(recipe.title)'", category: "backup")
-                    }
+                    logDebug("Loaded additional image \(index) from SwiftData for '\(String(describing: recipe.title))'", category: "backup")
                 }
                 if !imageBackups.isEmpty {
                     additionalImageBackups = imageBackups
                 }
             }
             
+            
+            // Convert RecipeX to RecipeData for backup
+            let recipeData = RecipeData(from: recipe)
+            
             let backup = RecipeBackup(
-                recipe: recipeModel,
-                dateAdded: recipe.dateAdded,
+                recipe: recipeData,
+                dateAdded: recipe.dateAdded ?? Date(),
                 mainImage: mainImageBackup,
                 additionalImages: additionalImageBackups
             )
@@ -319,7 +293,7 @@ class RecipeBackupManager {
     func importBackup(
         from url: URL,
         into modelContext: ModelContext,
-        existingRecipes: [Recipe],
+        existingRecipes: [RecipeX],
         overwriteMode: ImportOverwriteMode
     ) async throws -> RecipeImportResult {
         logInfo("Starting import from \(url.lastPathComponent)", category: "backup")
@@ -335,6 +309,7 @@ class RecipeBackupManager {
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        decoder.dataDecodingStrategy = .base64 // Explicitly decode base64 Data
         
         let package: RecipeBackupPackage
         do {
@@ -348,94 +323,52 @@ class RecipeBackupManager {
         
         var newCount = 0
         var updatedCount = 0
-        var skippedCount = 0
+        let skippedCount = 0
         
         _ = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         
         for recipeBackup in package.recipes {
-            let recipeModel = recipeBackup.recipe
+            let recipeData = recipeBackup.recipe
+            
+            // Convert RecipeData to RecipeX
+            let recipe = recipeData.toRecipeX()
             
             // Check if recipe already exists
-            let existingRecipe = existingRecipes.first { $0.id == recipeModel.id }
+            let existingRecipe = existingRecipes.first { $0.id == recipe.id }
             
             if let existing = existingRecipe {
-                switch overwriteMode {
-                case .skip:
-                    logDebug("Skipping existing recipe '\(recipeModel.title)'", category: "backup")
-                    skippedCount += 1
-                    continue
-                    
-                case .overwrite:
-                    logInfo("Overwriting existing recipe '\(recipeModel.title)'", category: "backup")
-                    // Delete the existing recipe (images will be overwritten)
-                    modelContext.delete(existing)
-                    updatedCount += 1
-                    
-                case .keepBoth:
-                    logInfo("Keeping both versions of '\(recipeModel.title)'", category: "backup")
-                    // Will create new recipe with new ID below
-                    newCount += 1
-                }
+                logInfo("Overwriting existing recipe '\(recipe.safeTitle)'", category: "backup")
+                // Delete the existing recipe (images will be overwritten)
+                modelContext.delete(existing)
+                updatedCount += 1
             } else {
                 newCount += 1
             }
             
-            // Restore images to SwiftData (new system)
-            var restoredMainImageData: Data?
-            var restoredMainImageName: String?
+            // Restore images from backup
             if let mainImage = recipeBackup.mainImage {
-                // Store directly in SwiftData
-                restoredMainImageData = mainImage.imageData
-                restoredMainImageName = mainImage.fileName
-                logDebug("Prepared main image for SwiftData: '\(mainImage.fileName)'", category: "backup")
+                recipe.imageData = mainImage.imageData
+                recipe.imageName = mainImage.fileName
+                recipe.imageHash = RecipeX.calculateImageHash(from: mainImage.imageData)
+                logDebug("Set main image data for '\(recipe.safeTitle)'", category: "backup")
             }
             
-            var restoredAdditionalImagesData: Data?
             if let additionalImages = recipeBackup.additionalImages, !additionalImages.isEmpty {
-                // Encode additional images as JSON array of Data
-                let imageDataArray = additionalImages.map { $0.imageData }
-                restoredAdditionalImagesData = try? JSONEncoder().encode(imageDataArray)
-                logDebug("Prepared \(additionalImages.count) additional images for SwiftData", category: "backup")
+                // Store additional images as JSON array of dictionaries
+                var additionalImagesArray: [[String: Data]] = []
+                for (index, imageBackup) in additionalImages.enumerated() {
+                    let imageName = "additional_\(index)_\(recipe.safeID.uuidString).jpg"
+                    additionalImagesArray.append([
+                        "data": imageBackup.imageData,
+                        "name": Data(imageName.utf8)
+                    ])
+                }
+                recipe.additionalImagesData = try? JSONEncoder().encode(additionalImagesArray)
+                logDebug("Set additional images data for '\(recipe.safeTitle)'", category: "backup")
             }
             
-            // Create recipe model with restored image names
-            var recipeToImport = recipeModel
-            if let mainImageName = restoredMainImageName {
-                recipeToImport = recipeToImport.withImageName(mainImageName)
-            }
-            
-            // Handle keep both mode - create new ID
-            if overwriteMode == .keepBoth && existingRecipe != nil {
-                recipeToImport = RecipeModel(
-                    id: UUID(), // New ID
-                    title: recipeToImport.title,
-                    headerNotes: recipeToImport.headerNotes,
-                    yield: recipeToImport.yield,
-                    ingredientSections: recipeToImport.ingredientSections,
-                    instructionSections: recipeToImport.instructionSections,
-                    notes: recipeToImport.notes,
-                    reference: recipeToImport.reference,
-                    imageName: recipeToImport.imageName,
-                    additionalImageNames: recipeToImport.additionalImageNames,
-                    imageURLs: recipeToImport.imageURLs
-                )
-            }
-            
-            // Create and insert the recipe
-            let newRecipe = Recipe(from: recipeToImport)
-            
-            // UPDATED: Set image data directly in SwiftData
-            if let imageData = restoredMainImageData {
-                newRecipe.imageData = imageData
-                logDebug("Set main image data for '\(recipeToImport.title)'", category: "backup")
-            }
-            if let additionalImagesData = restoredAdditionalImagesData {
-                newRecipe.additionalImagesData = additionalImagesData
-                logDebug("Set additional images data for '\(recipeToImport.title)'", category: "backup")
-            }
-            
-            modelContext.insert(newRecipe)
-            logDebug("Imported recipe '\(recipeToImport.title)'", category: "backup")
+            modelContext.insert(recipe)
+            logDebug("Imported recipe '\(recipe.safeTitle)'", category: "backup")
         }
         
         // Save the context
@@ -468,20 +401,15 @@ class RecipeBackupManager {
         var recipeBackups: [RecipeBackup] = []
         
         for recipe in recipes {
-            guard let recipeModel = recipe.toRecipeModel() else {
-                logWarning("Skipping RecipeX '\(recipe.safeTitle)' - could not convert to RecipeModel", category: "backup")
-                continue
-            }
-            
-            // Load main image from RecipeX imageData
+            // Load main image if exists
             var mainImageBackup: RecipeBackup.ImageBackup?
             if let imageData = recipe.imageData {
                 let fileName = recipe.imageName ?? "image_\(recipe.safeID.uuidString).jpg"
                 mainImageBackup = RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData)
-                logDebug("Loaded main image from RecipeX SwiftData for '\(recipe.safeTitle)'", category: "backup")
+                logDebug("Loaded main image from SwiftData for '\(recipe.safeTitle)'", category: "backup")
             }
             
-            // Load additional images from RecipeX
+            // Load additional images if exist
             var additionalImageBackups: [RecipeBackup.ImageBackup]?
             if let additionalImagesData = recipe.additionalImagesData,
                let imageArray = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData) {
@@ -490,7 +418,7 @@ class RecipeBackupManager {
                     if let imageData = imageDict["data"] {
                         let fileName = "additional_\(index)_\(recipe.safeID.uuidString).jpg"
                         imageBackups.append(RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData))
-                        logDebug("Loaded additional image \(index) from RecipeX for '\(recipe.safeTitle)'", category: "backup")
+                        logDebug("Loaded additional image \(index) from SwiftData for '\(recipe.safeTitle)'", category: "backup")
                     }
                 }
                 if !imageBackups.isEmpty {
@@ -498,12 +426,33 @@ class RecipeBackupManager {
                 }
             }
             
+            // Convert RecipeX to RecipeData for backup
+            let recipeData = RecipeData(from: recipe)
+            
+            // DEBUG: Log what's in RecipeData before encoding
+            logDebug("RecipeData created for '\(recipe.safeTitle)':", category: "backup")
+            logDebug("  - id: \(recipeData.id?.uuidString ?? "nil")", category: "backup")
+            logDebug("  - title: \(recipeData.title ?? "nil")", category: "backup")
+            logDebug("  - ingredientSectionsData: \(recipeData.ingredientSectionsData != nil ? "\(recipeData.ingredientSectionsData!.count) bytes" : "nil")", category: "backup")
+            logDebug("  - instructionSectionsData: \(recipeData.instructionSectionsData != nil ? "\(recipeData.instructionSectionsData!.count) bytes" : "nil")", category: "backup")
+            logDebug("  - notesData: \(recipeData.notesData != nil ? "\(recipeData.notesData!.count) bytes" : "nil")", category: "backup")
+            
             let backup = RecipeBackup(
-                recipe: recipeModel,
+                recipe: recipeData,
                 dateAdded: recipe.dateAdded ?? Date(),
                 mainImage: mainImageBackup,
                 additionalImages: additionalImageBackups
             )
+            
+            // DEBUG: Try to encode just the RecipeData to see if it works
+            do {
+                let testEncoder = JSONEncoder()
+                testEncoder.dataEncodingStrategy = .base64
+                let testData = try testEncoder.encode(recipeData)
+                logDebug("  - RecipeData encodes successfully: \(testData.count) bytes", category: "backup")
+            } catch {
+                logError("  - FAILED to encode RecipeData: \(error)", category: "backup")
+            }
             
             recipeBackups.append(backup)
         }
@@ -513,6 +462,7 @@ class RecipeBackupManager {
         // Encode to JSON
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+        encoder.dataEncodingStrategy = .base64 // Explicitly encode Data as base64
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         
         let jsonData: Data
@@ -549,6 +499,7 @@ class RecipeBackupManager {
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        decoder.dataDecodingStrategy = .base64 // Explicitly decode base64 Data
         
         let package: RecipeBackupPackage
         do {
@@ -562,104 +513,87 @@ class RecipeBackupManager {
         
         var newCount = 0
         var updatedCount = 0
-        var skippedCount = 0
+        let skippedCount = 0
         
         for recipeBackup in package.recipes {
-            let recipeModel = recipeBackup.recipe
+            let recipeData = recipeBackup.recipe
+            
+            // Convert RecipeData to RecipeX - this properly sets ALL properties including ingredientSectionsData, instructionSectionsData, notesData
+            let recipe = recipeData.toRecipeX()
             
             // Check if recipe already exists
-            let existingRecipe = existingRecipes.first { $0.id == recipeModel.id }
+            let existingRecipe = existingRecipes.first { $0.id == recipe.id }
             
             if let existing = existingRecipe {
                 switch overwriteMode {
-                case .skip:
-                    logDebug("Skipping existing RecipeX '\(recipeModel.title)'", category: "backup")
-                    skippedCount += 1
-                    continue
                     
-                case .overwrite:
-                    logInfo("Overwriting existing RecipeX '\(recipeModel.title)'", category: "backup")
+                default:
+                    logInfo("Overwriting existing RecipeX '\(recipe.safeTitle)'", category: "backup")
                     modelContext.delete(existing)
                     updatedCount += 1
                     
-                case .keepBoth:
-                    logInfo("Keeping both versions of RecipeX '\(recipeModel.title)'", category: "backup")
-                    newCount += 1
                 }
             } else {
                 newCount += 1
             }
             
-            // Handle keep both mode - create new ID
-            var recipeToImport = recipeModel
-            if overwriteMode == .keepBoth && existingRecipe != nil {
-                recipeToImport = RecipeModel(
-                    id: UUID(), // New ID
-                    title: recipeToImport.title,
-                    headerNotes: recipeToImport.headerNotes,
-                    yield: recipeToImport.yield,
-                    ingredientSections: recipeToImport.ingredientSections,
-                    instructionSections: recipeToImport.instructionSections,
-                    notes: recipeToImport.notes,
-                    reference: recipeToImport.reference,
-                    imageName: recipeToImport.imageName,
-                    additionalImageNames: recipeToImport.additionalImageNames,
-                    imageURLs: recipeToImport.imageURLs
-                )
+            // Use the already-converted recipe (it has all the data!)
+            // Just update CloudKit and timestamp properties
+            
+            // Handle ID for overwrite mode
+            if existingRecipe != nil {
+                recipe.id = UUID() // Generate new ID if overwriting
             }
             
-            // Create RecipeX (unified model with CloudKit sync)
-            let newRecipe = RecipeX(from: recipeToImport)
-            
             // Initialize CloudKit sync properties
-            newRecipe.needsCloudSync = true
-            newRecipe.syncRetryCount = 0
-            newRecipe.lastSyncError = nil
-            newRecipe.cloudRecordID = nil
-            newRecipe.lastSyncedToCloud = nil
+            recipe.needsCloudSync = true
+            recipe.syncRetryCount = 0
+            recipe.lastSyncError = nil
+            recipe.cloudRecordID = nil
+            recipe.lastSyncedToCloud = nil
             
             // Set extraction source
-            newRecipe.extractionSource = "import"
+            recipe.extractionSource = "import"
             
             // Set timestamps
             let now = Date()
-            newRecipe.dateAdded = recipeBackup.dateAdded
-            newRecipe.dateCreated = now
-            newRecipe.lastModified = now
+            recipe.dateAdded = recipeBackup.dateAdded
+            recipe.dateCreated = now
+            recipe.lastModified = now
             
             // Set initial version
-            newRecipe.version = 1
+            recipe.version = 1
             
             // Set device identifier
-            newRecipe.lastModifiedDeviceID = UIDevice.current.identifierForVendor?.uuidString
+            recipe.lastModifiedDeviceID = UIDevice.current.identifierForVendor?.uuidString
             
-            // Restore images to SwiftData
+            // Restore images to SwiftData (these aren't in RecipeData, they're in RecipeBackup)
             if let mainImage = recipeBackup.mainImage {
-                newRecipe.imageData = mainImage.imageData
-                newRecipe.imageName = mainImage.fileName
-                newRecipe.imageHash = RecipeX.calculateImageHash(from: mainImage.imageData)
-                logDebug("Set main image data for RecipeX '\(recipeToImport.title)'", category: "backup")
+                recipe.imageData = mainImage.imageData
+                recipe.imageName = mainImage.fileName
+                recipe.imageHash = RecipeX.calculateImageHash(from: mainImage.imageData)
+                logDebug("Set main image data for RecipeX '\(recipe.safeTitle)'", category: "backup")
             }
             
             if let additionalImages = recipeBackup.additionalImages, !additionalImages.isEmpty {
                 // Store additional images as JSON array of dictionaries
                 var additionalImagesArray: [[String: Data]] = []
                 for (index, imageBackup) in additionalImages.enumerated() {
-                    let imageName = "additional_\(index)_\(newRecipe.safeID.uuidString).jpg"
+                    let imageName = "additional_\(index)_\(recipe.safeID.uuidString).jpg"
                     additionalImagesArray.append([
                         "data": imageBackup.imageData,
                         "name": Data(imageName.utf8)
                     ])
                 }
-                newRecipe.additionalImagesData = try? JSONEncoder().encode(additionalImagesArray)
-                logDebug("Set additional images data for RecipeX '\(recipeToImport.title)'", category: "backup")
+                recipe.additionalImagesData = try? JSONEncoder().encode(additionalImagesArray)
+                logDebug("Set additional images data for RecipeX '\(recipe.safeTitle)'", category: "backup")
             }
             
             // Calculate content fingerprint for duplicate detection
-            newRecipe.updateContentFingerprint()
+            recipe.updateContentFingerprint()
             
-            modelContext.insert(newRecipe)
-            logDebug("Imported RecipeX '\(recipeToImport.title)' with CloudKit sync enabled", category: "backup")
+            modelContext.insert(recipe)
+            logDebug("Imported RecipeX '\(recipe.safeTitle)' with CloudKit sync enabled", category: "backup")
         }
         
         // Save the context
@@ -679,147 +613,70 @@ class RecipeBackupManager {
         )
     }
     
-    // MARK: - Hybrid Backup (Both Recipe and RecipeX)
     
-    /// Creates a hybrid backup containing both legacy Recipe and new RecipeX models
-    func createHybridBackup(recipes: [Recipe], recipesX: [RecipeX]) async throws -> URL {
-        logInfo("Starting hybrid backup: \(recipes.count) Recipe + \(recipesX.count) RecipeX", category: "backup")
-        
-        var allBackups: [RecipeBackup] = []
-        
-        // Process legacy Recipe models
-        for recipe in recipes {
-            guard let recipeModel = recipe.toRecipeModel() else {
-                logWarning("Skipping recipe '\(recipe.title)' - could not convert", category: "backup")
-                continue
-            }
-            
-            var mainImageBackup: RecipeBackup.ImageBackup?
-            if let imageData = recipe.imageData {
-                let fileName = recipe.imageName ?? "image_\(UUID().uuidString).jpg"
-                mainImageBackup = RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData)
-            }
-            
-            var additionalImageBackups: [RecipeBackup.ImageBackup]?
-            if let additionalImagesData = recipe.additionalImagesData,
-               let decodedImages = try? JSONDecoder().decode([Data].self, from: additionalImagesData) {
-                var imageBackups: [RecipeBackup.ImageBackup] = []
-                for (index, imageData) in decodedImages.enumerated() {
-                    let fileName = "additional_\(index)_\(UUID().uuidString).jpg"
-                    imageBackups.append(RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData))
-                }
-                if !imageBackups.isEmpty {
-                    additionalImageBackups = imageBackups
-                }
-            }
-            
-            let backup = RecipeBackup(
-                recipe: recipeModel,
-                dateAdded: recipe.dateAdded,
-                mainImage: mainImageBackup,
-                additionalImages: additionalImageBackups
-            )
-            allBackups.append(backup)
-        }
-        
-        // Process RecipeX models
-        for recipe in recipesX {
-            guard let recipeModel = recipe.toRecipeModel() else {
-                logWarning("Skipping RecipeX '\(recipe.safeTitle)' - could not convert", category: "backup")
-                continue
-            }
-            
-            var mainImageBackup: RecipeBackup.ImageBackup?
-            if let imageData = recipe.imageData {
-                let fileName = recipe.imageName ?? "image_\(recipe.safeID.uuidString).jpg"
-                mainImageBackup = RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData)
-            }
-            
-            var additionalImageBackups: [RecipeBackup.ImageBackup]?
-            if let additionalImagesData = recipe.additionalImagesData,
-               let imageArray = try? JSONDecoder().decode([[String: Data]].self, from: additionalImagesData) {
-                var imageBackups: [RecipeBackup.ImageBackup] = []
-                for (index, imageDict) in imageArray.enumerated() {
-                    if let imageData = imageDict["data"] {
-                        let fileName = "additional_\(index)_\(recipe.safeID.uuidString).jpg"
-                        imageBackups.append(RecipeBackup.ImageBackup(fileName: fileName, imageData: imageData))
-                    }
-                }
-                if !imageBackups.isEmpty {
-                    additionalImageBackups = imageBackups
-                }
-            }
-            
-            let backup = RecipeBackup(
-                recipe: recipeModel,
-                dateAdded: recipe.dateAdded ?? Date(),
-                mainImage: mainImageBackup,
-                additionalImages: additionalImageBackups
-            )
-            allBackups.append(backup)
-        }
-        
-        guard !allBackups.isEmpty else {
-            throw RecipeBackupError.noRecipesToBackup
-        }
-        
-        let package = RecipeBackupPackage(recipes: allBackups)
-        
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        
-        let jsonData: Data
-        do {
-            jsonData = try encoder.encode(package)
-        } catch {
-            logError("Failed to encode hybrid backup: \(error)", category: "backup")
-            throw RecipeBackupError.encodingFailed(error)
-        }
-        
-        return try await saveBackupFile(jsonData: jsonData, prefix: "HybridBackup")
-    }
     
     // MARK: - Helper Methods
     
-    /// Saves backup JSON data to a file
-    private func saveBackupFile(jsonData: Data, prefix: String) async throws -> URL {
-        // Get or create Reczipes2 folder
+    /// Saves backup data to a file with the given prefix and extension
+    private func saveBackupFile(jsonData: Data, prefix: String, fileExtension: String = "reczipes") async throws -> URL {
+        // Get or create Reczipes2 folder - try Documents first, fall back to tmp
         var reczipesDirectory: URL
         
+        // First, try to verify Documents directory exists and is accessible
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         
+        // Verify we can actually access the documents directory
         var isDir: ObjCBool = false
         let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
         
+        logDebug("Documents directory check: exists=\(docsExists), isDir=\(isDir.boolValue), path=\(documentsDirectory.path)", category: "backup")
+        
         if docsExists && isDir.boolValue {
+            // Documents exists, use it
             reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2")
         } else {
-            logWarning("Documents directory not accessible, using temporary directory", category: "backup")
-            reczipesDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("Reczipes2")
+            // Documents doesn't exist or isn't accessible - use temporary directory
+            logWarning("Documents directory not accessible, using temporary directory for backups", category: "backup")
+            let tmpDirectory = FileManager.default.temporaryDirectory
+            reczipesDirectory = tmpDirectory.appendingPathComponent("Reczipes2")
         }
         
-        try FileManager.default.createDirectory(at: reczipesDirectory, withIntermediateDirectories: true, attributes: nil)
+        // Try to create the backup directory
+        do {
+            try FileManager.default.createDirectory(at: reczipesDirectory, withIntermediateDirectories: true, attributes: nil)
+            logDebug("Backup directory ready at: \(reczipesDirectory.path)", category: "backup")
+        } catch let error as NSError {
+            logError("Failed to create backup directory: \(error) (domain: \(error.domain), code: \(error.code))", category: "backup")
+            
+            // Final fallback - just use temp directory root
+            logWarning("Using fallback: temporary directory root", category: "backup")
+            reczipesDirectory = FileManager.default.temporaryDirectory
+        }
         
-        // Create filename with timestamp and milliseconds
+        // Create backup file in Reczipes2 folder
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let currentDate = Date()
         let dateString = dateFormatter.string(from: currentDate)
+        
+        // Add milliseconds to ensure uniqueness when creating multiple backups quickly
         let milliseconds = Int((currentDate.timeIntervalSince1970.truncatingRemainder(dividingBy: 1)) * 1000)
-        let fileName = "\(prefix)_\(dateString)_\(String(format: "%03d", milliseconds)).reczipes"
+        let fileName = "\(prefix)_\(dateString)_\(String(format: "%03d", milliseconds)).\(fileExtension)"
         let fileURL = reczipesDirectory.appendingPathComponent(fileName)
         
-        try jsonData.write(to: fileURL)
-        logInfo("Backup created successfully: \(fileName) (\(jsonData.count) bytes)", category: "backup")
-        return fileURL
+        do {
+            try jsonData.write(to: fileURL)
+            logInfo("Backup created successfully: \(fileName) (\(jsonData.count) bytes) at \(fileURL.path)", category: "backup")
+            return fileURL
+        } catch {
+            logError("Failed to write backup file: \(error)", category: "backup")
+            throw RecipeBackupError.fileCreationFailed
+        }
     }
 }
 
 enum ImportOverwriteMode {
-    case skip          // Skip recipes that already exist
     case overwrite     // Replace existing recipes with imported ones
-    case keepBoth      // Import as new recipe with different ID
 }
 
 // MARK: - Book Backup Support (NEW)
@@ -895,7 +752,7 @@ struct BookBackup: Codable {
 }
 
 /// Book import result information
-struct BookImportResult {
+struct BookImportResult_RBM {
     let newBooks: Int
     let updatedBooks: Int
     let skippedBooks: Int
@@ -958,8 +815,8 @@ class BookBackupManager {
             throw RecipeBackupError.encodingFailed(error)
         }
         
-        // Save to file
-        let url = try await saveBackupFile(jsonData: jsonData, prefix: "BookBackup")
+        // Save to file with .bookbackup extension
+        let url = try await saveBookBackupFile(jsonData: jsonData, prefix: "BookBackup")
         logInfo("Book backup created successfully: \(url.lastPathComponent) (\(jsonData.count) bytes)", category: "backup")
         
         return url
@@ -973,7 +830,7 @@ class BookBackupManager {
         into modelContext: ModelContext,
         existingBooks: [Book],
         overwriteMode: ImportOverwriteMode
-    ) async throws -> BookImportResult {
+    ) async throws -> BookImportResult_RBM {
         logInfo("Starting Book import from \(url.lastPathComponent)", category: "backup")
         
         // Read and decode the backup file
@@ -1000,7 +857,7 @@ class BookBackupManager {
         
         var newCount = 0
         var updatedCount = 0
-        var skippedCount = 0
+        let skippedCount = 0
         
         for bookBackup in package.books {
             // Check if book already exists
@@ -1008,20 +865,13 @@ class BookBackupManager {
             
             if let existing = existingBook {
                 switch overwriteMode {
-                case .skip:
-                    logDebug("Skipping existing Book '\(bookBackup.name)'", category: "backup")
-                    skippedCount += 1
-                    continue
                     
                 case .overwrite:
                     logInfo("Overwriting existing Book '\(bookBackup.name)'", category: "backup")
                     modelContext.delete(existing)
                     updatedCount += 1
-                    
-                case .keepBoth:
-                    logInfo("Keeping both versions of Book '\(bookBackup.name)'", category: "backup")
-                    newCount += 1
                 }
+
             } else {
                 newCount += 1
             }
@@ -1030,7 +880,7 @@ class BookBackupManager {
             var bookToImport = bookBackup
             
             // Handle keep both mode - create new ID
-            if overwriteMode == .keepBoth && existingBook != nil {
+            if existingBook != nil {
                 bookToImport = BookBackup(
                     id: UUID(), // New ID
                     name: bookBackup.name,
@@ -1087,7 +937,7 @@ class BookBackupManager {
             throw RecipeBackupError.importFailed(error)
         }
         
-        return BookImportResult(
+        return BookImportResult_RBM(
             newBooks: newCount,
             updatedBooks: updatedCount,
             skippedBooks: skippedCount,
@@ -1097,95 +947,64 @@ class BookBackupManager {
     
     // MARK: - Helper Methods
     
-    /// Saves backup JSON data to a file
-    private func saveBackupFile(jsonData: Data, prefix: String) async throws -> URL {
-        // Get or create Reczipes2 folder
+    /// Saves book backup data to a file with .bookbackup extension
+    private func saveBookBackupFile(jsonData: Data, prefix: String) async throws -> URL {
+        // Get or create Reczipes2 folder - try Documents first, fall back to tmp
         var reczipesDirectory: URL
         
+        // First, try to verify Documents directory exists and is accessible
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         
+        // Verify we can actually access the documents directory
         var isDir: ObjCBool = false
         let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
         
+        logDebug("Documents directory check: exists=\(docsExists), isDir=\(isDir.boolValue), path=\(documentsDirectory.path)", category: "backup")
+        
         if docsExists && isDir.boolValue {
+            // Documents exists, use it
             reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2")
         } else {
-            logWarning("Documents directory not accessible, using temporary directory", category: "backup")
-            reczipesDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("Reczipes2")
+            // Documents doesn't exist or isn't accessible - use temporary directory
+            logWarning("Documents directory not accessible, using temporary directory for backups", category: "backup")
+            let tmpDirectory = FileManager.default.temporaryDirectory
+            reczipesDirectory = tmpDirectory.appendingPathComponent("Reczipes2")
         }
         
-        try FileManager.default.createDirectory(at: reczipesDirectory, withIntermediateDirectories: true, attributes: nil)
+        // Try to create the backup directory
+        do {
+            try FileManager.default.createDirectory(at: reczipesDirectory, withIntermediateDirectories: true, attributes: nil)
+            logDebug("Backup directory ready at: \(reczipesDirectory.path)", category: "backup")
+        } catch let error as NSError {
+            logError("Failed to create backup directory: \(error) (domain: \(error.domain), code: \(error.code))", category: "backup")
+            
+            // Final fallback - just use temp directory root
+            logWarning("Using fallback: temporary directory root", category: "backup")
+            reczipesDirectory = FileManager.default.temporaryDirectory
+        }
         
-        // Create filename with timestamp and milliseconds
+        // Create backup file with .bookbackup extension
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let currentDate = Date()
         let dateString = dateFormatter.string(from: currentDate)
+        
+        // Add milliseconds to ensure uniqueness when creating multiple backups quickly
         let milliseconds = Int((currentDate.timeIntervalSince1970.truncatingRemainder(dividingBy: 1)) * 1000)
         let fileName = "\(prefix)_\(dateString)_\(String(format: "%03d", milliseconds)).bookbackup"
         let fileURL = reczipesDirectory.appendingPathComponent(fileName)
         
-        try jsonData.write(to: fileURL)
-        logInfo("Book backup created successfully: \(fileName) (\(jsonData.count) bytes)", category: "backup")
-        return fileURL
+        do {
+            try jsonData.write(to: fileURL)
+            logInfo("Book backup created successfully: \(fileName) (\(jsonData.count) bytes) at \(fileURL.path)", category: "backup")
+            return fileURL
+        } catch {
+            logError("Failed to write backup file: \(error)", category: "backup")
+            throw RecipeBackupError.fileCreationFailed
+        }
     }
 }
 
-// MARK: - Book Extension
 
-extension Book {
-    convenience init(
-        id: UUID,
-        name: String,
-        bookDescription: String?,
-        dateCreated: Date,
-        dateModified: Date,
-        recipeIDs: [UUID],
-        color: String?
-    ) {
-        self.init()
-        self.id = id
-        self.name = name
-        self.bookDescription = bookDescription
-        self.dateCreated = dateCreated
-        self.dateModified = dateModified
-        self.recipeIDs = recipeIDs
-        self.color = color
-    }
-}
 
-// MARK: - RecipeModel Extension
 
-extension RecipeModel {
-    func withImageName(_ imageName: String) -> RecipeModel {
-        RecipeModel(
-            id: self.id,
-            title: self.title,
-            headerNotes: self.headerNotes,
-            yield: self.yield,
-            ingredientSections: self.ingredientSections,
-            instructionSections: self.instructionSections,
-            notes: self.notes,
-            reference: self.reference,
-            imageName: imageName,
-            additionalImageNames: self.additionalImageNames,
-            imageURLs: self.imageURLs
-        )
-    }
-    
-    func withAdditionalImageNames(_ names: [String]) -> RecipeModel {
-        RecipeModel(
-            id: self.id,
-            title: self.title,
-            headerNotes: self.headerNotes,
-            yield: self.yield,
-            ingredientSections: self.ingredientSections,
-            instructionSections: self.instructionSections,
-            notes: self.notes,
-            reference: self.reference,
-            imageName: self.imageName,
-            additionalImageNames: names,
-            imageURLs: self.imageURLs
-        )
-    }
-}

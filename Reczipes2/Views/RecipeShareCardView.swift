@@ -9,7 +9,7 @@ import SwiftUI
 
 /// A beautifully styled card view for sharing recipes via email, text, or other methods
 struct RecipeShareCardView: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let sourceType: RecipeSourceType
     
     enum RecipeSourceType {
@@ -60,7 +60,7 @@ struct RecipeShareCardView: View {
                 .clipShape(Capsule())
                 
                 // Title
-                Text(recipe.title)
+                Text(recipe.title ?? "No Name")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
@@ -310,12 +310,12 @@ private struct InstructionStepView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            if let stepNum = step.stepNumber {
+            if step.stepNumber > 0 {
                 ZStack {
                     Circle()
                         .fill(color)
                         .frame(width: 32, height: 32)
-                    Text("\(stepNum)")
+                    Text("\(step.stepNumber)")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                 }
@@ -383,55 +383,61 @@ private struct NoteCardView: View {
 // MARK: - Preview
 
 #Preview("Email Share") {
-    RecipeShareCardView(
-        recipe: RecipeModel(
+    let ingredientSections = [
+        IngredientSection(
+            title: "Dry Ingredients",
+            ingredients: [
+                Ingredient(quantity: "2¼", unit: "cups", name: "all-purpose flour"),
+                Ingredient(quantity: "1", unit: "tsp", name: "baking soda"),
+                Ingredient(quantity: "1", unit: "tsp", name: "salt")
+            ]
+        ),
+        IngredientSection(
+            title: "Wet Ingredients",
+            ingredients: [
+                Ingredient(quantity: "1", unit: "cup", name: "butter", preparation: "softened"),
+                Ingredient(quantity: "¾", unit: "cup", name: "granulated sugar"),
+                Ingredient(quantity: "¾", unit: "cup", name: "brown sugar", preparation: "packed"),
+                Ingredient(quantity: "2", unit: "", name: "large eggs"),
+                Ingredient(quantity: "2", unit: "tsp", name: "vanilla extract")
+            ]
+        ),
+        IngredientSection(
+            ingredients: [
+                Ingredient(quantity: "2", unit: "cups", name: "chocolate chips")
+            ]
+        )
+    ]
+    
+    let instructionSections = [
+        InstructionSection(
+            steps: [
+                InstructionStep(stepNumber: 1, text: "Preheat oven to 375°F (190°C)."),
+                InstructionStep(stepNumber: 2, text: "In a medium bowl, whisk together flour, baking soda, and salt. Set aside."),
+                InstructionStep(stepNumber: 3, text: "In a large bowl, beat butter and both sugars until creamy, about 2-3 minutes."),
+                InstructionStep(stepNumber: 4, text: "Add eggs one at a time, beating well after each addition. Stir in vanilla."),
+                InstructionStep(stepNumber: 5, text: "Gradually blend in the flour mixture. Fold in chocolate chips."),
+                InstructionStep(stepNumber: 6, text: "Drop rounded tablespoons of dough onto ungreased cookie sheets, spacing them 2 inches apart."),
+                InstructionStep(stepNumber: 7, text: "Bake for 9-11 minutes or until golden brown. Cool on baking sheet for 2 minutes before transferring to a wire rack.")
+            ]
+        )
+    ]
+    
+    let notes = [
+        RecipeNote(type: .tip, text: "For chewier cookies, slightly underbake them and let them finish cooking on the hot pan."),
+        RecipeNote(type: .timing, text: "Cookies can be stored in an airtight container for up to 5 days."),
+        RecipeNote(type: .substitution, text: "You can use dark chocolate chips or a mix of chocolate chips and nuts.")
+    ]
+    
+    return RecipeShareCardView(
+        recipe: RecipeX(
             title: "Classic Chocolate Chip Cookies",
             headerNotes: "The perfect chewy cookie with crispy edges",
-            yield: "Makes 24 cookies",
-            ingredientSections: [
-                IngredientSection(
-                    title: "Dry Ingredients",
-                    ingredients: [
-                        Ingredient(quantity: "2¼", unit: "cups", name: "all-purpose flour"),
-                        Ingredient(quantity: "1", unit: "tsp", name: "baking soda"),
-                        Ingredient(quantity: "1", unit: "tsp", name: "salt")
-                    ]
-                ),
-                IngredientSection(
-                    title: "Wet Ingredients",
-                    ingredients: [
-                        Ingredient(quantity: "1", unit: "cup", name: "butter", preparation: "softened"),
-                        Ingredient(quantity: "¾", unit: "cup", name: "granulated sugar"),
-                        Ingredient(quantity: "¾", unit: "cup", name: "brown sugar", preparation: "packed"),
-                        Ingredient(quantity: "2", unit: "", name: "large eggs"),
-                        Ingredient(quantity: "2", unit: "tsp", name: "vanilla extract")
-                    ]
-                ),
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "2", unit: "cups", name: "chocolate chips")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(stepNumber: 1, text: "Preheat oven to 375°F (190°C)."),
-                        InstructionStep(stepNumber: 2, text: "In a medium bowl, whisk together flour, baking soda, and salt. Set aside."),
-                        InstructionStep(stepNumber: 3, text: "In a large bowl, beat butter and both sugars until creamy, about 2-3 minutes."),
-                        InstructionStep(stepNumber: 4, text: "Add eggs one at a time, beating well after each addition. Stir in vanilla."),
-                        InstructionStep(stepNumber: 5, text: "Gradually blend in the flour mixture. Fold in chocolate chips."),
-                        InstructionStep(stepNumber: 6, text: "Drop rounded tablespoons of dough onto ungreased cookie sheets, spacing them 2 inches apart."),
-                        InstructionStep(stepNumber: 7, text: "Bake for 9-11 minutes or until golden brown. Cool on baking sheet for 2 minutes before transferring to a wire rack.")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "For chewier cookies, slightly underbake them and let them finish cooking on the hot pan."),
-                RecipeNote(type: .timing, text: "Cookies can be stored in an airtight container for up to 5 days."),
-                RecipeNote(type: .substitution, text: "You can use dark chocolate chips or a mix of chocolate chips and nuts.")
-            ],
-            reference: "Adapted from the classic Toll House recipe"
+            recipeYield: "Makes 24 cookies",
+            reference: "Adapted from the classic Toll House recipe",
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode(instructionSections),
+            notesData: try? JSONEncoder().encode(notes)
         ),
         sourceType: .email
     )
@@ -439,35 +445,41 @@ private struct NoteCardView: View {
 }
 
 #Preview("Text Share") {
-    RecipeShareCardView(
-        recipe: RecipeModel(
+    let ingredientSections = [
+        IngredientSection(
+            ingredients: [
+                Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt"),
+                Ingredient(quantity: "1", unit: "cup", name: "water"),
+                Ingredient(quantity: "⅛", unit: "tsp", name: "salt"),
+                Ingredient(quantity: "⅛", unit: "tsp", name: "ground black pepper"),
+                Ingredient(quantity: "⅛", unit: "tsp", name: "cumin powder"),
+                Ingredient(quantity: "", unit: "", name: "ice cubes")
+            ]
+        )
+    ]
+    
+    let instructionSections = [
+        InstructionSection(
+            steps: [
+                InstructionStep(stepNumber: 1, text: "Combine all ingredients in the blender and blend until smooth."),
+                InstructionStep(stepNumber: 2, text: "Serve cold. Sugar can be added instead of salt and pepper, if preferred.")
+            ]
+        )
+    ]
+    
+    let notes = [
+        RecipeNote(type: .tip, text: "Very refreshing on a hot day!")
+    ]
+    
+    return RecipeShareCardView(
+        recipe: RecipeX(
             title: "Lassi",
             headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
-            yield: "Serves 1 to 2",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt"),
-                        Ingredient(quantity: "1", unit: "cup", name: "water"),
-                        Ingredient(quantity: "⅛", unit: "tsp", name: "salt"),
-                        Ingredient(quantity: "⅛", unit: "tsp", name: "ground black pepper"),
-                        Ingredient(quantity: "⅛", unit: "tsp", name: "cumin powder"),
-                        Ingredient(quantity: "", unit: "", name: "ice cubes")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(stepNumber: 1, text: "Combine all ingredients in the blender and blend until smooth."),
-                        InstructionStep(stepNumber: 2, text: "Serve cold. Sugar can be added instead of salt and pepper, if preferred.")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "Very refreshing on a hot day!")
-            ],
-            reference: "Traditional Indian drink"
+            recipeYield: "Serves 1 to 2",
+            reference: "Traditional Indian drink",
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode(instructionSections),
+            notesData: try? JSONEncoder().encode(notes)
         ),
         sourceType: .text
     )

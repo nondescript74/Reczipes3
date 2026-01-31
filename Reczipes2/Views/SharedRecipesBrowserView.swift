@@ -33,28 +33,85 @@ struct SharedRecipesBrowserView: View {
     }
     
     var body: some View {
-        Group {
-            if isLoading {
-                loadingView
-            } else if let error = errorMessage {
-                errorView(error)
-            } else if sharedRecipes.isEmpty {
-                emptyStateView
-            } else {
-                recipeListView
+        ZStack {
+            Group {
+                if isLoading && sharedRecipes.isEmpty {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading community recipes...")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let error = errorMessage, currentSharingError == nil {
+                    errorView(error)
+                } else if sharedRecipes.isEmpty {
+                    emptyStateView
+                } else {
+                    recipeListView
+                        .disabled(isLoading)
+                }
+            }
+            
+            // Overlay for refresh operations
+            if isLoading && !sharedRecipes.isEmpty {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    
+                    Text("Refreshing...")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                .padding(32)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                )
+                .shadow(radius: 20)
             }
         }
         .navigationTitle("Community Recipes")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task {
-                        await loadSharedRecipes()
+            if !isLoading {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task {
+                            await loadSharedRecipes()
+                        }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            if !sharedRecipes.isEmpty {
+                HStack {
+                    Image(systemName: "person.3.fill")
+                        .foregroundStyle(.blue)
+                    Text("\(filteredRecipes.count) \(filteredRecipes.count == 1 ? "Recipe" : "Recipes")")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    if searchText.isEmpty && filteredRecipes.count != sharedRecipes.count {
+                        Text("(\(sharedRecipes.count) total)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if !searchText.isEmpty {
+                        Text("of \(sharedRecipes.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
             }
         }
         .searchable(text: $searchText, prompt: "Search recipes or authors")
@@ -104,14 +161,6 @@ struct SharedRecipesBrowserView: View {
     }
     
     // MARK: - Subviews
-    
-    private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-            Text("Loading community recipes...")
-                .foregroundStyle(.secondary)
-        }
-    }
     
     private func errorView(_ message: String) -> some View {
         ContentUnavailableView {
@@ -183,7 +232,7 @@ struct SharedRecipesBrowserView: View {
         currentSharingError = nil
         
         do {
-            let recipes = try await sharingService.fetchSharedRecipes(limit: 200)
+            let recipes = try await sharingService.fetchSharedRecipes(limit: 100)
             await MainActor.run {
                 self.sharedRecipes = recipes
                 self.isLoading = false
@@ -308,11 +357,9 @@ struct SharedRecipeDetailView: View {
                                 
                                 ForEach(section.steps) { step in
                                     HStack(alignment: .top, spacing: 8) {
-                                        if let number = step.stepNumber {
-                                            Text("\(number).")
-                                                .fontWeight(.semibold)
-                                                .foregroundStyle(.blue)
-                                        }
+                                        Text("\(step.stepNumber).")
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(.blue)
                                         
                                         Text(step.text)
                                     }
@@ -415,7 +462,7 @@ struct SharedRecipeDetailView: View {
         return parts.joined(separator: " ")
     }
     
-    private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
+    private func iconForNoteType(_ type: RecipeNoteType) -> String {
         switch type {
         case .tip: return "lightbulb.fill"
         case .substitution: return "arrow.triangle.swap"
@@ -425,7 +472,7 @@ struct SharedRecipeDetailView: View {
         }
     }
     
-    private func colorForNoteType(_ type: RecipeNote.NoteType) -> Color {
+    private func colorForNoteType(_ type: RecipeNoteType) -> Color {
         switch type {
         case .tip: return .blue
         case .substitution: return .green
@@ -439,6 +486,6 @@ struct SharedRecipeDetailView: View {
 #Preview {
     NavigationStack {
         SharedRecipesBrowserView()
-            .modelContainer(for: [Recipe.self])
+            .modelContainer(for: [RecipeX.self])
     }
 }

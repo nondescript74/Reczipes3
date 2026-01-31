@@ -254,7 +254,7 @@ class FODMAPAnalyzer {
     private init() {}
     
     /// Analyze a recipe for FODMAP content
-    func analyzeRecipe(_ recipe: RecipeModel) -> FODMAPAnalysisResult {
+    func analyzeRecipe(_ recipe: RecipeX) -> FODMAPAnalysisResult {
         var detectedFoods: [DetectedFODMAPFood] = []
         var categoryScores: [FODMAPCategory: Double] = [:]
         var categoryIngredients: [FODMAPCategory: [String]] = [:]
@@ -321,7 +321,7 @@ class FODMAPAnalyzer {
         let alternatives = getLowFODMAPAlternatives(for: detectedFoods)
         
         return FODMAPAnalysisResult(
-            recipeID: recipe.id,
+            recipeID: recipe.safeID,
             overallScore: totalScore,
             categoryBreakdown: categoryBreakdown,
             detectedFoods: detectedFoods,
@@ -330,7 +330,7 @@ class FODMAPAnalyzer {
         )
     }
     
-    private func extractAllIngredients(from recipe: RecipeModel) -> [String] {
+    private func extractAllIngredients(from recipe: RecipeX) -> [String] {
         var ingredients: [String] = []
         for section in recipe.ingredientSections {
             for ingredient in section.ingredients {
@@ -398,13 +398,13 @@ class FODMAPAnalyzer {
     }
     
     /// Generate enhanced Claude prompt for FODMAP analysis
-    func generateClaudeFODMAPPrompt(recipe: RecipeModel) -> String {
+    func generateClaudeFODMAPPrompt(recipe: RecipeX) -> String {
         let ingredients = extractAllIngredients(from: recipe).joined(separator: ", ")
         
         return """
         Perform a comprehensive FODMAP analysis of this recipe based on Monash University FODMAP research.
         
-        Recipe: \(recipe.title)
+        Recipe: \(recipe.safeTitle)
         Ingredients: \(ingredients)
         
         Please analyze this recipe according to the four FODMAP categories:
@@ -499,7 +499,7 @@ struct EnhancedFODMAPScore: Identifiable {
     let id = UUID()
     let basicAnalysis: FODMAPAnalysisResult
     let claudeAnalysis: ClaudeFODMAPAnalysis?
-    let recipe: RecipeModel
+    let recipe: RecipeX
     
     var combinedRecommendation: FODMAPRecommendation {
         guard let claude = claudeAnalysis else {
@@ -537,7 +537,7 @@ extension AllergenAnalyzer {
     
     /// Analyze recipe for FODMAPs using both local and Claude analysis
     func analyzeFODMAP(
-        _ recipe: RecipeModel,
+        _ recipe: RecipeX,
         apiKey: String
     ) async throws -> EnhancedFODMAPScore {
         // 1. Get basic FODMAP analysis

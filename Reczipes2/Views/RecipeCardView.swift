@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct RecipeCardView: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let isSaved: Bool
     let onSave: () -> Void
     
@@ -17,7 +17,7 @@ struct RecipeCardView: View {
             // Header
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(recipe.title)
+                    Text(recipe.title ?? "No title")
                         .font(.title2)
                         .fontWeight(.bold)
                     
@@ -116,14 +116,9 @@ struct RecipeCardView: View {
                     
                     ForEach(section.steps.prefix(2)) { step in
                         HStack(alignment: .top, spacing: 4) {
-                            if let stepNum = step.stepNumber {
-                                Text("\(stepNum).")
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("•")
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text("\(step.stepNumber).")
+                                .fontWeight(.medium)
+                                .foregroundStyle(.secondary)
                             Text(step.text)
                                 .font(.subheadline)
                                 .lineLimit(2)
@@ -185,7 +180,7 @@ struct RecipeCardView: View {
         .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
     
-    private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
+    private func iconForNoteType(_ type: RecipeNoteType) -> String {
         switch type {
         case .tip: return "lightbulb.fill"
         case .substitution: return "arrow.left.arrow.right"
@@ -195,7 +190,7 @@ struct RecipeCardView: View {
         }
     }
     
-    private func colorForNoteType(_ type: RecipeNote.NoteType) -> Color {
+    private func colorForNoteType(_ type: RecipeNoteType) -> Color {
         switch type {
         case .tip: return .blue
         case .substitution: return .orange
@@ -207,36 +202,44 @@ struct RecipeCardView: View {
 }
 
 #Preview {
-    RecipeCardView(
-        recipe: RecipeModel(
-            title: "Lassi",
-            headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
-            yield: "Serves 1 to 2",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt", metricQuantity: "175", metricUnit: "mL"),
-                        Ingredient(quantity: "1", unit: "cup", name: "water", metricQuantity: "250", metricUnit: "mL"),
-                        Ingredient(quantity: "⅛", unit: "tsp.", name: "salt", metricQuantity: "0.5", metricUnit: "mL"),
-                        Ingredient(quantity: "⅛", unit: "tsp.", name: "ground black pepper", metricQuantity: "0.5", metricUnit: "mL"),
-                        Ingredient(quantity: "⅛", unit: "tsp.", name: "cumin powder", metricQuantity: "0.5", metricUnit: "mL"),
-                        Ingredient(quantity: "", unit: "", name: "ice cubes")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(text: "Combine all ingredients in the blender and blend until smooth."),
-                        InstructionStep(text: "Serve cold. Sugar can be added instead of salt and pepper, if preferred.")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "Very refreshing on a hot day!")
-            ],
-            reference: "Traditional Indian drink"
-        ),
+    let ingredientSections = [
+        IngredientSection(
+            ingredients: [
+                Ingredient(quantity: "¾", unit: "cup", name: "plain yogurt", metricQuantity: "175", metricUnit: "mL"),
+                Ingredient(quantity: "1", unit: "cup", name: "water", metricQuantity: "250", metricUnit: "mL"),
+                Ingredient(quantity: "⅛", unit: "tsp.", name: "salt", metricQuantity: "0.5", metricUnit: "mL"),
+                Ingredient(quantity: "⅛", unit: "tsp.", name: "ground black pepper", metricQuantity: "0.5", metricUnit: "mL"),
+                Ingredient(quantity: "⅛", unit: "tsp.", name: "cumin powder", metricQuantity: "0.5", metricUnit: "mL"),
+                Ingredient(name: "ice cubes")
+            ]
+        )
+    ]
+    
+    let instructionSections = [
+        InstructionSection(
+            steps: [
+                InstructionStep(stepNumber: 1, text: "Combine all ingredients in the blender and blend until smooth."),
+                InstructionStep(stepNumber: 2, text: "Serve cold. Sugar can be added instead of salt and pepper, if preferred.")
+            ]
+        )
+    ]
+    
+    let notes = [
+        RecipeNote(type: .tip, text: "Very refreshing on a hot day!")
+    ]
+    
+    let recipe = RecipeX(
+        title: "Lassi",
+        headerNotes: "Yogurt Sherbet - Very refreshing and cooling.",
+        recipeYield: "Serves 1 to 2",
+        reference: "Traditional Indian drink",
+        ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+        instructionSectionsData: try? JSONEncoder().encode(instructionSections),
+        notesData: try? JSONEncoder().encode(notes)
+    )
+    
+    return RecipeCardView(
+        recipe: recipe,
         isSaved: false,
         onSave: {}
     )

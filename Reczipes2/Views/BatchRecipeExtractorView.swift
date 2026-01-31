@@ -258,7 +258,7 @@ struct BatchRecipeExtractorView: View {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("Extracted: \(recipe.title)")
+                        Text("Extracted: \(String(describing: recipe.title))")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                     }
@@ -457,7 +457,7 @@ struct BatchRecipeExtractorView: View {
     NavigationStack {
         BatchRecipeExtractorView(
             apiKey: "test-api-key",
-            modelContext: ModelContext(try! ModelContainer(for: SavedLink.self, Recipe.self))
+            modelContext: ModelContext(try! ModelContainer(for: SavedLink.self, RecipeX.self))
         )
     }
 }

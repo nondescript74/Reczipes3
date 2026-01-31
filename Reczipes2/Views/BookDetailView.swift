@@ -30,10 +30,10 @@ struct BookDetailView: View {
     }
     
     // Get recipes in the book, maintaining order
-    private var bookRecipes: [RecipeModel] {
+    private var bookRecipes: [RecipeX] {
         guard let recipeIDs = book.recipeIDs else { return [] }
         return recipeIDs.compactMap { recipeID in
-            savedRecipes.first { $0.id == recipeID }?.toRecipeModel()
+            savedRecipes.first { $0.id == recipeID }
         }
     }
     
@@ -226,16 +226,22 @@ struct BookDetailView: View {
 // MARK: - Book Recipe Page View
 
 struct BookRecipePageView: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let pageNumber: Int
     let bookColor: Color
     let savedRecipes: [RecipeX]
     
     @State private var showingFullDetail = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Query private var recipeXEntities: [RecipeX] // Query for RecipeX to get imageData
     
     private var isSaved: Bool {
         savedRecipes.contains { $0.id == recipe.id }
+    }
+    
+    // Get RecipeX entity for this recipe to access imageData
+    private var recipeX: RecipeX? {
+        recipeXEntities.first { $0.id == recipe.id }
     }
     
     // On iPad (regular width), use fullScreenCover; on iPhone use sheet
@@ -248,9 +254,10 @@ struct BookRecipePageView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Recipe image
-                    if let imageName = recipe.imageName {
+                    if recipeX?.imageData != nil || recipe.imageName != nil {
                         RecipeImageView(
-                            imageName: imageName,
+                            imageName: recipe.imageName,
+                            imageData: recipeX?.imageData, // Pass imageData from RecipeX!
                             size: CGSize(width: geometry.size.width, height: 300),
                             cornerRadius: 0
                         )
@@ -285,7 +292,7 @@ struct BookRecipePageView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 
-                                Text(recipe.title)
+                                Text(recipe.title ?? "No title")
                                     .font(.title)
                                     .fontWeight(.bold)
                             }
@@ -437,27 +444,25 @@ struct BookRecipePageView: View {
             }
         }
         .fullScreenCover(isPresented: $showingFullDetail) {
-            NavigationStack {
-                RecipeDetailView(
-                    recipe: recipe,
-                    isSaved: isSaved,
-                    onSave: { }
-                )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button {
-                            showingFullDetail = false
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title3)
-                                    .symbolRenderingMode(.hierarchical)
-                                Text("Close")
-                                    .font(.body)
+            if let recipeXEntity = recipeX {
+                NavigationStack {
+                    RecipeDetailView(recipe: recipeXEntity)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button {
+                                    showingFullDetail = false
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title3)
+                                            .symbolRenderingMode(.hierarchical)
+                                        Text("Close")
+                                            .font(.body)
+                                    }
+                                    .foregroundStyle(.secondary)
+                                }
                             }
-                            .foregroundStyle(.secondary)
                         }
-                    }
                 }
             }
         }

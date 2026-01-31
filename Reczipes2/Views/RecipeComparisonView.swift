@@ -9,8 +9,8 @@ import SwiftUI
 import SwiftData
 
 struct RecipeComparisonView: View {
-    let existingRecipe: Recipe
-    let newRecipe: RecipeModel
+    let existingRecipe: RecipeX
+    let newRecipe: RecipeX
     let canReplaceExisting: Bool
     
     @Environment(\.dismiss) private var dismiss
@@ -71,7 +71,7 @@ struct RecipeComparisonView: View {
                         .foregroundColor(.blue)
                         .frame(maxWidth: .infinity, alignment: .center)
                     
-                    recipeCard(for: existingRecipe)
+                    recipeCard_a(for: existingRecipe)
                 }
                 .frame(maxWidth: .infinity)
                 
@@ -84,7 +84,7 @@ struct RecipeComparisonView: View {
                         .foregroundColor(.green)
                         .frame(maxWidth: .infinity, alignment: .center)
                     
-                    recipeModelCard(for: newRecipe)
+                    recipeCard_a(for: newRecipe)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -102,7 +102,7 @@ struct RecipeComparisonView: View {
                     .fontWeight(.bold)
                     .frame(maxWidth: .infinity, alignment: .center)
                 
-                recipeCard(for: existingRecipe)
+                recipeCard_a(for: existingRecipe)
             }
             .padding()
         }
@@ -116,7 +116,7 @@ struct RecipeComparisonView: View {
                     .fontWeight(.bold)
                     .frame(maxWidth: .infinity, alignment: .center)
                 
-                recipeModelCard(for: newRecipe)
+                recipeCard_a(for: newRecipe)
             }
             .padding()
         }
@@ -124,14 +124,14 @@ struct RecipeComparisonView: View {
     
     // MARK: - Recipe Cards
     
-    private func recipeCard(for recipe: Recipe) -> some View {
+    private func recipeCard_a(for recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             // Title
             VStack(alignment: .leading, spacing: 4) {
                 Text("Title")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(recipe.title)
+                Text(recipe.title ?? "No title")
                     .font(.title3)
                     .fontWeight(.semibold)
             }
@@ -184,76 +184,6 @@ struct RecipeComparisonView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Text("\(recipe.instructions.count) step(s)")
-                    .font(.subheadline)
-            }
-            
-            // Reference
-            if let reference = recipe.reference, !reference.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Reference")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(reference)
-                        .font(.subheadline)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-    }
-    
-    private func recipeModelCard(for recipe: RecipeModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Title
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Title")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(recipe.title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-            }
-            
-            // Header Notes
-            if let headerNotes = recipe.headerNotes, !headerNotes.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Header Notes")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(headerNotes)
-                        .font(.subheadline)
-                }
-            }
-            
-            // Yield
-            if let recipeYield = recipe.yield, !recipeYield.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Yield")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(recipeYield)
-                        .font(.subheadline)
-                }
-            }
-            
-            // Ingredients
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Ingredients")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                let ingredientCount = recipe.ingredientSections.flatMap { $0.ingredients }.count
-                Text("\(ingredientCount) ingredient(s)")
-                    .font(.subheadline)
-            }
-            
-            // Instructions
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                let stepCount = recipe.instructionSections.flatMap { $0.steps }.count
-                Text("\(stepCount) step(s)")
                     .font(.subheadline)
             }
             

@@ -11,7 +11,7 @@ import SwiftData
 
 struct DatabaseMaintenanceView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var allRecipes: [Recipe]
+    @Query private var allRecipes: [RecipeX]
     @Query private var allAssignments: [RecipeImageAssignment]
     
     @StateObject private var duplicateMonitor = CloudKitDuplicateMonitor.shared
@@ -344,6 +344,6 @@ struct ReportDetailView: View {
 #Preview {
     NavigationStack {
         DatabaseMaintenanceView()
-            .modelContainer(for: Recipe.self, inMemory: true)
+            .modelContainer(for: RecipeX.self, inMemory: true)
     }
 }

@@ -10,14 +10,14 @@ import SwiftUI
 
 /// Section showing nutritional analysis for a recipe based on user's goals
 struct RecipeNutritionalSection: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let profile: UserAllergenProfile?
     let servings: Int
     
     @State private var nutritionalScore: NutritionalScore?
     @State private var isExpanded: Bool = false
     
-    init(recipe: RecipeModel, profile: UserAllergenProfile?, servings: Int = 1) {
+    init(recipe: RecipeX, profile: UserAllergenProfile?, servings: Int = 1) {
         self.recipe = recipe
         self.profile = profile
         self.servings = servings
@@ -323,7 +323,7 @@ struct RecipeNutritionalSection: View {
  
  ```swift
  struct RecipeDetailView: View {
-     let recipe: RecipeModel
+     let recipe: RecipeX
      @Query private var profiles: [UserAllergenProfile]
      @State private var servingSize: Int = 1
      
@@ -401,20 +401,24 @@ struct RecipeNutritionalSection: View {
         steps: steps
     )
     
-    let recipe = RecipeModel(
+    let notes = [
+        RecipeNote(id: UUID(), type: .tip, text: "Great for meal prep")
+    ]
+    
+    // Encode sections to Data for RecipeX
+    let ingredientSectionsData = try? JSONEncoder().encode([ingredientSection])
+    let instructionSectionsData = try? JSONEncoder().encode([instructionSection])
+    let notesData = try? JSONEncoder().encode(notes)
+    
+    let recipe = RecipeX(
         id: UUID(),
         title: "Grilled Chicken Salad",
         headerNotes: "A healthy, protein-rich meal",
-        yield: "Serves 4",
-        ingredientSections: [ingredientSection],
-        instructionSections: [instructionSection],
-        notes: [
-            RecipeNote(id: UUID(), type: .tip, text: "Great for meal prep")
-        ],
+        recipeYield: "Serves 4",
         reference: nil,
-        imageName: nil,
-        additionalImageNames: nil,
-        imageURLs: nil
+        ingredientSectionsData: ingredientSectionsData,
+        instructionSectionsData: instructionSectionsData,
+        notesData: notesData
     )
     
     let profile = UserAllergenProfile(
@@ -439,23 +443,24 @@ struct RecipeNutritionalSection: View {
     let ingredientSection = IngredientSection(id: UUID(), title: nil, ingredients: ingredients, transitionNote: nil)
     
     let steps = [
-        InstructionStep(id: UUID(), stepNumber: nil, text: "Cook the dish")
+        InstructionStep(id: UUID(), stepNumber: 1, text: "Cook the dish")
     ]
     
     let instructionSection = InstructionSection(id: UUID(), title: nil, steps: steps)
     
-    let recipe = RecipeModel(
+    // Encode sections to Data for RecipeX
+    let ingredientSectionsData = try? JSONEncoder().encode([ingredientSection])
+    let instructionSectionsData = try? JSONEncoder().encode([instructionSection])
+    
+    let recipe = RecipeX(
         id: UUID(),
         title: "Test Recipe",
         headerNotes: nil,
-        yield: "Serves 2",
-        ingredientSections: [ingredientSection],
-        instructionSections: [instructionSection],
-        notes: [],
+        recipeYield: "Serves 2",
         reference: nil,
-        imageName: nil,
-        additionalImageNames: nil,
-        imageURLs: nil
+        ingredientSectionsData: ingredientSectionsData,
+        instructionSectionsData: instructionSectionsData,
+        notesData: nil
     )
     
     let profile = UserAllergenProfile(name: "Test User", isActive: true)

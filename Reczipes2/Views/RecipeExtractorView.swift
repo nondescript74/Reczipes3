@@ -170,9 +170,9 @@ struct RecipeExtractorView: View {
                 if let recipe = viewModel.extractedRecipe {
                     let imageCount = downloadedWebImages.count + (viewModel.selectedImage != nil ? 1 : 0)
                     if imageCount > 0 {
-                        Text("\"\(recipe.title)\" and \(imageCount) image\(imageCount == 1 ? "" : "s") have been added to your recipe collection.")
+                        Text("\"\(String(describing: recipe.title))\" and \(imageCount) image\(imageCount == 1 ? "" : "s") have been added to your recipe collection.")
                     } else {
-                        Text("\"\(recipe.title)\" has been added to your recipe collection.")
+                        Text("\"\(String(describing: recipe.title))\" has been added to your recipe collection.")
                     }
                 }
             }
@@ -570,7 +570,7 @@ struct RecipeExtractorView: View {
         .cornerRadius(12)
     }
     
-    private func extractedRecipeSection(recipe: RecipeModel) -> some View {
+    private func extractedRecipeSection(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             recipeSuccessHeader
             
@@ -578,8 +578,8 @@ struct RecipeExtractorView: View {
             
             extractionSummary(recipe: recipe)
             
-            if let imageURLs = recipe.imageURLs, !imageURLs.isEmpty {
-                imageSelectionSection(imageURLs: imageURLs)
+            if !viewModel.extractedImageURLs.isEmpty {
+                imageSelectionSection(imageURLs: viewModel.extractedImageURLs)
             }
             
             saveButton
@@ -598,9 +598,9 @@ struct RecipeExtractorView: View {
         .background(Color.green.opacity(0.1))
         .cornerRadius(16)
         .sheet(isPresented: $showWebImagePicker) {
-            if let imageURLs = recipe.imageURLs {
+            if !viewModel.extractedImageURLs.isEmpty {
                 MultiWebImagePickerView(
-                    imageURLs: imageURLs,
+                    imageURLs: viewModel.extractedImageURLs,
                     selectedURLs: $selectedWebImageURLs
                 ) {
                     // Reset downloaded images when selection changes
@@ -622,7 +622,7 @@ struct RecipeExtractorView: View {
         }
     }
     
-    private func recipeDebugInfo(recipe: RecipeModel) -> some View {
+    private func recipeDebugInfo(recipe: RecipeX) -> some View {
         Group {
             if recipe.ingredientSections.isEmpty {
                 HStack {
@@ -646,7 +646,7 @@ struct RecipeExtractorView: View {
         }
     }
     
-    private func extractionSummary(recipe: RecipeModel) -> some View {
+    private func extractionSummary(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Extracted:")
                 .font(.caption)
@@ -657,8 +657,8 @@ struct RecipeExtractorView: View {
             Text("• \(recipe.instructionSections.count) instruction section(s)")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            if let imageURLs = recipe.imageURLs {
-                Text("• \(imageURLs.count) image(s) found")
+            if !viewModel.extractedImageURLs.isEmpty {
+                Text("• \(viewModel.extractedImageURLs.count) image(s) found")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -820,17 +820,17 @@ struct RecipeExtractorView: View {
         .buttonStyle(.plain)
     }
     
-    private func recipeQuickPreview(recipe: RecipeModel) -> some View {
+    private func recipeQuickPreview(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quick Preview")
                 .font(.headline)
             
             if !recipe.ingredientSections.isEmpty {
-                ingredientsPreview(recipe: recipe)
+                ingredientsPreview(ingredientSections: recipe.ingredientSections)
             }
             
             if !recipe.instructionSections.isEmpty {
-                instructionsPreview(recipe: recipe)
+                instructionsPreview(instructionSections: recipe.instructionSections)
             }
             
             Text("Tap recipe title below to view full details →")
@@ -843,13 +843,13 @@ struct RecipeExtractorView: View {
         .cornerRadius(8)
     }
     
-    private func ingredientsPreview(recipe: RecipeModel) -> some View {
+    private func ingredientsPreview(ingredientSections: [IngredientSection]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ingredients:")
                 .font(.subheadline)
                 .fontWeight(.semibold)
             
-            ForEach(recipe.ingredientSections.prefix(1)) { section in
+            ForEach(ingredientSections.prefix(1)) { section in
                 ForEach(section.ingredients.prefix(3)) { ingredient in
                     HStack {
                         Text("•")
@@ -874,17 +874,17 @@ struct RecipeExtractorView: View {
         }
     }
     
-    private func instructionsPreview(recipe: RecipeModel) -> some View {
+    private func instructionsPreview(instructionSections: [InstructionSection]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Instructions:")
                 .font(.subheadline)
                 .fontWeight(.semibold)
             
-            ForEach(recipe.instructionSections.prefix(1)) { section in
+            ForEach(instructionSections.prefix(1)) { section in
                 ForEach(section.steps.prefix(2)) { step in
                     HStack(alignment: .top) {
-                        if let stepNumber = step.stepNumber {
-                            Text("\(stepNumber).")
+                        if step.stepNumber > 0 {
+                            Text("\(step.stepNumber).")
                                 .fontWeight(.semibold)
                         } else {
                             Text("•")
@@ -905,18 +905,14 @@ struct RecipeExtractorView: View {
         }
     }
     
-    private func recipeNavigationLink(recipe: RecipeModel) -> some View {
+    private func recipeNavigationLink(recipe: RecipeX) -> some View {
         NavigationLink {
-            RecipeDetailView(
-                recipe: recipe,
-                isSaved: false,
-                onSave: {},
-                previewImage: downloadedWebImages.first ?? viewModel.selectedImage
-            )
+            // Convert RecipeModel to RecipeX for the detail view
+            RecipeDetailView(recipe: recipe)
         } label: {
             HStack {
                 VStack(alignment: .leading) {
-                    Text(recipe.title)
+                    Text(recipe.title ?? "Unknown")
                         .font(.title3)
                         .fontWeight(.semibold)
                     
@@ -941,6 +937,7 @@ struct RecipeExtractorView: View {
     }
     
     // MARK: - Save Recipe
+
     
     private func downloadAndSaveRecipe(imageURLs: [String]) async {
         isDownloadingImage = true
@@ -969,12 +966,12 @@ struct RecipeExtractorView: View {
     private func saveRecipe() {
         logInfo("Save button tapped", category: "recipe")
         
-        guard let recipeModel = viewModel.extractedRecipe else {
+        guard let recipe = viewModel.extractedRecipe else {
             logError("No recipe to save", category: "recipe")
             return
         }
         
-        logInfo("Saving recipe: \(recipeModel.title)", category: "recipe")
+        logInfo("Saving recipe: \(recipe.title ?? "Unknown")", category: "recipe")
         
         // Determine which images we'll save
         let imagesToSave: [UIImage]
@@ -985,9 +982,6 @@ struct RecipeExtractorView: View {
         } else {
             imagesToSave = []
         }
-        
-        // Convert RecipeModel to SwiftData RecipeX (new unified model)
-        let recipe = RecipeX(from: recipeModel)
         
         // Save all images using RecipeX's setImage method
         for (index, image) in imagesToSave.enumerated() {
@@ -1082,218 +1076,6 @@ struct RecipeExtractorView: View {
     }
 }
 
-// MARK: - Supporting Views
 
-struct MultiWebImagePickerView: View {
-    let imageURLs: [String]
-    @Binding var selectedURLs: [String]
-    let onSelectionChange: () -> Void
-    
-    @Environment(\.dismiss) private var dismiss
-    @State private var tempSelectedURLs: [String]
-    
-    init(imageURLs: [String], selectedURLs: Binding<[String]>, onSelectionChange: @escaping () -> Void) {
-        self.imageURLs = imageURLs
-        self._selectedURLs = selectedURLs
-        self.onSelectionChange = onSelectionChange
-        self._tempSelectedURLs = State(initialValue: selectedURLs.wrappedValue)
-    }
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if !tempSelectedURLs.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("\(tempSelectedURLs.count) image\(tempSelectedURLs.count == 1 ? "" : "s") selected")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Text("The first image will be used as the main thumbnail")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                    }
-                    
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 16),
-                        GridItem(.flexible(), spacing: 16)
-                    ], spacing: 16) {
-                        ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
-                            ImageSelectionCard(
-                                url: url,
-                                isSelected: tempSelectedURLs.contains(url),
-                                selectionIndex: tempSelectedURLs.firstIndex(of: url),
-                                onTap: {
-                                    toggleSelection(url)
-                                }
-                            )
-                        }
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("Select Images")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        selectedURLs = tempSelectedURLs
-                        onSelectionChange()
-                        dismiss()
-                    }
-                    .disabled(tempSelectedURLs.isEmpty)
-                }
-            }
-        }
-    }
-    
-    private func toggleSelection(_ url: String) {
-        if let index = tempSelectedURLs.firstIndex(of: url) {
-            tempSelectedURLs.remove(at: index)
-        } else {
-            tempSelectedURLs.append(url)
-        }
-    }
-}
 
-struct ImageSelectionCard: View {
-    let url: String
-    let isSelected: Bool
-    let selectionIndex: Int?
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: url)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 150)
-                            .clipped()
-                    case .failure:
-                        Rectangle()
-                            .fill(Color.red.opacity(0.2))
-                            .frame(height: 150)
-                            .overlay(
-                                VStack {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundColor(.red)
-                                    Text("Failed to load")
-                                        .font(.caption2)
-                                        .foregroundColor(.red)
-                                }
-                            )
-                    case .empty:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 150)
-                            .overlay(ProgressView())
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
-                )
-                
-                if isSelected {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 32, height: 32)
-                        
-                        if let index = selectionIndex, index == 0 {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.white)
-                                .font(.system(size: 14))
-                        } else if let index = selectionIndex {
-                            Text("\(index + 1)")
-                                .foregroundColor(.white)
-                                .font(.system(size: 14, weight: .bold))
-                        } else {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.white)
-                                .font(.system(size: 14, weight: .bold))
-                        }
-                    }
-                    .offset(x: -8, y: 8)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-}
 
-struct ImageComparisonView: View {
-    let original: UIImage
-    let processed: UIImage
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    VStack(alignment: .leading) {
-                        Text("Original")
-                            .font(.headline)
-                        Image(uiImage: original)
-                            .resizable()
-                            .scaledToFit()
-                            .cornerRadius(8)
-                    }
-                    
-                    VStack(alignment: .leading) {
-                        Text("Processed (Enhanced)")
-                            .font(.headline)
-                        Image(uiImage: processed)
-                            .resizable()
-                            .scaledToFit()
-                            .cornerRadius(8)
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Image Comparison")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Preview
-
-#Preview("Multi Image Picker") {
-    MultiWebImagePickerView(
-        imageURLs: [
-            "https://example.com/image1.jpg",
-            "https://example.com/image2.jpg",
-            "https://example.com/image3.jpg"
-        ],
-        selectedURLs: .constant([]),
-        onSelectionChange: {}
-    )
-}
-
-#Preview {
-    RecipeExtractorView(apiKey: "test-api-key")
-}

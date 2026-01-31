@@ -17,12 +17,12 @@ enum SchemaV1: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
-            Recipe.self,
+            RecipeX.self,
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
             CachedDiabeticAnalysis.self,
             SavedLink.self,
-            RecipeBook.self,
+            Book.self,
             CookingSession.self,
         ]
     }
@@ -61,12 +61,12 @@ enum SchemaV2: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
-            Recipe.self,
+            RecipeX.self,
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
             CachedDiabeticAnalysis.self,
             SavedLink.self,
-            RecipeBook.self,
+            Book.self,
             CookingSession.self,
         ]
     }
@@ -158,12 +158,12 @@ enum SchemaV3: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
-            Recipe.self,
+            RecipeX.self,
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
             CachedDiabeticAnalysis.self,
             SavedLink.self,
-            RecipeBook.self,
+            Book.self,
             CookingSession.self,
         ]
     }
@@ -287,12 +287,12 @@ enum SchemaV4: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [
-            Recipe.self,
+            RecipeX.self,
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
             CachedDiabeticAnalysis.self,
             SavedLink.self,
-            RecipeBook.self,
+            Book.self,
             CookingSession.self,
             SharedRecipe.self,          // NEW: CloudKit sharing models
             SharedRecipeBook.self,      // NEW: CloudKit sharing models

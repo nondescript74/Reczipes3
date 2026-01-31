@@ -117,15 +117,15 @@ class CloudKitDuplicateMonitor: ObservableObject {
         logInfo("🔍 Checking for duplicates after sync...", category: "cloudkit")
         
         do {
-            let descriptor = FetchDescriptor<Recipe>(sortBy: [SortDescriptor(\.title)])
+            let descriptor = FetchDescriptor<RecipeX>(sortBy: [SortDescriptor(\.title)])
             let allRecipes = try context.fetch(descriptor)
             
             logInfo("📊 Total recipes: \(allRecipes.count)", category: "cloudkit")
             
             // Group by content fingerprint
-            var recipesByFingerprint: [String: [Recipe]] = [:]
+            var recipesByFingerprint: [String: [RecipeX]] = [:]
             for recipe in allRecipes {
-                let fingerprint = recipe.contentFingerprint
+                let fingerprint = recipe.contentFingerprint ?? "No contentFingerprint"
                 recipesByFingerprint[fingerprint, default: []].append(recipe)
             }
             
@@ -167,13 +167,13 @@ class CloudKitDuplicateMonitor: ObservableObject {
         logInfo("🧹 Starting automatic duplicate cleanup...", category: "cloudkit")
         
         do {
-            let descriptor = FetchDescriptor<Recipe>(sortBy: [SortDescriptor(\.title)])
+            let descriptor = FetchDescriptor<RecipeX>(sortBy: [SortDescriptor(\.title)])
             let allRecipes = try context.fetch(descriptor)
             
             // Group by content fingerprint
-            var recipesByFingerprint: [String: [Recipe]] = [:]
+            var recipesByFingerprint: [String: [RecipeX]] = [:]
             for recipe in allRecipes {
-                let fingerprint = recipe.contentFingerprint
+                let fingerprint = recipe.contentFingerprint ?? "No contentFingerprint"
                 recipesByFingerprint[fingerprint, default: []].append(recipe)
             }
             
@@ -183,15 +183,16 @@ class CloudKitDuplicateMonitor: ObservableObject {
                 // Sort by creation date, keep oldest
                 let sorted = recipes.sorted { recipe1, recipe2 in
                     // Use dateAdded to determine which is oldest
-                    return recipe1.dateAdded < recipe2.dateAdded
+                    let aDate = Date()
+                    return recipe1.dateAdded ?? aDate < recipe2.dateAdded ?? aDate
                 }
                 
                 let canonical = sorted.first!
                 let duplicates = sorted.dropFirst()
                 
-                logInfo("   Keeping: \(canonical.title) (ID: \(canonical.id))", category: "cloudkit")
+                logInfo("   Keeping: \(String(describing: canonical.title)) (ID: \(String(describing: canonical.id)))", category: "cloudkit")
                 for duplicate in duplicates {
-                    logInfo("   🗑️ Deleting duplicate: \(duplicate.id)", category: "cloudkit")
+                    logInfo("   🗑️ Deleting duplicate: \(String(describing: duplicate.id))", category: "cloudkit")
                     context.delete(duplicate)
                     deletedCount += 1
                 }

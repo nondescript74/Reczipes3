@@ -10,7 +10,7 @@ import SwiftData
 
 struct ImageAssignmentDebugView: View {
     @Query private var assignments: [RecipeImageAssignment]
-    @Query private var savedRecipes: [Recipe]
+    @Query private var savedRecipes: [RecipeX]
     
     var body: some View {
         NavigationStack {
@@ -56,9 +56,9 @@ struct ImageAssignmentDebugView: View {
                 Section("All Recipes (Bundled + SwiftData)") {
                     ForEach(RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)) { recipe in
                         VStack(alignment: .leading) {
-                            Text(recipe.title)
+                            Text(recipe.title ?? "No Title")
                                 .font(.headline)
-                            Text(recipe.id.uuidString)
+                            Text(recipe.id!.uuidString)
                                 .font(.caption2)
                                 .monospaced()
                         }

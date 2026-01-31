@@ -17,7 +17,7 @@ class BatchRecipeExtractorViewModel: ObservableObject {
     @Published var isExtracting = false
     @Published var isPaused = false
     @Published var currentLink: SavedLink?
-    @Published var currentRecipe: RecipeModel?
+    @Published var currentRecipe: RecipeX?
     @Published var currentProgress: Int = 0
     @Published var totalToExtract: Int = 0
     @Published var successCount: Int = 0
@@ -184,55 +184,62 @@ class BatchRecipeExtractorViewModel: ObservableObject {
     
     /// Extract a single recipe from a link with automatic retry on failure
     private func extractSingleLink(_ link: SavedLink) async {
-        let operationID = "extract-\(link.id.uuidString)"
-        
-        // Extract values needed for the closure to avoid capturing non-Sendable link
+        // Extract values needed to avoid capturing non-Sendable link
         let linkID = link.id
         let linkURL = link.url
         let linkTitle = link.title
         
-        do {
-            // Wrap the entire extraction process in retry logic
-            let (recipe, downloadedImages) = try await retryManager.withRetry(
-                operationID: operationID,
-                configuration: retryConfiguration
-            ) {
-                // This closure will be retried on transient failures
-                try await self.performExtractionWithValues(linkID: linkID, url: linkURL, title: linkTitle)
+        // Manual retry logic since we can't use retryManager with non-Sendable return types
+        var attempt = 0
+        let maxAttempts = retryConfiguration.maxAttempts
+        
+        while attempt < maxAttempts {
+            attempt += 1
+            
+            do {
+                // Perform the extraction
+                let (recipe, downloadedImages) = try await performExtractionWithValues(
+                    linkID: linkID,
+                    url: linkURL,
+                    title: linkTitle
+                )
+                
+                // Save recipe to database
+                currentStatus = "Saving recipe..."
+                try await saveRecipe(recipe, images: downloadedImages, link: link)
+                
+                // Mark as success
+                successCount += 1
+                link.isProcessed = true
+                link.processingError = nil
+                
+                if attempt > 1 {
+                    logInfo("Successfully extracted '\(String(describing: recipe.title))' after \(attempt) attempts", category: "batch-extraction")
+                } else {
+                    logInfo("Successfully extracted and saved: \(String(describing: recipe.title))", category: "batch-extraction")
+                }
+                
+                // Success - break out of retry loop
+                break
+                
+            } catch {
+                // Check if we should retry
+                if attempt < maxAttempts {
+                    let delay = calculateRetryDelay(attempt: attempt)
+                    logWarning("Extraction attempt \(attempt) failed for '\(linkTitle)', retrying in \(delay)s: \(error)", category: "batch-extraction")
+                    currentStatus = "Attempt \(attempt) failed, retrying in \(Int(delay))s..."
+                    
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                } else {
+                    // All retries exhausted
+                    failureCount += 1
+                    link.isProcessed = true
+                    link.processingError = error.localizedDescription
+                    errorLog.append((link: link.title, error: error.localizedDescription))
+                    
+                    logError("Failed to extract '\(link.title)' after \(attempt) attempt(s): \(error)", category: "batch-extraction")
+                }
             }
-            
-            // Save recipe to database (outside retry block - if this fails, we don't retry)
-            currentStatus = "Saving recipe..."
-            try await saveRecipe(recipe, images: downloadedImages, link: link)
-            
-            // Mark as success
-            successCount += 1
-            link.isProcessed = true
-            link.processingError = nil
-            
-            // Get retry stats for logging
-            let stats = await retryManager.getRetryStats(operationID: operationID)
-            if stats.totalAttempts > 1 {
-                logInfo("Successfully extracted '\(recipe.title)' after \(stats.totalAttempts) attempts", category: "batch-extraction")
-            } else {
-                logInfo("Successfully extracted and saved: \(recipe.title)", category: "batch-extraction")
-            }
-            
-            // Clear retry history for this operation
-            await retryManager.clearHistory(operationID: operationID)
-            
-        } catch {
-            // All retries failed - mark as permanent failure
-            failureCount += 1
-            link.isProcessed = true
-            link.processingError = error.localizedDescription
-            errorLog.append((link: link.title, error: error.localizedDescription))
-            
-            let stats = await retryManager.getRetryStats(operationID: operationID)
-            logError("Failed to extract '\(link.title)' after \(stats.totalAttempts) attempt(s): \(error)", category: "batch-extraction")
-            
-            // Clear retry history
-            await retryManager.clearHistory(operationID: operationID)
         }
         
         // Save link status
@@ -243,14 +250,32 @@ class BatchRecipeExtractorViewModel: ObservableObject {
         }
     }
     
-    /// Perform the actual extraction (wrapped by retry logic)
+    /// Calculate retry delay using exponential backoff
+    private func calculateRetryDelay(attempt: Int) -> TimeInterval {
+        let baseDelay = retryConfiguration.initialDelay
+        let multiplier = retryConfiguration.backoffMultiplier
+        let maxDelay = retryConfiguration.maxDelay
+        
+        var delay = baseDelay * pow(multiplier, Double(attempt - 1))
+        delay = min(delay, maxDelay)
+        
+        // Add jitter if configured
+        if retryConfiguration.useJitter {
+            let jitter = Double.random(in: 0...0.3) * delay
+            delay += jitter
+        }
+        
+        return delay
+    }
+    
+    /// Perform the actual extraction
     /// - Parameters:
     ///   - linkID: The UUID of the saved link
     ///   - url: The URL to extract from
     ///   - title: The title of the link (for logging)
     /// - Returns: Tuple of (recipe, downloaded images)
     /// - Throws: Any error during extraction
-    private func performExtractionWithValues(linkID: UUID, url: String, title: String) async throws -> (RecipeModel, [UIImage]) {
+    private func performExtractionWithValues(linkID: UUID, url: String, title: String) async throws -> (RecipeX, [UIImage]) {
         // Create extractor for this link
         let extractor = RecipeExtractorViewModel(apiKey: apiKey)
         
@@ -277,35 +302,36 @@ class BatchRecipeExtractorViewModel: ObservableObject {
         // Store the current recipe for display
         currentRecipe = recipe
         
-        // Download images if available (with individual retry per image)
+        // Extract image URLs from recipe notes (where they're stored during web extraction)
+        let imageURLs = extractImageURLsFromNotes(recipe)
+        
+        // Download images if available
         var downloadedImages: [UIImage] = []
-        if let imageURLs = recipe.imageURLs, !imageURLs.isEmpty {
+        if !imageURLs.isEmpty {
             currentStatus = "Downloading \(imageURLs.count) image(s)..."
-            logInfo("Downloading \(imageURLs.count) images for: \(recipe.title)", category: "batch-extraction")
+            logInfo("Downloading \(imageURLs.count) images for: \(String(describing: recipe.title))", category: "batch-extraction")
             
-            for (index, imageURL) in imageURLs.enumerated() {
-                let imageOperationID = "image-\(linkID.uuidString)-\(index)"
+            for (_ , imageURL) in imageURLs.enumerated() {
+                // Try to download each image with basic retry
+                var imageAttempt = 0
+                let maxImageAttempts = 2
                 
-                do {
-                    // Retry image downloads too
-                    let image = try await retryManager.withRetry(
-                        operationID: imageOperationID,
-                        configuration: .init(
-                            maxAttempts: 2,  // Fewer retries for images
-                            initialDelay: 1.0,
-                            maxDelay: 5.0,
-                            backoffMultiplier: 2.0,
-                            useJitter: true
-                        )
-                    ) {
-                        try await self.webImageDownloader.downloadImage(from: imageURL)
+                while imageAttempt < maxImageAttempts {
+                    imageAttempt += 1
+                    
+                    do {
+                        let image = try await webImageDownloader.downloadImage(from: imageURL)
+                        downloadedImages.append(image)
+                        break // Success
+                    } catch {
+                        if imageAttempt < maxImageAttempts {
+                            logWarning("Image download attempt \(imageAttempt) failed, retrying: \(error)", category: "batch-extraction")
+                            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                        } else {
+                            logWarning("Failed to download image after \(imageAttempt) attempts: \(error)", category: "batch-extraction")
+                            // Continue with other images - don't fail the whole extraction
+                        }
                     }
-                    downloadedImages.append(image)
-                    await retryManager.clearHistory(operationID: imageOperationID)
-                } catch {
-                    logWarning("Failed to download image after retries: \(error)", category: "batch-extraction")
-                    await retryManager.clearHistory(operationID: imageOperationID)
-                    // Continue with other images - don't fail the whole extraction
                 }
             }
         }
@@ -314,9 +340,7 @@ class BatchRecipeExtractorViewModel: ObservableObject {
     }
     
     /// Save a recipe with its images to the database
-    private func saveRecipe(_ recipeModel: RecipeModel, images: [UIImage], link: SavedLink) async throws {
-        // Convert RecipeModel to SwiftData Recipe
-        let recipe = Recipe(from: recipeModel)
+    private func saveRecipe(_ recipe: RecipeX, images: [UIImage], link: SavedLink) async throws {
         
         // Set reference to the original link URL
         recipe.reference = link.url
@@ -335,18 +359,18 @@ class BatchRecipeExtractorViewModel: ObservableObject {
             
             if index == 0 {
                 // First image is the main image - store in imageData
-                let filename = "recipe_\(recipe.id.uuidString).jpg"
+                let filename = "recipe_\(recipe.id!.uuidString).jpg"
                 recipe.imageName = filename
                 recipe.imageData = imageData
                 
                 logInfo("Saved main image data (\(imageData.count / 1024)KB) to recipe", category: "batch-extraction")
                 
                 // Create image assignment for compatibility
-                let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: filename)
+                let assignment = RecipeImageAssignment(recipeID: recipe.id!, imageName: filename)
                 modelContext.insert(assignment)
             } else {
                 // Additional images - add to the filename list for tracking
-                let filename = "recipe_\(recipe.id.uuidString)_\(index).jpg"
+                let filename = "recipe_\(recipe.id!.uuidString)_\(index).jpg"
                 additionalImageFilenames.append(filename)
             }
         }
@@ -359,7 +383,7 @@ class BatchRecipeExtractorViewModel: ObservableObject {
             for (index, image) in images.dropFirst().enumerated() {
                 guard let imageData = image.jpegData(compressionQuality: 0.8) else { continue }
                 
-                let filename = "recipe_\(recipe.id.uuidString)_\(index + 1).jpg"
+                let filename = "recipe_\(recipe.id!.uuidString)_\(index + 1).jpg"
                 additionalImages.append(["data": imageData, "name": Data(filename.utf8)])
             }
             
@@ -382,10 +406,36 @@ class BatchRecipeExtractorViewModel: ObservableObject {
         // Save the context
         do {
             try modelContext.save()
-            logInfo("Recipe saved successfully: \(recipe.title) with \(images.count) image(s) in SwiftData", category: "batch-extraction")
+            logInfo("Recipe saved successfully: \(String(describing: recipe.title)) with \(images.count) image(s) in SwiftData", category: "batch-extraction")
         } catch {
             logError("Failed to save recipe to database: \(error)", category: "batch-extraction")
             throw error
         }
+    }
+    
+    /// Extract image URLs from recipe notes
+    /// Image URLs are stored in notes during web extraction with the format:
+    /// "Image URLs from source:\n" followed by URLs on separate lines
+    private func extractImageURLsFromNotes(_ recipe: RecipeX) -> [String] {
+        let notes = recipe.notes
+        
+        for note in notes {
+            if note.text.hasPrefix("Image URLs from source:") {
+                // Extract URLs from the note text
+                let lines = note.text.components(separatedBy: .newlines)
+                // Skip the first line which is "Image URLs from source:"
+                let urls = lines.dropFirst().compactMap { line -> String? in
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    // Validate it looks like a URL
+                    if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+                        return trimmed
+                    }
+                    return nil
+                }
+                return urls
+            }
+        }
+        
+        return []
     }
 }

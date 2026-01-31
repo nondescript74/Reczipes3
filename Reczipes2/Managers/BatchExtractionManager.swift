@@ -25,7 +25,7 @@ struct ExtractionStatus {
     let currentIndex: Int
     let totalCount: Int
     let currentLink: SavedLink?
-    let currentRecipe: RecipeModel?
+    let currentRecipe: RecipeX?
     let currentStep: ExtractionStep
     let stepProgress: Double // 0.0 to 1.0 for current step
     let imagesDownloaded: Int
@@ -48,8 +48,8 @@ class BatchExtractionManager: ObservableObject {
     @Published var successCount: Int = 0
     @Published var failureCount: Int = 0
     @Published var errorLog: [(link: String, error: String, timestamp: Date)] = []
-    @Published var currentRecipe: RecipeModel?
-    @Published var recentlyExtracted: [RecipeModel] = [] // Last 5 extracted recipes
+    @Published var currentRecipe: RecipeX?
+    @Published var recentlyExtracted: [RecipeX] = [] // Last 5 extracted recipes
     
     // MARK: - Private Properties
     
@@ -260,7 +260,11 @@ class BatchExtractionManager: ObservableObject {
             
             // Step 2: Download images
             var downloadedImages: [UIImage] = []
-            if let imageURLs = recipe.imageURLs, !imageURLs.isEmpty {
+            
+            // Extract image URLs from recipe notes
+            let imageURLs = extractImageURLs(from: recipe)
+            
+            if !imageURLs.isEmpty {
                 await updateStatus(
                     currentIndex: index,
                     totalCount: total,
@@ -300,6 +304,9 @@ class BatchExtractionManager: ObservableObject {
                 stepProgress: 0.8
             )
             
+            // Clean up image URL notes before saving
+            cleanupImageURLNotes(from: recipe)
+            
             try await saveRecipe(recipe, images: downloadedImages, link: link, modelContext: modelContext)
             
             // Mark as success
@@ -317,7 +324,7 @@ class BatchExtractionManager: ObservableObject {
             link.isProcessed = true
             link.processingError = nil
             
-            logInfo("Successfully extracted: \(recipe.title)", category: "batch-extraction")
+            logInfo("Successfully extracted: \(String(describing: recipe.title))", category: "batch-extraction")
             
         } catch {
             // Mark as failure
@@ -341,9 +348,9 @@ class BatchExtractionManager: ObservableObject {
         }
     }
     
-    private func saveRecipe(_ recipeModel: RecipeModel, images: [UIImage], link: SavedLink, modelContext: ModelContext) async throws {
-        // Convert RecipeModel to SwiftData RecipeX (unified CloudKit-compatible model)
-        let recipe = RecipeX(from: recipeModel)
+    private func saveRecipe(_ recipe: RecipeX, images: [UIImage], link: SavedLink, modelContext: ModelContext) async throws {
+         
+         
         recipe.reference = link.url
         recipe.extractionSource = "web"
         recipe.originalFileName = nil
@@ -411,6 +418,47 @@ class BatchExtractionManager: ObservableObject {
             try imageData.write(to: fileURL)
         } catch {
             logError("Failed to save image \(filename): \(error)", category: "batch-extraction")
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Extract image URLs from recipe notes
+    /// The RecipeExtractorViewModel stores image URLs in notes with the format:
+    /// "Image URLs from source:\nurl1\nurl2\nurl3"
+    private func extractImageURLs(from recipe: RecipeX) -> [String] {
+        let notes = recipe.notes
+        
+        // Look for the note containing image URLs
+        for note in notes {
+            let text = note.text
+            if text.hasPrefix("Image URLs from source:") {
+                // Extract URLs from the note
+                let lines = text.components(separatedBy: .newlines)
+                // Skip the first line ("Image URLs from source:")
+                let urls = lines.dropFirst().map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+                return Array(urls)
+            }
+        }
+        
+        return []
+    }
+    
+    /// Remove image URL notes from recipe after images have been downloaded
+    /// This prevents cluttering the recipe with temporary extraction metadata
+    @MainActor
+    private func cleanupImageURLNotes(from recipe: RecipeX) {
+        var notes = recipe.notes
+        
+        // Remove notes that contain image URLs
+        notes.removeAll { note in
+            note.text.hasPrefix("Image URLs from source:")
+        }
+        
+        // Update the recipe with cleaned notes
+        if let encodedNotes = try? JSONEncoder().encode(notes) {
+            recipe.notesData = encodedNotes.isEmpty ? nil : encodedNotes
         }
     }
     

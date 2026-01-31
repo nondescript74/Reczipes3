@@ -26,10 +26,7 @@ struct AppClipDataHandler {
             let extractedRecipe = try decoder.decode(AppClipExtractedRecipeData.self, from: data)
             
             // Convert simple App Clip data to RecipeModel structure
-            let recipeModel = convertAppClipDataToRecipeModel(extractedRecipe)
-            
-            // Convert RecipeModel to Recipe (SwiftData)
-            let recipe = Recipe(from: recipeModel)
+            let recipe = convertAppClipDataToRecipeX(extractedRecipe)
             
             // Save to SwiftData
             modelContext.insert(recipe)
@@ -38,7 +35,7 @@ struct AppClipDataHandler {
             // Clear the pending recipe
             sharedDefaults?.removeObject(forKey: pendingRecipeKey)
             
-            logInfo("✅ Successfully imported recipe from App Clip: \(recipe.title)", category: "app-clip")
+            logInfo("✅ Successfully imported recipe from App Clip: \(String(describing: recipe.title))", category: "app-clip")
             return true
             
         } catch {
@@ -47,8 +44,10 @@ struct AppClipDataHandler {
         }
     }
     
-    /// Convert App Clip's simple data structure to RecipeModel
-    private static func convertAppClipDataToRecipeModel(_ clipData: AppClipExtractedRecipeData) -> RecipeModel {
+    /// Convert App Clip's simple data structure to RecipeX
+    private static func convertAppClipDataToRecipeX(_ clipData: AppClipExtractedRecipeData) -> RecipeX {
+        let encoder = JSONEncoder()
+        
         // Convert ingredients array to IngredientSection
         let ingredientSection = IngredientSection(
             title: nil,
@@ -85,13 +84,18 @@ struct AppClipDataHandler {
         }
         notes.append(RecipeNote(type: .general, text: "Imported from App Clip"))
         
-        return RecipeModel(
+        // Encode sections to Data
+        let ingredientSectionsData = try? encoder.encode([ingredientSection])
+        let instructionSectionsData = try? encoder.encode([instructionSection])
+        let notesData = try? encoder.encode(notes)
+        
+        return RecipeX(
             title: clipData.title,
             headerNotes: headerNotesText,
-            yield: yieldString,
-            ingredientSections: [ingredientSection],
-            instructionSections: [instructionSection],
-            notes: notes
+            recipeYield: yieldString,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
+            notesData: notesData
         )
     }
     

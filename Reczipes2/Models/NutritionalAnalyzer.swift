@@ -20,7 +20,7 @@ class NutritionalAnalyzer {
     
     /// Analyze a single recipe against user's nutritional goals
     /// Returns a score indicating how well the recipe fits the goals
-    func analyzeRecipe(_ recipe: RecipeModel, goals: NutritionalGoals, servings: Int = 1) -> NutritionalScore {
+    func analyzeRecipe(_ recipe: RecipeX, goals: NutritionalGoals, servings: Int = 1) -> NutritionalScore {
         // Extract nutrition info from recipe
         let nutrition = extractNutrition(from: recipe, servings: servings)
         
@@ -121,7 +121,7 @@ class NutritionalAnalyzer {
         let compatibilityScore = calculateCompatibilityScore(percentages: percentages, alerts: alerts)
         
         return NutritionalScore(
-            recipeID: recipe.id,
+            recipeID: recipe.safeID,
             nutrition: nutrition,
             dailyPercentages: percentages,
             alerts: alerts,
@@ -131,10 +131,10 @@ class NutritionalAnalyzer {
     }
     
     /// Analyze multiple recipes
-    func analyzeRecipes(_ recipes: [RecipeModel], goals: NutritionalGoals) -> [UUID: NutritionalScore] {
+    func analyzeRecipes(_ recipes: [RecipeX], goals: NutritionalGoals) -> [UUID: NutritionalScore] {
         var scores: [UUID: NutritionalScore] = [:]
         for recipe in recipes {
-            scores[recipe.id] = analyzeRecipe(recipe, goals: goals)
+            scores[recipe.safeID] = analyzeRecipe(recipe, goals: goals)
         }
         return scores
     }
@@ -142,7 +142,7 @@ class NutritionalAnalyzer {
     // MARK: - Filtering & Sorting
     
     /// Filter recipes that fit well within nutritional goals
-    func filterCompatibleRecipes(_ recipes: [RecipeModel], goals: NutritionalGoals, minimumScore: Double = 60.0) -> [RecipeModel] {
+    func filterCompatibleRecipes(_ recipes: [RecipeX], goals: NutritionalGoals, minimumScore: Double = 60.0) -> [RecipeX] {
         recipes.filter { recipe in
             let score = analyzeRecipe(recipe, goals: goals)
             return score.compatibilityScore >= minimumScore
@@ -150,11 +150,11 @@ class NutritionalAnalyzer {
     }
     
     /// Sort recipes by compatibility with nutritional goals (best fit first)
-    func sortRecipesByCompatibility(_ recipes: [RecipeModel], goals: NutritionalGoals) -> [RecipeModel] {
+    func sortRecipesByCompatibility(_ recipes: [RecipeX], goals: NutritionalGoals) -> [RecipeX] {
         let scores = analyzeRecipes(recipes, goals: goals)
         return recipes.sorted { recipe1, recipe2 in
-            let score1 = scores[recipe1.id]?.compatibilityScore ?? 0
-            let score2 = scores[recipe2.id]?.compatibilityScore ?? 0
+            let score1 = scores[recipe1.safeID]?.compatibilityScore ?? 0
+            let score2 = scores[recipe2.safeID]?.compatibilityScore ?? 0
             return score1 > score2
         }
     }
@@ -164,7 +164,7 @@ class NutritionalAnalyzer {
     /// Extract nutritional information from a recipe
     /// This uses keyword matching and estimation
     /// TODO: Integrate with Claude API for more accurate extraction
-    private func extractNutrition(from recipe: RecipeModel, servings: Int) -> RecipeNutrition {
+    private func extractNutrition(from recipe: RecipeX, servings: Int) -> RecipeNutrition {
         // Get servings from recipe or use parameter
         let recipeServings = extractServingsCount(from: recipe) ?? servings
         
@@ -178,9 +178,15 @@ class NutritionalAnalyzer {
     }
     
     /// Try to parse explicit nutrition information from recipe
-    private func parseExplicitNutrition(from recipe: RecipeModel) -> RecipeNutrition? {
+    private func parseExplicitNutrition(from recipe: RecipeX) -> RecipeNutrition? {
+        // Decode notes from JSON data
+        var notesText = ""
+        if let notesData = recipe.notesData,
+           let notes = try? JSONDecoder().decode([RecipeNote].self, from: notesData) {
+            notesText = notes.map { $0.text }.joined(separator: " ")
+        }
+        
         // Look in headerNotes and notes for nutrition facts
-        let notesText = recipe.notes.map { $0.text }.joined(separator: " ")
         let searchText = [recipe.headerNotes, notesText]
             .compactMap { $0 }
             .joined(separator: " ")
@@ -216,7 +222,7 @@ class NutritionalAnalyzer {
     }
     
     /// Estimate nutrition from ingredients (basic keyword matching)
-    private func estimateNutrition(from recipe: RecipeModel, servings: Int) -> RecipeNutrition {
+    private func estimateNutrition(from recipe: RecipeX, servings: Int) -> RecipeNutrition {
         var estimatedCalories = 0.0
         var estimatedSodium = 0.0
         var estimatedSugar = 0.0
@@ -296,8 +302,8 @@ class NutritionalAnalyzer {
     }
     
     /// Extract servings count from recipe yield
-    private func extractServingsCount(from recipe: RecipeModel) -> Int? {
-        guard let yieldString = recipe.yield else { return nil }
+    private func extractServingsCount(from recipe: RecipeX) -> Int? {
+        guard let yieldString = recipe.recipeYield else { return nil }
         
         let numbers = yieldString.components(separatedBy: CharacterSet.decimalDigits.inverted)
             .compactMap { Int($0) }
@@ -306,10 +312,16 @@ class NutritionalAnalyzer {
     }
     
     /// Extract ingredient names from recipe
-    private func extractIngredients(from recipe: RecipeModel) -> [String] {
+    private func extractIngredients(from recipe: RecipeX) -> [String] {
         var ingredients: [String] = []
         
-        for section in recipe.ingredientSections {
+        // Decode ingredient sections from JSON data
+        guard let sectionsData = recipe.ingredientSectionsData,
+              let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
+            return []
+        }
+        
+        for section in sections {
             for ingredient in section.ingredients {
                 ingredients.append(ingredient.name)
             }

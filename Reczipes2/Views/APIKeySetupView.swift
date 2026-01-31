@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OSLog
 
 struct APIKeySetupView: View {
     @Binding var isPresented: Bool
@@ -14,6 +15,8 @@ struct APIKeySetupView: View {
     @State private var errorMessage = ""
     @State private var isValidating = false
     @State private var skipValidation = false
+    
+    var log = OSLog(subsystem: "com.headydiscy.Reczipes2", category: "APIKeySetupView")
     
     var body: some View {
         NavigationView {
@@ -127,6 +130,7 @@ struct APIKeySetupView: View {
     @MainActor
     private func validateAndSaveAPIKey() async {
         print("🔑 Starting API key validation in setup...")
+        
         showError = false
         errorMessage = ""
         isValidating = true

@@ -125,7 +125,7 @@ struct CloudKitDiagnosticsView: View {
     // MARK: - Helper Functions
     
     private func refreshRecipeCount() {
-        let descriptor = FetchDescriptor<Recipe>()
+        let descriptor = FetchDescriptor<RecipeX>()
         if let recipes = try? modelContext.fetch(descriptor) {
             recipeCount = recipes.count
             print("📊 Local recipe count: \(recipeCount)")

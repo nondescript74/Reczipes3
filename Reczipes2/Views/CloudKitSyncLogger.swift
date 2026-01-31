@@ -15,19 +15,19 @@ final class CloudKitSyncLogger: Sendable {
     private init() {}
     
     /// Log when a recipe is created
-    nonisolated func logRecipeCreated(_ recipe: Recipe) {
-        print("🔵 [CloudKit Sync] Recipe created:")
-        print("   ID: \(recipe.id.uuidString)")
-        print("   Title: \(recipe.title)")
-        print("   Date: \(recipe.dateAdded)")
+    nonisolated func logRecipeCreated(_ recipe: RecipeX) {
+        print("🔵 [CloudKit Sync] RecipeX created:")
+        print("   ID: \(recipe.id!.uuidString)")
+        print("   Title: \(String(describing: recipe.title))")
+        print("   Date: \(String(describing: recipe.dateAdded))")
         print("   Should sync to CloudKit automatically")
     }
     
     /// Log when a recipe is updated
-    nonisolated func logRecipeUpdated(_ recipe: Recipe) {
-        print("🟡 [CloudKit Sync] Recipe updated:")
-        print("   ID: \(recipe.id.uuidString)")
-        print("   Title: \(recipe.title)")
+    nonisolated func logRecipeUpdated(_ recipe: RecipeX) {
+        print("🟡 [CloudKit Sync] RecipeX updated:")
+        print("   ID: \(recipe.id!.uuidString)")
+        print("   Title: \(String(describing: recipe.title))")
         print("   Modified: \(recipe.lastModified ?? Date())")
         print("   Version: \(recipe.currentVersion)")
         print("   Should sync changes to CloudKit")
@@ -35,7 +35,7 @@ final class CloudKitSyncLogger: Sendable {
     
     /// Log when a recipe is deleted
     nonisolated func logRecipeDeleted(id: UUID, title: String) {
-        print("🔴 [CloudKit Sync] Recipe deleted:")
+        print("🔴 [CloudKit Sync] RecipeX deleted:")
         print("   ID: \(id.uuidString)")
         print("   Title: \(title)")
         print("   Should remove from CloudKit")
@@ -56,16 +56,3 @@ final class CloudKitSyncLogger: Sendable {
     }
 }
 
-// MARK: - Extension to make logging easier
-
-extension Recipe {
-    /// Log this recipe's creation
-    @MainActor func logCreation() {
-        CloudKitSyncLogger.shared.logRecipeCreated(self)
-    }
-    
-    /// Log this recipe's update
-    @MainActor func logUpdate() {
-        CloudKitSyncLogger.shared.logRecipeUpdated(self)
-    }
-}

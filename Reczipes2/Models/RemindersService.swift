@@ -45,9 +45,9 @@ class RemindersService {
     
     /// Add recipe ingredients to a new reminder list
     /// - Parameters:
-    ///   - recipe: The recipe containing ingredients to export
+    ///   - recipe: The RecipeX containing ingredients to export
     /// - Returns: true if successful, false otherwise
-    func addIngredientsToReminders(recipe: RecipeModel) async throws {
+    func addIngredientsToReminders(recipe: RecipeX) async throws {
         // Ensure we have permission
         if !hasPermission {
             let granted = await requestPermission()
@@ -57,18 +57,25 @@ class RemindersService {
         }
         
         logInfo("📝 ========== ADDING INGREDIENTS TO REMINDERS ==========", category: "general")
-        logInfo("📝 Recipe: \(recipe.title)", category: "general")
+        logInfo("📝 Recipe: \(recipe.safeTitle)", category: "general")
         
         // Find or create a list for recipe ingredients
-        let listTitle = "🍳 \(recipe.title)"
+        let listTitle = "🍳 \(recipe.safeTitle)"
         let calendar = try findOrCreateReminderList(named: listTitle)
         
         logInfo("📝 Using reminder list: \(calendar.title)", category: "general")
         
         var addedCount = 0
         
+        // Decode ingredient sections from RecipeX
+        guard let sectionsData = recipe.ingredientSectionsData,
+              let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
+            logError("Failed to decode ingredient sections", category: "general")
+            throw RemindersError.saveFailed
+        }
+        
         // Iterate through all ingredient sections
-        for section in recipe.ingredientSections {
+        for section in sections {
             // Add section title as a reminder if present
             if let sectionTitle = section.title {
                 let sectionReminder = EKReminder(eventStore: eventStore)

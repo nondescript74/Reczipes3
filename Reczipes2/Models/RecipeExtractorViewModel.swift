@@ -14,13 +14,14 @@ import Combine
 
 @MainActor
 class RecipeExtractorViewModel: ObservableObject {
-    @Published var extractedRecipe: RecipeModel?
+    @Published var extractedRecipe: RecipeX?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var selectedImage: UIImage?
     @Published var processedImage: UIImage?
     @Published var usePreprocessing = true
     @Published var recipeURL: String = ""
+    @Published var extractedImageURLs: [String] = [] // Image URLs from web extraction
     
     private let apiClient: ClaudeAPIClient
     private let imagePreprocessor = ImagePreprocessor()
@@ -51,10 +52,8 @@ class RecipeExtractorViewModel: ObservableObject {
         }
     }
     
-    private func saveRecipeDirectly(_ recipeModel: RecipeModel, modelContext: ModelContext) {
-        // Create RecipeX (unified CloudKit-compatible model)
-        let recipe = RecipeX(from: recipeModel)
-        
+    private func saveRecipeDirectly(_ recipe: RecipeX, modelContext: ModelContext) {
+         
         // Set extraction source
         recipe.extractionSource = "camera" // or "photos" or "files"
         
@@ -100,26 +99,26 @@ class RecipeExtractorViewModel: ObservableObject {
         }
     }
     
-    func handleKeepBoth(modelContext: ModelContext) {
-        guard let recipe = extractedRecipe else { return }
-        
-        // Create a new RecipeModel with modified title
-        let modifiedRecipe = RecipeModel(
-            id: recipe.id,
-            title: "\(recipe.title) (2)",
-            headerNotes: recipe.headerNotes,
-            yield: recipe.yield,
-            ingredientSections: recipe.ingredientSections,
-            instructionSections: recipe.instructionSections,
-            notes: recipe.notes,
-            reference: recipe.reference,
-            imageName: recipe.imageName,
-            additionalImageNames: recipe.additionalImageNames,
-            imageURLs: recipe.imageURLs
-        )
-        
-        saveRecipeDirectly(modifiedRecipe, modelContext: modelContext)
-    }
+//    func handleKeepBoth(modelContext: ModelContext) {
+//        guard let recipe = extractedRecipe else { return }
+//        
+//        // Create a new RecipeModel with modified title
+//        let modifiedRecipe = RecipeModel(
+//            id: recipe.id,
+//            title: "\(recipe.title) (2)",
+//            headerNotes: recipe.headerNotes,
+//            yield: recipe.yield,
+//            ingredientSections: recipe.ingredientSections,
+//            instructionSections: recipe.instructionSections,
+//            notes: recipe.notes,
+//            reference: recipe.reference,
+//            imageName: recipe.imageName,
+//            additionalImageNames: recipe.additionalImageNames,
+//            imageURLs: recipe.imageURLs
+//        )
+//        
+//        saveRecipeDirectly(modifiedRecipe, modelContext: modelContext)
+//    }
     
     func handleReplaceOriginal(modelContext: ModelContext) {
         guard let newRecipe = extractedRecipe,
@@ -187,6 +186,7 @@ class RecipeExtractorViewModel: ObservableObject {
             extractedRecipe = nil
             selectedImage = nil // Clear image when extracting from URL
             processedImage = nil
+            extractedImageURLs = [] // Clear previous image URLs
         }
         
         logInfo("Starting URL extraction from: \(url)", category: "extraction")
@@ -214,41 +214,29 @@ class RecipeExtractorViewModel: ObservableObject {
             logInfo("Calling Claude API for URL extraction...", category: "extraction")
             
             // Extract recipe using Claude
-            var recipe = try await apiClient.extractRecipe(from: contentToSend)
+            let recipe = try await apiClient.extractRecipe(from: contentToSend)
             
-            // Add the source URL to the reference field
+            // Add the source URL to the reference field if not already present
             if recipe.reference == nil || recipe.reference?.isEmpty == true {
-                recipe = RecipeModel(
-                    id: recipe.id,
-                    title: recipe.title,
-                    headerNotes: recipe.headerNotes,
-                    yield: recipe.yield,
-                    ingredientSections: recipe.ingredientSections,
-                    instructionSections: recipe.instructionSections,
-                    notes: recipe.notes,
-                    reference: url,
-                    imageName: recipe.imageName,
-                    imageURLs: imageURLs.isEmpty ? nil : imageURLs
-                )
-            } else {
-                // Just add image URLs to existing recipe
-                recipe = RecipeModel(
-                    id: recipe.id,
-                    title: recipe.title,
-                    headerNotes: recipe.headerNotes,
-                    yield: recipe.yield,
-                    ingredientSections: recipe.ingredientSections,
-                    instructionSections: recipe.instructionSections,
-                    notes: recipe.notes,
-                    reference: recipe.reference,
-                    imageName: recipe.imageName,
-                    imageURLs: imageURLs.isEmpty ? nil : imageURLs
-                )
+                recipe.reference = url
+            }
+            
+            // Store image URLs in recipe notes (or you can add a separate property if needed)
+            if !imageURLs.isEmpty {
+                let imageURLNote = "Image URLs from source:\n" + imageURLs.joined(separator: "\n")
+                var notes = recipe.notes // Get current notes (computed property)
+                notes.append(RecipeNote(type: .general, text: imageURLNote))
+                
+                // Encode and store back in notesData
+                if let encodedNotes = try? JSONEncoder().encode(notes) {
+                    recipe.notesData = encodedNotes
+                }
             }
             
             await MainActor.run {
                 self.extractedRecipe = recipe
-                logInfo("URL extraction successful: \(recipe.title)", category: "extraction")
+                self.extractedImageURLs = imageURLs // Store image URLs separately for view access
+                logInfo("URL extraction successful: \(String(describing: recipe.title))", category: "extraction")
             }
         } catch let error as WebExtractionError {
             await MainActor.run {
@@ -343,6 +331,7 @@ class RecipeExtractorViewModel: ObservableObject {
         errorMessage = nil
         isLoading = false
         recipeURL = ""
+        extractedImageURLs = []
     }
     
     /// Toggle preprocessing and re-extract if image is available

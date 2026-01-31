@@ -277,23 +277,6 @@ final class Book {
 
 extension Book {
     
-    /// Create Book from legacy RecipeBook model
-    convenience init(from recipeBook: RecipeBook) {
-        self.init(
-            id: recipeBook.id,
-            name: recipeBook.name,
-            bookDescription: recipeBook.bookDescription,
-            coverImageData: recipeBook.coverImageData,
-            coverImageName: recipeBook.coverImageName,
-            color: recipeBook.color,
-            recipeIDs: recipeBook.recipeIDs,
-            dateCreated: recipeBook.dateCreated,
-            dateModified: recipeBook.dateModified,
-            version: 1,
-            needsCloudSync: true,
-            isShared: false
-        )
-    }
     
     /// Create Book from SharedRecipeBook model
     convenience init(from sharedBook: SharedRecipeBook, isImported: Bool = true) {

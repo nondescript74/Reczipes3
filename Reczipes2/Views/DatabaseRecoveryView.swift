@@ -182,22 +182,33 @@ struct DatabaseRecoveryView: View {
                 .fontWeight(.bold)
             
             VStack(alignment: .leading, spacing: 12) {
-                Text("Successfully recovered:")
-                    .font(.headline)
-                
-                if result.recipesFound > 0 {
-                    Label("\(result.recipesFound) recipe\(result.recipesFound == 1 ? "" : "s")",
-                          systemImage: "book.fill")
-                }
-                
-                if result.booksFound > 0 {
-                    Label("\(result.booksFound) recipe book\(result.booksFound == 1 ? "" : "s")",
-                          systemImage: "books.vertical.fill")
-                }
-                
-                if result.profilesFound > 0 {
-                    Label("\(result.profilesFound) user profile\(result.profilesFound == 1 ? "" : "s")",
-                          systemImage: "person.fill")
+                if result.recipesFound >= 0 {
+                    // We have actual counts
+                    Text("Successfully recovered:")
+                        .font(.headline)
+                    
+                    if result.recipesFound > 0 {
+                        Label("\(result.recipesFound) recipe\(result.recipesFound == 1 ? "" : "s")",
+                              systemImage: "book.fill")
+                    }
+                    
+                    if result.booksFound > 0 {
+                        Label("\(result.booksFound) recipe book\(result.booksFound == 1 ? "" : "s")",
+                              systemImage: "books.vertical.fill")
+                    }
+                    
+                    if result.profilesFound > 0 {
+                        Label("\(result.profilesFound) user profile\(result.profilesFound == 1 ? "" : "s")",
+                              systemImage: "person.fill")
+                    }
+                } else {
+                    // Counts unknown - database was copied without reading
+                    Text("Your old database has been successfully copied to the current location.")
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                    
+                    Label("Your recipes will appear after restart", systemImage: "arrow.clockwise")
+                        .font(.subheadline)
                 }
             }
             .padding()
@@ -269,20 +280,23 @@ struct DatabaseRecoveryView: View {
         error = nil
         
         do {
-            // First, check what's in the old database
-            let result = try await DatabaseRecoveryService.recoverFromOldDatabase(migrationInfo: info)
+            // Backup old database first
+            _ = try DatabaseRecoveryService.backupOldDatabase(url: info.oldDatabaseURL)
             
-            if result.hasData {
-                // Backup old database first
-                _ = try DatabaseRecoveryService.backupOldDatabase(url: info.oldDatabaseURL)
-                
-                // Copy old database to current location
-                try DatabaseRecoveryService.copyOldDatabaseToCurrent(migrationInfo: info)
-                
-                recoveryResult = result
-            } else {
-                error = RecoveryError.noDataFound
-            }
+            // Copy old database to current location
+            try DatabaseRecoveryService.copyOldDatabaseToCurrent(migrationInfo: info)
+            
+            // Since we successfully copied, create a recovery result
+            // We can't know exact counts without loading the database,
+            // but we know it has data since it passed the size check
+            let result = RecoveryResult(
+                recipesFound: -1,  // Unknown count, will be available after restart
+                booksFound: -1,
+                profilesFound: -1,
+                oldDatabaseURL: info.oldDatabaseURL
+            )
+            
+            recoveryResult = result
         } catch {
             self.error = error
         }

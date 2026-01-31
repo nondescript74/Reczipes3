@@ -238,62 +238,13 @@ final class RecipeX {
     }
 }
 
-// MARK: - Convenience Initializers
-
-extension RecipeX {
-    
-    /// Create RecipeX from legacy Recipe model
-    convenience init(from recipe: Recipe) {
-        self.init(
-            id: recipe.id,
-            title: recipe.title,
-            headerNotes: recipe.headerNotes,
-            recipeYield: recipe.recipeYield,
-            reference: recipe.reference,
-            ingredientSectionsData: recipe.ingredientSectionsData,
-            instructionSectionsData: recipe.instructionSectionsData,
-            notesData: recipe.notesData,
-            imageData: recipe.imageData,
-            additionalImagesData: recipe.additionalImagesData,
-            imageName: recipe.imageName,
-            additionalImageNames: recipe.additionalImageNames,
-            dateAdded: recipe.dateAdded,
-            dateCreated: recipe.dateCreated,
-            lastModified: recipe.lastModified,
-            version: recipe.version,
-            ingredientsHash: recipe.ingredientsHash,
-            imageHash: recipe.imageHash,
-            extractionSource: recipe.extractionSource,
-            originalFileName: recipe.originalFileName
-        )
-    }
-    
-    /// Create RecipeX from RecipeModel (used during extraction)
-    convenience init(from recipeModel: RecipeModel, ownerUserID: String? = nil, ownerDisplayName: String? = nil) {
-        let encoder = JSONEncoder()
-        
-        let ingredientsData = try? encoder.encode(recipeModel.ingredientSections)
-        let instructionsData = try? encoder.encode(recipeModel.instructionSections)
-        let notesData = try? encoder.encode(recipeModel.notes)
-        
-        self.init(
-            id: recipeModel.id,
-            title: recipeModel.title,
-            headerNotes: recipeModel.headerNotes,
-            recipeYield: recipeModel.yield,
-            reference: recipeModel.reference,
-            ingredientSectionsData: ingredientsData,
-            instructionSectionsData: instructionsData,
-            notesData: notesData,
-            imageName: recipeModel.imageName,
-            additionalImageNames: recipeModel.additionalImageNames,
-            ownerUserID: ownerUserID,
-            ownerDisplayName: ownerDisplayName
-        )
-    }
-}
-
 // MARK: - Computed Properties
+
+//extension RecipeX {
+//    func convertFromCloudKitRecipe(cloudKitRecipe: CKRecord) -> Self {
+//        
+//    }
+//}
 
 extension RecipeX {
     
@@ -430,6 +381,38 @@ extension RecipeX {
         return !(title ?? "").isEmpty &&
                !ingredients.isEmpty &&
                !instructions.isEmpty
+    }
+    
+    /// Decoded ingredient sections (for view access)
+    var ingredientSections: [IngredientSection] {
+        guard let sectionsData = ingredientSectionsData,
+              let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
+            return []
+        }
+        return sections
+    }
+    
+    /// Decoded instruction sections (for view access)
+    var instructionSections: [InstructionSection] {
+        guard let sectionsData = instructionSectionsData,
+              let sections = try? JSONDecoder().decode([InstructionSection].self, from: sectionsData) else {
+            return []
+        }
+        return sections
+    }
+    
+    /// Decoded notes (for view access)
+    var notes: [RecipeNote] {
+        guard let notesDataValue = notesData,
+              let notes = try? JSONDecoder().decode([RecipeNote].self, from: notesDataValue) else {
+            return []
+        }
+        return notes
+    }
+    
+    /// Alias for recipeYield to match legacy API
+    var yield: String? {
+        return recipeYield
     }
 }
 
@@ -617,37 +600,6 @@ extension RecipeX {
 
 // MARK: - Conversion Methods
 
-extension RecipeX {
-    
-    /// Convert to RecipeModel for display/editing
-    @MainActor
-    func toRecipeModel() -> RecipeModel? {
-        let decoder = JSONDecoder()
-        
-        guard let ingredientsData = ingredientSectionsData,
-              let instructionsData = instructionSectionsData,
-              let ingredients = try? decoder.decode([IngredientSection].self, from: ingredientsData),
-              let instructions = try? decoder.decode([InstructionSection].self, from: instructionsData) else {
-            return nil
-        }
-        
-        let notes = notesData.flatMap { try? decoder.decode([RecipeNote].self, from: $0) } ?? []
-        
-        return RecipeModel(
-            id: safeID,
-            title: safeTitle,
-            headerNotes: headerNotes,
-            yield: recipeYield,
-            ingredientSections: ingredients,
-            instructionSections: instructions,
-            notes: notes,
-            reference: reference,
-            imageName: imageName,
-            additionalImageNames: additionalImageNames
-        )
-    }
-}
-
 // MARK: - Hash Calculation
 
 extension RecipeX {
@@ -682,7 +634,7 @@ extension RecipeX {
     }
     
     /// Generate content fingerprint for duplicate detection
-    func generateContentFingerprint() -> String {
+    @MainActor func generateContentFingerprint() -> String {
         var components: [String] = []
         
         let normalizedTitle = (title ?? "").lowercased().trimmingCharacters(in: .whitespaces)
@@ -804,5 +756,13 @@ extension RecipeX {
 }
 
 // MARK: - String Extension
-// Note: sha256Hash() extension is defined in Recipe.swift and shared across the project
+
+extension String {
+    /// Calculate SHA256 hash of string
+    nonisolated func sha256Hash() -> String {
+        guard let data = self.data(using: .utf8) else { return "" }
+        let hashed = SHA256.hash(data: data)
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
 

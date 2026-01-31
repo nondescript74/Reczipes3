@@ -80,51 +80,6 @@ class DatabaseRecoveryService {
     }
     
     /// Attempt to recover recipes from old database file
-    static func recoverFromOldDatabase(migrationInfo: DatabaseMigrationInfo) async throws -> RecoveryResult {
-        logInfo("🔄 Starting database recovery...", category: "storage")
-        logInfo("   Old DB: \(migrationInfo.oldDatabaseURL.lastPathComponent) (\(migrationInfo.oldDatabaseSizeFormatted))", category: "storage")
-        logInfo("   Current DB: \(migrationInfo.currentDatabaseURL.lastPathComponent) (\(migrationInfo.currentDatabaseSizeFormatted))", category: "storage")
-        
-        // Create a temporary container to read from old database
-        let oldConfig = ModelConfiguration(url: migrationInfo.oldDatabaseURL)
-        
-        let oldContainer = try ModelContainer(
-            for: Recipe.self,
-            RecipeImageAssignment.self,
-            UserAllergenProfile.self,
-            CachedDiabeticAnalysis.self,
-            SavedLink.self,
-            RecipeBook.self,
-            CookingSession.self,
-            migrationPlan: Reczipes2MigrationPlan.self,
-            configurations: oldConfig
-        )
-        
-        // Read data from old database
-        let oldContext = oldContainer.mainContext
-        
-        let recipeDescriptor = FetchDescriptor<Recipe>()
-        let recipes = try oldContext.fetch(recipeDescriptor)
-        
-        let booksDescriptor = FetchDescriptor<RecipeBook>()
-        let books = try oldContext.fetch(booksDescriptor)
-        
-        let profilesDescriptor = FetchDescriptor<UserAllergenProfile>()
-        let profiles = try oldContext.fetch(profilesDescriptor)
-        
-        logInfo("   Found in old database:", category: "storage")
-        logInfo("   - \(recipes.count) recipes", category: "storage")
-        logInfo("   - \(books.count) recipe books", category: "storage")
-        logInfo("   - \(profiles.count) user profiles", category: "storage")
-        
-        // Create result
-        return RecoveryResult(
-            recipesFound: recipes.count,
-            booksFound: books.count,
-            profilesFound: profiles.count,
-            oldDatabaseURL: migrationInfo.oldDatabaseURL
-        )
-    }
     
     /// Copy old database file to current location
     static func copyOldDatabaseToCurrent(migrationInfo: DatabaseMigrationInfo) throws {
@@ -200,6 +155,11 @@ struct RecoveryResult {
     let oldDatabaseURL: URL
     
     var hasData: Bool {
-        recipesFound > 0 || booksFound > 0 || profilesFound > 0
+        // If counts are unknown (-1), assume we have data
+        // since we only get here if the database file was large enough
+        if recipesFound < 0 {
+            return true
+        }
+        return recipesFound > 0 || booksFound > 0 || profilesFound > 0
     }
 }

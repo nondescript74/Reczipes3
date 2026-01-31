@@ -81,21 +81,25 @@ struct LinkExtractionView: View {
                 if let recipe = viewModel.extractedRecipe {
                     let imageCount = downloadedWebImages.count
                     if imageCount > 0 {
-                        Text("\"\(recipe.title)\" and \(imageCount) image\(imageCount == 1 ? "" : "s") have been added to your recipe collection.")
+                        Text("\"\(recipe.safeTitle)\" and \(imageCount) image\(imageCount == 1 ? "" : "s") have been added to your recipe collection.")
                     } else {
-                        Text("\"\(recipe.title)\" has been added to your recipe collection.")
+                        Text("\"\(recipe.safeTitle)\" has been added to your recipe collection.")
                     }
                 }
             }
             .sheet(isPresented: $showWebImagePicker) {
-                if let recipe = viewModel.extractedRecipe,
-                   let imageURLs = recipe.imageURLs {
-                    MultiWebImagePickerView(
-                        imageURLs: imageURLs,
-                        selectedURLs: $selectedWebImageURLs
-                    ) {
-                        // Reset downloaded images when selection changes
-                        self.downloadedWebImages = []
+                // Extract image URLs from recipe notes
+                if let recipe = viewModel.extractedRecipe {
+                    let imageURLs = extractImageURLsFromNotes(recipe)
+                    
+                    if !imageURLs.isEmpty {
+                        MultiWebImagePickerView(
+                            imageURLs: imageURLs,
+                            selectedURLs: $selectedWebImageURLs
+                        ) {
+                            // Reset downloaded images when selection changes
+                            self.downloadedWebImages = []
+                        }
                     }
                 }
             }
@@ -165,13 +169,14 @@ struct LinkExtractionView: View {
         }
     }
     
-    private func extractedRecipeSection(recipe: RecipeModel) -> some View {
+    private func extractedRecipeSection(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             recipeSuccessHeader
             
             extractionSummary(recipe: recipe)
             
-            if let imageURLs = recipe.imageURLs, !imageURLs.isEmpty {
+            let imageURLs = extractImageURLsFromNotes(recipe)
+            if !imageURLs.isEmpty {
                 imageSelectionSection(imageURLs: imageURLs)
             }
             
@@ -204,7 +209,7 @@ struct LinkExtractionView: View {
         }
     }
     
-    private func extractionSummary(recipe: RecipeModel) -> some View {
+    private func extractionSummary(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Extracted:")
                 .font(.caption)
@@ -215,7 +220,9 @@ struct LinkExtractionView: View {
             Text("• \(recipe.instructionSections.count) instruction section(s)")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            if let imageURLs = recipe.imageURLs {
+            
+            let imageURLs = extractImageURLsFromNotes(recipe)
+            if !imageURLs.isEmpty {
                 Text("• \(imageURLs.count) image(s) found")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -378,7 +385,7 @@ struct LinkExtractionView: View {
         .buttonStyle(.plain)
     }
     
-    private func recipeQuickPreview(recipe: RecipeModel) -> some View {
+    private func recipeQuickPreview(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quick Preview")
                 .font(.headline)
@@ -401,7 +408,7 @@ struct LinkExtractionView: View {
         .cornerRadius(8)
     }
     
-    private func ingredientsPreview(recipe: RecipeModel) -> some View {
+    private func ingredientsPreview(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ingredients:")
                 .font(.subheadline)
@@ -432,7 +439,7 @@ struct LinkExtractionView: View {
         }
     }
     
-    private func instructionsPreview(recipe: RecipeModel) -> some View {
+    private func instructionsPreview(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Instructions:")
                 .font(.subheadline)
@@ -441,8 +448,8 @@ struct LinkExtractionView: View {
             ForEach(recipe.instructionSections.prefix(1)) { section in
                 ForEach(section.steps.prefix(2)) { step in
                     HStack(alignment: .top) {
-                        if let stepNumber = step.stepNumber {
-                            Text("\(stepNumber).")
+                        if step.stepNumber > 0 {
+                            Text("\(step.stepNumber).")
                                 .fontWeight(.semibold)
                         } else {
                             Text("•")
@@ -463,18 +470,18 @@ struct LinkExtractionView: View {
         }
     }
     
-    private func recipeNavigationLink(recipe: RecipeModel) -> some View {
+    private func recipeNavigationLink(recipe: RecipeX) -> some View {
         NavigationLink {
-            RecipeDetailView(
-                recipe: recipe,
-                isSaved: false,
-                onSave: {},
-                previewImage: downloadedWebImages.first
-            )
+            // Add the first downloaded image if available
+            if let firstImage = downloadedWebImages.first {
+                recipe.setImage(firstImage, isMainImage: true)
+            }
+            
+            return RecipeDetailView(recipe: recipe)
         } label: {
             HStack {
                 VStack(alignment: .leading) {
-                    Text(recipe.title)
+                    Text(recipe.safeTitle)
                         .font(.title3)
                         .fontWeight(.semibold)
                     
@@ -499,6 +506,23 @@ struct LinkExtractionView: View {
     }
     
     // MARK: - Save Recipe
+    
+    /// Extract image URLs from recipe notes
+    /// The RecipeExtractorViewModel stores image URLs in a note with the prefix "Image URLs from source:"
+    private func extractImageURLsFromNotes(_ recipe: RecipeX) -> [String] {
+        let notes = recipe.notes
+        
+        // Look for the note containing image URLs
+        guard let imageURLNote = notes.first(where: { $0.text.starts(with: "Image URLs from source:") }) else {
+            return []
+        }
+        
+        // Extract URLs from the note text
+        let lines = imageURLNote.text.components(separatedBy: .newlines)
+        
+        // Skip the first line (the header) and return the rest as URLs
+        return Array(lines.dropFirst()).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
     
     private func downloadAndSaveRecipe(imageURLs: [String]) async {
         isDownloadingImage = true
@@ -526,12 +550,12 @@ struct LinkExtractionView: View {
     private func saveRecipe() {
         logInfo("Saving recipe from link", category: "recipe")
         
-        guard var recipeModel = viewModel.extractedRecipe else {
+        guard let recipe = viewModel.extractedRecipe else {
             logError("No recipe to save", category: "recipe")
             return
         }
         
-        logInfo("Saving recipe: \(recipeModel.title)", category: "recipe")
+        logInfo("Saving recipe: \(recipe.safeTitle)", category: "recipe")
         
         // Add tips from the SavedLink as recipe notes (type: .tip)
         if let tips = link.tips, !tips.isEmpty {
@@ -542,47 +566,52 @@ struct LinkExtractionView: View {
                 RecipeNote(type: .tip, text: tipText)
             }
             
-            // Append tips to existing notes
-            recipeModel = RecipeModel(
-                id: recipeModel.id,
-                title: recipeModel.title,
-                headerNotes: recipeModel.headerNotes,
-                yield: recipeModel.yield,
-                ingredientSections: recipeModel.ingredientSections,
-                instructionSections: recipeModel.instructionSections,
-                notes: recipeModel.notes + tipNotes,  // Append tips to existing notes
-                reference: recipeModel.reference,
-                imageName: recipeModel.imageName,
-                additionalImageNames: recipeModel.additionalImageNames
-            )
+            // Get existing notes and append tips
+            var existingNotes = recipe.notes
+            existingNotes.append(contentsOf: tipNotes)
             
-            logInfo("Total notes including tips: \(recipeModel.notes.count)", category: "recipe")
+            // Encode and store back in recipe
+            if let encodedNotes = try? JSONEncoder().encode(existingNotes) {
+                recipe.notesData = encodedNotes
+            }
+            
+            logInfo("Total notes including tips: \(existingNotes.count)", category: "recipe")
         }
         
         // Determine which images we'll save
         let imagesToSave = downloadedWebImages.isEmpty ? [] : downloadedWebImages
         
-        // Convert RecipeModel to SwiftData Recipe first
-        let recipe = Recipe(from: recipeModel)
+        // Set extraction source
+        recipe.extractionSource = "web"
         
-        // Set reference to the original link URL
-        recipe.reference = link.url
+        // Set reference to the original link URL (if not already set)
+        if recipe.reference == nil || recipe.reference?.isEmpty == true {
+            recipe.reference = link.url
+        }
+        
+        // Initialize CloudKit sync properties
+        recipe.needsCloudSync = true
+        recipe.syncRetryCount = 0
+        recipe.lastSyncError = nil
+        
+        // Set timestamps
+        let now = Date()
+        recipe.dateAdded = now
+        recipe.dateCreated = now
+        recipe.lastModified = now
+        
+        // Set initial version
+        recipe.version = 1
         
         // Insert into SwiftData context
         modelContext.insert(recipe)
         
-        // Save all images using the new setImage() method
+        // Save all images using the setImage() method
         for (index, image) in imagesToSave.enumerated() {
             if index == 0 {
                 // First image is the main thumbnail
                 recipe.setImage(image, isMainImage: true)
                 logInfo("✅ Saved main image using setImage() (CloudKit-synced)", category: "recipe")
-                
-                // Create image assignment for compatibility
-                if let imageName = recipe.imageName {
-                    let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
-                    modelContext.insert(assignment)
-                }
             } else {
                 // Additional images
                 recipe.setImage(image, isMainImage: false)
@@ -590,17 +619,17 @@ struct LinkExtractionView: View {
             }
         }
         
-        logInfo("Saved \(imagesToSave.count) image(s) to SwiftData for CloudKit sync", category: "recipe")
+        logInfo("Saved \(imagesToSave.count) image(s) to RecipeX for CloudKit sync", category: "recipe")
         
         // Update the link to mark it as processed
         link.isProcessed = true
-        link.extractedRecipeID = recipe.id
+        link.extractedRecipeID = recipe.safeID
         link.processingError = nil
         
         // Save the context
         do {
             try modelContext.save()
-            logInfo("Recipe saved successfully to SwiftData with imageData", category: "storage")
+            logInfo("Recipe saved successfully to SwiftData as RecipeX with imageData", category: "storage")
             
             // Small delay to ensure SwiftData propagates the change
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -613,9 +642,9 @@ struct LinkExtractionView: View {
     }
     
     // MARK: - Image Management (Deprecated - kept for reference)
-    // Note: saveImageToDisk() is no longer used - images are saved via recipe.setImage()
+    // Note: saveImageToDisk() is no longer used - images are saved via recipe.setImage() in RecipeX
     
-    @available(*, deprecated, message: "Use recipe.setImage() instead")
+    @available(*, deprecated, message: "Use recipe.setImage() instead - images are now stored in RecipeX.imageData")
     private func saveImageToDisk(_ image: UIImage, filename: String) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             logError("Failed to convert image to JPEG data", category: "storage")
@@ -647,5 +676,5 @@ struct LinkExtractionView: View {
         apiKey: "test-api-key",
         onExtractionComplete: { _, _ in }
     )
-    .modelContainer(for: [SavedLink.self, Recipe.self], inMemory: true)
+    .modelContainer(for: [SavedLink.self, RecipeX.self], inMemory: true)
 }

@@ -74,7 +74,7 @@ class DiabetesAnalyzer {
     // MARK: - Analysis Methods
     
     /// Analyze a recipe for diabetes-friendliness
-    func analyzeRecipe(_ recipe: RecipeModel) -> DiabetesScore {
+    func analyzeRecipe(_ recipe: RecipeX) -> DiabetesScore {
         let ingredients = extractIngredientNames(from: recipe)
         
         let highSugarMatches = findMatches(in: ingredients, keywords: highSugarKeywords)
@@ -91,7 +91,7 @@ class DiabetesAnalyzer {
         let suitability = determineSuitability(score: riskScore)
         
         return DiabetesScore(
-            recipeID: recipe.id,
+            recipeID: recipe.safeID,
             riskScore: riskScore,
             suitability: suitability,
             highSugarIngredients: highSugarMatches,
@@ -102,10 +102,10 @@ class DiabetesAnalyzer {
     }
     
     /// Analyze multiple recipes
-    func analyzeRecipes(_ recipes: [RecipeModel]) -> [UUID: DiabetesScore] {
+    func analyzeRecipes(_ recipes: [RecipeX]) -> [UUID: DiabetesScore] {
         var scores: [UUID: DiabetesScore] = [:]
         for recipe in recipes {
-            scores[recipe.id] = analyzeRecipe(recipe)
+            scores[recipe.safeID] = analyzeRecipe(recipe)
         }
         return scores
     }
@@ -113,7 +113,7 @@ class DiabetesAnalyzer {
     // MARK: - Filtering & Sorting
     
     /// Filter recipes to show only diabetes-friendly ones
-    func filterDiabeticFriendlyRecipes(_ recipes: [RecipeModel]) -> [RecipeModel] {
+    func filterDiabeticFriendlyRecipes(_ recipes: [RecipeX]) -> [RecipeX] {
         recipes.filter { recipe in
             let score = analyzeRecipe(recipe)
             return score.isDiabeticFriendly
@@ -121,21 +121,27 @@ class DiabetesAnalyzer {
     }
     
     /// Sort recipes by diabetes-friendliness (best first)
-    func sortRecipesByDiabeticFriendliness(_ recipes: [RecipeModel]) -> [RecipeModel] {
+    func sortRecipesByDiabeticFriendliness(_ recipes: [RecipeX]) -> [RecipeX] {
         let scores = analyzeRecipes(recipes)
         return recipes.sorted { recipe1, recipe2 in
-            let score1 = scores[recipe1.id]?.riskScore ?? Double.infinity
-            let score2 = scores[recipe2.id]?.riskScore ?? Double.infinity
+            let score1 = scores[recipe1.safeID]?.riskScore ?? Double.infinity
+            let score2 = scores[recipe2.safeID]?.riskScore ?? Double.infinity
             return score1 < score2
         }
     }
     
     // MARK: - Helper Methods
     
-    private func extractIngredientNames(from recipe: RecipeModel) -> [String] {
+    private func extractIngredientNames(from recipe: RecipeX) -> [String] {
         var names: [String] = []
         
-        for section in recipe.ingredientSections {
+        // Decode ingredient sections from JSON data
+        guard let sectionsData = recipe.ingredientSectionsData,
+              let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
+            return []
+        }
+        
+        for section in sections {
             for ingredient in section.ingredients {
                 names.append(ingredient.name)
                 

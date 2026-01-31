@@ -25,7 +25,7 @@ class BatchImageExtractorViewModel: ObservableObject {
     @Published var failureCount = 0
     
     @Published var currentImage: UIImage?
-    @Published var currentRecipe: RecipeModel?
+    @Published var currentRecipe: RecipeX?
     @Published var currentStatus = "Ready"
     
     @Published var remainingAssets: [PHAsset] = []
@@ -324,7 +324,7 @@ class BatchImageExtractorViewModel: ObservableObject {
             await saveRecipe(recipe, withImage: image)
             
             successCount += 1
-            logInfo("Successfully extracted recipe: \(recipe.title)", category: "batch")
+            logInfo("Successfully extracted recipe: \(String(describing: recipe.title))", category: "batch")
             
         } catch let error as ClaudeAPIError {
             logError("API error for image \(imageIndex + 1): \(error.errorDescription ?? "unknown")", category: "batch")
@@ -395,11 +395,11 @@ class BatchImageExtractorViewModel: ObservableObject {
         logInfo("Batch extraction from UIImages complete: \(successCount) success, \(failureCount) failures", category: "batch")
     }
     
-    private func saveRecipe(_ recipeModel: RecipeModel, withImage image: UIImage) async {
-        logInfo("Saving recipe: \(recipeModel.title)", category: "batch")
-        
-        // Convert to SwiftData RecipeX (NEW unified model)
-        let recipeX = RecipeX(from: recipeModel)
+    private func saveRecipe(_ recipeX: RecipeX, withImage image: UIImage) async {
+        logInfo("Saving recipe: \(String(describing: recipeX.title))", category: "batch")
+//
+//        // Convert to SwiftData RecipeX (NEW unified model)
+//        let recipeX = RecipeX(from: recipeModel)
         
         // Set owner info (get from CloudKit if available)
         if let userID = CloudKitSharingService.shared.currentUserID {

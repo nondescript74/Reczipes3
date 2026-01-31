@@ -189,8 +189,8 @@ struct PersistentContainerInfoView: View {
         info.modelTypes = container.schema.entities.map { $0.name }.sorted()
         
         // Get counts
-        info.recipeCount = (try? modelContext.fetchCount(FetchDescriptor<Recipe>())) ?? 0
-        info.recipeBookCount = (try? modelContext.fetchCount(FetchDescriptor<RecipeBook>())) ?? 0
+        info.recipeCount = (try? modelContext.fetchCount(FetchDescriptor<RecipeX>())) ?? 0
+        info.recipeBookCount = (try? modelContext.fetchCount(FetchDescriptor<Book>())) ?? 0
         info.savedLinkCount = (try? modelContext.fetchCount(FetchDescriptor<SavedLink>())) ?? 0
         
         containerInfo = info

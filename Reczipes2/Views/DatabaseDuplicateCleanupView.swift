@@ -280,12 +280,12 @@ struct DatabaseDuplicateCleanupView: View {
         isScanning = true
         
         do {
-            let allRecipes = try modelContext.fetch(FetchDescriptor<Recipe>())
+            let allRecipes = try modelContext.fetch(FetchDescriptor<RecipeX>())
             
             // Group by ID to find duplicates
-            var recipesByID: [UUID: [Recipe]] = [:]
+            var recipesByID: [UUID: [RecipeX]] = [:]
             for recipe in allRecipes {
-                recipesByID[recipe.id, default: []].append(recipe)
+                recipesByID[recipe.id!, default: []].append(recipe)
             }
             
             // Find which IDs have duplicates
@@ -364,7 +364,7 @@ struct DuplicateInfo {
     let uniqueRecipes: Int
     let duplicateCount: Int
     let duplicateExamples: [String]
-    let duplicateGroups: [UUID: [Recipe]]
+    let duplicateGroups: [UUID: [RecipeX]]
     
     var hasDuplicates: Bool {
         duplicateCount > 0

@@ -79,7 +79,7 @@ class CloudKitImageManager {
     }
     
     /// Delete all images for a recipe
-    func deleteAllImages(for recipe: Recipe) {
+    func deleteAllImages(for recipe: RecipeX) {
         // Delete main image
         if let imageName = recipe.imageName {
             deleteImage(named: imageName)

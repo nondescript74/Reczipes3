@@ -706,7 +706,7 @@ struct BatchImageExtractorView: View {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text("Extracted: \(recipe.title)")
+                            Text("Extracted: \(String(describing: recipe.title))")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                         }
@@ -1523,7 +1523,7 @@ struct PhotoAssetCell: View {
     NavigationStack {
         BatchImageExtractorView(
             apiKey: "test-api-key",
-            modelContext: ModelContext(try! ModelContainer(for: Recipe.self))
+            modelContext: ModelContext(try! ModelContainer(for: RecipeX.self))
         )
     }
 }

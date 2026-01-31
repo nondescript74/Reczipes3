@@ -491,12 +491,12 @@ class DatabaseInvestigationService {
         let config = ModelConfiguration(url: url, allowsSave: false)
         
         let container = try ModelContainer(
-            for: Recipe.self,
+            for: RecipeX.self,
             RecipeImageAssignment.self,
             UserAllergenProfile.self,
             CachedDiabeticAnalysis.self,
             SavedLink.self,
-            RecipeBook.self,
+            Book.self,
             CookingSession.self,
             SharedRecipe.self,
             SharedRecipeBook.self,
@@ -508,13 +508,15 @@ class DatabaseInvestigationService {
         )
         
         let context = container.mainContext
-        let descriptor = FetchDescriptor<Recipe>(sortBy: [SortDescriptor(\.dateAdded, order: .reverse)])
+        let descriptor = FetchDescriptor<RecipeX>(sortBy: [SortDescriptor(\.dateAdded, order: .reverse)])
         let recipes = try context.fetch(descriptor)
         
-        return recipes.map { recipe in
-            RecipeInfo(
-                id: recipe.id,
-                title: recipe.title,
+        return recipes.compactMap { recipe in
+            guard let id = recipe.id else { return nil }
+            
+            return RecipeInfo(
+                id: id,
+                title: recipe.title ?? "Untitled Recipe",
                 dateAdded: recipe.dateAdded,
                 hasImage: recipe.imageData != nil || recipe.imageName != nil,
                 hasIngredients: recipe.ingredientSectionsData != nil

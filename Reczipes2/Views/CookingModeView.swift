@@ -8,25 +8,14 @@
 import SwiftUI
 
 struct CookingModeView: View {
-    let item: RecipeDisplayItem
+    let recipe: RecipeX
     
     @State private var completedSteps: Set<Int> = []
     @State private var servingMultiplier: Double = 1.0
     @Environment(\.dismiss) private var dismiss
     
-    // Convenience accessor for the recipe model
-    private var recipe: RecipeModel {
-        item.toRecipeModel()
-    }
-    
-    // Convenience initializer for backward compatibility
-    init(recipe: RecipeModel) {
-        self.item = .owned(recipe)
-    }
-    
-    // New initializer for RecipeDisplayItem
-    init(item: RecipeDisplayItem) {
-        self.item = item
+    init(recipe: RecipeX) {
+        self.recipe = recipe
     }
     
     var body: some View {
@@ -72,7 +61,7 @@ struct CookingModeView: View {
     @ViewBuilder
     private var recipeHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(recipe.title)
+            Text(recipe.safeTitle)
                 .font(.largeTitle.bold())
             
             HStack(spacing: 16) {
@@ -88,7 +77,7 @@ struct CookingModeView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                if let prepTime = recipe.prepTime {
+                if let prepTime = formatTime(minutes: recipe.prepTimeMinutes) {
                     Label(prepTime, systemImage: "clock.fill")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -219,8 +208,8 @@ struct CookingModeView: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                if let stepNumber = step.stepNumber {
-                    Text("Step \(stepNumber)")
+                if step.stepNumber > 0 {
+                    Text("Step \(step.stepNumber)")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
                 }
@@ -246,7 +235,7 @@ struct CookingModeView: View {
             Label("Notes", systemImage: "note.text")
                 .font(.headline)
             
-            ForEach(recipe.notes) { note in
+            ForEach(Array(recipe.notes.enumerated()), id: \.offset) { index, note in
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: iconForNoteType(note.type))
                         .font(.title3)
@@ -254,7 +243,7 @@ struct CookingModeView: View {
                         .frame(width: 32)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(note.type.rawValue.capitalized)
+                        Text(note.type.displayName)
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(colorForNoteType(note.type))
@@ -365,7 +354,7 @@ struct CookingModeView: View {
         }
     }
     
-    private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
+    private func iconForNoteType(_ type: RecipeNoteType) -> String {
         switch type {
         case .tip: return "lightbulb.fill"
         case .substitution: return "arrow.left.arrow.right"
@@ -375,7 +364,7 @@ struct CookingModeView: View {
         }
     }
     
-    private func colorForNoteType(_ type: RecipeNote.NoteType) -> Color {
+    private func colorForNoteType(_ type: RecipeNoteType) -> Color {
         switch type {
         case .tip: return .blue
         case .substitution: return .orange
@@ -384,75 +373,26 @@ struct CookingModeView: View {
         case .general: return .gray
         }
     }
-}
-
-// MARK: - RecipeModel Extensions for Cooking Mode
-
-extension RecipeModel {
-    /// Cuisine type extracted from headerNotes or reference
-    var cuisine: String? {
-        // You can parse this from headerNotes or reference if available
-        // For now, return nil - you can enhance this later
-        return nil
-    }
     
-    /// Prep time extracted from headerNotes
-    var prepTime: String? {
-        // You can parse this from headerNotes if available
-        // For now, return nil - you can enhance this later
-        return nil
-    }
-    
-    /// Number of servings extracted from yield string
-    var servings: Int? {
-        guard let yieldString = yield else { return nil }
+    private func formatTime(minutes: Int?) -> String? {
+        guard let minutes = minutes, minutes > 0 else { return nil }
         
-        // Try to extract number from yield string
-        // Example: "Serves 4" → 4, "Makes 12 cookies" → 12
-        let numbers = yieldString.components(separatedBy: CharacterSet.decimalDigits.inverted)
-            .compactMap { Int($0) }
-        
-        return numbers.first
+        if minutes < 60 {
+            return "\(minutes) min"
+        } else {
+            let hours = minutes / 60
+            let remainingMinutes = minutes % 60
+            if remainingMinutes == 0 {
+                return "\(hours) hr"
+            } else {
+                return "\(hours) hr \(remainingMinutes) min"
+            }
+        }
     }
 }
 
 #Preview {
     NavigationStack {
-        CookingModeView(
-            recipe: RecipeModel(
-                title: "Spaghetti Carbonara",
-                headerNotes: "Classic Italian pasta dish",
-                yield: "Serves 4",
-                ingredientSections: [
-                    IngredientSection(
-                        ingredients: [
-                            Ingredient(quantity: "1", unit: "lb", name: "spaghetti"),
-                            Ingredient(quantity: "6", unit: "oz", name: "guanciale or pancetta", preparation: "diced"),
-                            Ingredient(quantity: "4", unit: "", name: "large eggs"),
-                            Ingredient(quantity: "1", unit: "cup", name: "Pecorino Romano", preparation: "grated"),
-                            Ingredient(quantity: "", unit: "", name: "Black pepper to taste"),
-                            Ingredient(quantity: "", unit: "", name: "Salt for pasta water")
-                        ]
-                    )
-                ],
-                instructionSections: [
-                    InstructionSection(
-                        steps: [
-                            InstructionStep(stepNumber: 1, text: "Bring a large pot of salted water to boil. Cook spaghetti according to package directions until al dente."),
-                            InstructionStep(stepNumber: 2, text: "While pasta cooks, render the guanciale in a large skillet over medium heat until crispy, about 8 minutes."),
-                            InstructionStep(stepNumber: 3, text: "In a bowl, whisk together eggs and Pecorino Romano cheese."),
-                            InstructionStep(stepNumber: 4, text: "When pasta is ready, reserve 1 cup pasta water, then drain the spaghetti."),
-                            InstructionStep(stepNumber: 5, text: "Remove skillet from heat. Add hot pasta to the guanciale and toss to coat."),
-                            InstructionStep(stepNumber: 6, text: "Slowly add the egg mixture while tossing constantly. Add pasta water as needed to create a creamy sauce."),
-                            InstructionStep(stepNumber: 7, text: "Season generously with black pepper and serve immediately.")
-                        ]
-                    )
-                ],
-                notes: [
-                    RecipeNote(type: .tip, text: "The key is to work quickly and off the heat when adding eggs to prevent scrambling."),
-                    RecipeNote(type: .substitution, text: "Use freshly grated Pecorino Romano for best results.")
-                ]
-            )
-        )
+        CookingModeView(recipe: RecipeX.preview)
     }
 }

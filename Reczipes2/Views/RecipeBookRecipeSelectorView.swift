@@ -11,26 +11,27 @@ import SwiftData
 struct RecipeBookRecipeSelectorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var savedRecipes: [Recipe]
+    @Query private var savedRecipes: [RecipeX]
     
-    let book: RecipeBook
+    let book: Book
     
     @State private var searchText = ""
     @State private var selectedRecipeIDs = Set<UUID>()
     
     // Filter recipes that aren't already in the book
-    private var availableRecipes: [Recipe] {
+    private var availableRecipes: [RecipeX] {
         savedRecipes.filter { recipe in
-            !book.recipeIDs.contains(recipe.id)
+            guard let recipeID = recipe.id else { return false }
+            return !(book.recipeIDs?.contains(recipeID) ?? false)
         }
     }
     
-    private var filteredRecipes: [Recipe] {
+    private var filteredRecipes: [RecipeX] {
         if searchText.isEmpty {
             return availableRecipes
         } else {
             return availableRecipes.filter { recipe in
-                recipe.title.localizedCaseInsensitiveContains(searchText)
+                recipe.title?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
     }
@@ -91,12 +92,14 @@ struct RecipeBookRecipeSelectorView: View {
         List(filteredRecipes) { recipe in
             RecipeSelectionRow(
                 recipe: recipe,
-                isSelected: selectedRecipeIDs.contains(recipe.id),
+                isSelected: selectedRecipeIDs.contains(recipe.id ?? UUID()),
                 bookColor: bookColor
             )
             .contentShape(Rectangle())
             .onTapGesture {
-                toggleSelection(recipe.id)
+                if let recipeID = recipe.id {
+                    toggleSelection(recipeID)
+                }
             }
         }
         .listStyle(.plain)
@@ -115,8 +118,12 @@ struct RecipeBookRecipeSelectorView: View {
     private func addSelectedRecipes() {
         // Add the selected recipe IDs to the book
         for recipeID in selectedRecipeIDs {
-            if !book.recipeIDs.contains(recipeID) {
-                book.recipeIDs.append(recipeID)
+            if let bookRecipeIDs = book.recipeIDs {
+                if !bookRecipeIDs.contains(recipeID) {
+                    book.recipeIDs?.append(recipeID)
+                }
+            } else {
+                book.recipeIDs = [recipeID]
             }
         }
         
@@ -124,7 +131,7 @@ struct RecipeBookRecipeSelectorView: View {
         
         do {
             try modelContext.save()
-            logInfo("Added \(selectedRecipeIDs.count) recipes to book: \(book.name)", category: "book")
+            logInfo("Added \(selectedRecipeIDs.count) recipes to book: \(String(describing: book.name))", category: "book")
             dismiss()
         } catch {
             logError("Failed to add recipes to book: \(error)", category: "book")
@@ -135,7 +142,7 @@ struct RecipeBookRecipeSelectorView: View {
 // MARK: - Recipe Selection Row
 
 struct RecipeSelectionRow: View {
-    let recipe: Recipe
+    let recipe: RecipeX
     let isSelected: Bool
     let bookColor: Color
     
@@ -179,7 +186,7 @@ struct RecipeSelectionRow: View {
             
             // Recipe info
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title)
+                Text(recipe.title ?? "Untitled Recipe")
                     .font(.headline)
                     .lineLimit(2)
                 
@@ -199,34 +206,34 @@ struct RecipeSelectionRow: View {
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: RecipeBook.self, Recipe.self, configurations: config)
+    let container = try! ModelContainer(for: Book.self, RecipeX.self, configurations: config)
     
     // Create a sample book
-    let book = RecipeBook(
+    let book = Book(
         name: "Favorites",
         bookDescription: "My favorite recipes",
         color: "FF6B6B"
     )
     
     // Create some sample recipes
-    let recipe1 = Recipe(
+    let recipe1 = RecipeX(
         id: UUID(),
         title: "Chocolate Chip Cookies",
         headerNotes: "Classic homemade cookies",
         recipeYield: "24 cookies",
         reference: nil,
-        dateAdded: Date(),
-        imageName: nil
+        imageName: nil,
+        dateAdded: Date()
     )
     
-    let recipe2 = Recipe(
+    let recipe2 = RecipeX(
         id: UUID(),
         title: "Apple Pie",
         headerNotes: "Traditional American dessert",
         recipeYield: "8 servings",
         reference: nil,
-        dateAdded: Date(),
-        imageName: nil
+        imageName: nil,
+        dateAdded: Date()
     )
     
     container.mainContext.insert(book)

@@ -148,15 +148,16 @@ class ClaudeAPIClient {
     
     /// Extract a recipe from web content using Claude's text capabilities
     /// - Parameter htmlContent: The HTML or text content containing the recipe
-    /// - Returns: A RecipeModel parsed from the content
-    func extractRecipe(from htmlContent: String) async throws -> RecipeModel {
+    /// - Returns: A RecipeX parsed from the content
+    func extractRecipe(from htmlContent: String) async throws -> RecipeX {
         logInfo("WEB RECIPE EXTRACTION START", category: "extraction")
         logDebug("Content length: \(htmlContent.count) characters", category: "extraction")
         
         // Use retry manager for API resilience
         let operationID = "claude-extract-web-\(htmlContent.prefix(100).hashValue)"
         
-        return try await retryManager.withRetry(
+        // Get the Sendable RecipeResponse from retry logic
+        let recipeResponse = try await retryManager.withRetry(
             operationID: operationID,
             configuration: .init(
                 maxAttempts: 3,
@@ -168,10 +169,14 @@ class ClaudeAPIClient {
         ) {
             try await self.performWebExtraction(htmlContent: htmlContent)
         }
+        
+        // Convert to RecipeX outside of retry closure
+        return recipeResponse.toRecipeX()
     }
     
     /// Perform the actual web extraction (wrapped by retry logic)
-    private func performWebExtraction(htmlContent: String) async throws -> RecipeModel {
+    /// Returns RecipeResponse (Sendable) instead of RecipeX (SwiftData model)
+    private func performWebExtraction(htmlContent: String) async throws -> RecipeResponse {
         
         let systemPrompt = """
         You are an expert at extracting recipes from web pages and text content. 
@@ -382,20 +387,18 @@ class ClaudeAPIClient {
         let recipeResponse = try JSONDecoder().decode(RecipeResponse.self, from: jsonData)
         logInfo("Successfully parsed recipe", category: "extraction")
         logDebug("Recipe title: \(recipeResponse.title)", category: "extraction")
-        
-        let recipeModel = recipeResponse.toRecipeModel()
         logInfo("Web recipe extraction complete", category: "extraction")
         logInfo("WEB RECIPE EXTRACTION END", category: "extraction")
         
-        return recipeModel
+        return recipeResponse
     }
     
     /// Extract a recipe from an image using Claude's vision capabilities
     /// - Parameters:
     ///   - image: The UIImage containing the recipe
     ///   - usePreprocessing: Whether to apply image preprocessing for better OCR results
-    /// - Returns: A RecipeModel parsed from the image
-    func extractRecipe(from imageData: Data, usePreprocessing: Bool = true) async throws -> RecipeModel {
+    /// - Returns: A RecipeX parsed from the image
+    func extractRecipe(from imageData: Data, usePreprocessing: Bool = true) async throws -> RecipeX {
         logInfo("RECIPE EXTRACTION START", category: "extraction")
         logDebug("Original image data size: \(imageData.count) bytes", category: "extraction")
         logDebug("Use preprocessing: \(usePreprocessing)", category: "extraction")
@@ -403,7 +406,8 @@ class ClaudeAPIClient {
         // Use retry manager for API resilience
         let operationID = "claude-extract-image-\(imageData.hashValue)"
         
-        return try await retryManager.withRetry(
+        // Get the Sendable RecipeResponse from retry logic
+        let recipeResponse = try await retryManager.withRetry(
             operationID: operationID,
             configuration: .init(
                 maxAttempts: 3,
@@ -415,10 +419,14 @@ class ClaudeAPIClient {
         ) {
             try await self.performImageExtraction(imageData: imageData, usePreprocessing: usePreprocessing)
         }
+        
+        // Convert to RecipeX outside of retry closure
+        return recipeResponse.toRecipeX()
     }
     
     /// Perform the actual image extraction (wrapped by retry logic)
-    private func performImageExtraction(imageData: Data, usePreprocessing: Bool) async throws -> RecipeModel {
+    /// Returns RecipeResponse (Sendable) instead of RecipeX (SwiftData model)
+    private func performImageExtraction(imageData: Data, usePreprocessing: Bool) async throws -> RecipeResponse {
         
         // Preprocess the image if requested
         let finalImageData: Data
@@ -675,12 +683,11 @@ class ClaudeAPIClient {
             throw ClaudeAPIError.invalidJSON
         }
         
-        // Convert to RecipeModel
-        let recipeModel = recipeResponse.toRecipeModel()
+        // Convert to RecipeX
         logInfo("Recipe extraction complete", category: "extraction")
         logInfo("RECIPE EXTRACTION END", category: "extraction")
         
-        return recipeModel
+        return recipeResponse
     }
     
     private func extractJSON(from text: String) -> String? {
@@ -730,7 +737,7 @@ struct ContentBlock: Codable {
 
 // MARK: - Intermediate Recipe Response (matches Claude's JSON output)
 
-struct RecipeResponse: Codable {
+struct RecipeResponse: Codable, Sendable {
     let title: String
     let headerNotes: String?
     let yield: String?
@@ -739,20 +746,28 @@ struct RecipeResponse: Codable {
     let notes: [RecipeNoteResponse]?
     let reference: String?
     
-    func toRecipeModel() -> RecipeModel {
-        RecipeModel(
+    func toRecipeX() -> RecipeX {
+        let encoder = JSONEncoder()
+        
+        // Properly encode the data
+        let ingredientSectionsData = try? encoder.encode(ingredientSections.map { $0.toIngredientSection() })
+        let instructionSectionsData = try? encoder.encode(instructionSections.map { $0.toInstructionSection() })
+        let notesData = try? encoder.encode(notes?.map { $0.toRecipeNote() } ?? [])
+        
+        return RecipeX(
+            id: UUID(),
             title: title,
             headerNotes: headerNotes,
-            yield: yield,
-            ingredientSections: ingredientSections.map { $0.toIngredientSection() },
-            instructionSections: instructionSections.map { $0.toInstructionSection() },
-            notes: notes?.map { $0.toRecipeNote() } ?? [],
-            reference: reference
+            recipeYield: yield,
+            reference: reference,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
+            notesData: notesData
         )
     }
 }
 
-struct IngredientSectionResponse: Codable {
+struct IngredientSectionResponse: Codable, Sendable {
     let title: String?
     let ingredients: [IngredientResponse]
     let transitionNote: String?
@@ -766,7 +781,7 @@ struct IngredientSectionResponse: Codable {
     }
 }
 
-struct IngredientResponse: Codable {
+struct IngredientResponse: Codable, Sendable {
     let quantity: String?
     let unit: String?
     let name: String
@@ -786,7 +801,7 @@ struct IngredientResponse: Codable {
     }
 }
 
-struct InstructionSectionResponse: Codable {
+struct InstructionSectionResponse: Codable, Sendable {
     let title: String?
     let steps: [InstructionStepResponse]
     
@@ -798,24 +813,24 @@ struct InstructionSectionResponse: Codable {
     }
 }
 
-struct InstructionStepResponse: Codable {
+struct InstructionStepResponse: Codable, Sendable {
     let stepNumber: Int?
     let text: String
     
     func toInstructionStep() -> InstructionStep {
         InstructionStep(
-            stepNumber: stepNumber,
+            stepNumber: stepNumber ?? 1,
             text: text
         )
     }
 }
 
-struct RecipeNoteResponse: Codable {
+struct RecipeNoteResponse: Codable, Sendable {
     let type: String
     let text: String
     
     func toRecipeNote() -> RecipeNote {
-        let noteType = RecipeNote.NoteType(rawValue: type) ?? .general
+        let noteType = RecipeNoteType(rawValue: type) ?? .general
         return RecipeNote(type: noteType, text: text)
     }
 }

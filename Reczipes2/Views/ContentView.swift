@@ -10,28 +10,26 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \RecipeX.dateAdded, order: .reverse) private var savedRecipesX: [RecipeX]
+    @Query(sort: \RecipeX.dateAdded, order: .reverse) private var savedRecipes: [RecipeX]
+    @Query(sort: \CachedSharedRecipe.cachedDate, order: .reverse) private var cachedSharedRecipes: [CachedSharedRecipe]
     @Query private var allergenProfiles: [UserAllergenProfile]
-    @Query(sort: \RecipeBook.dateModified, order: .reverse) private var books: [RecipeBook]
-    @Query private var cachedRecipes: [CachedSharedRecipe]
+    @Query(sort: \Book.dateModified, order: .reverse) private var books: [Book]
     @Query private var imageAssignments: [RecipeImageAssignment]
     
     @EnvironmentObject private var appState: AppStateManager
     
-    @State private var selectedRecipe: RecipeModel?
-    @State private var showingImageAssignment = false
+    @State private var selectedRecipe: (any RecipeDisplayProtocol)?
+    @State private var selectedRecipeID: UUID?
     @State private var showingDebug = false
     @State private var showingRecipeExtractor = false
     @State private var showingAllergenProfiles = false
     @State private var showingImport = false
     @State private var showingSearch = false
-    @State private var showingSavedLinks = false
-    @State private var showingLegacyMigration = false
     @State private var filterMode: RecipeFilterMode = .none
     @State private var showOnlySafe = false
     @State private var isProcessingFilter = false
-    @State private var cachedAllRecipes: [RecipeModel] = [] // Cache for all recipes
-    @State private var cachedFilteredRecipes: [RecipeModel] = []
+    @State private var cachedAllRecipes: [any RecipeDisplayProtocol] = [] // Cache for all recipes (both types)
+    @State private var cachedFilteredRecipes: [any RecipeDisplayProtocol] = []
     @State private var cachedAllergenScores: [UUID: RecipeAllergenScore] = [:]
     @State private var cachedDiabetesScores: [UUID: DiabetesScore] = [:]
     @State private var cachedCombinedScores: [UUID: CombinedRecipeScore] = [:]
@@ -41,13 +39,10 @@ struct ContentView: View {
     @State private var contentFilter: ContentFilterMode = .mine
     @Query private var sharedRecipes: [SharedRecipe]
     
-    // Computed property for accessing savedRecipesX as savedRecipes (for backward compatibility)
-    private var savedRecipes: [RecipeX] {
-        savedRecipesX
-    }
-    
     // Auto-sync tracking for shared recipes
     @State private var lastCommunitySync: Date?
+    @State private var isSyncingCommunityRecipes = false
+    @State private var syncProgress: String = ""
     private let syncInterval: TimeInterval = 300 // 5 minutes
     
     // Active allergen profile
@@ -60,13 +55,14 @@ struct ContentView: View {
         cachedCombinedScores
     }
     
-    // All available recipe models - now returns cached version
-    private var availableRecipesBeforeFilter: [RecipeModel] {
+    // All available recipes - now returns cached version
+    // This combines owned recipes (RecipeX) and shared recipes (CachedSharedRecipe)
+    private var availableRecipesBeforeFilter: [any RecipeDisplayProtocol] {
         cachedAllRecipes
     }
     
     // Filtered recipes based on filter settings (now uses cached results)
-    private var availableRecipes: [RecipeModel] {
+    private var availableRecipes: [any RecipeDisplayProtocol] {
         let baseRecipes = filterMode != .none ? cachedFilteredRecipes : cachedAllRecipes
         
         // Apply content filter (mine/shared)
@@ -74,44 +70,36 @@ struct ContentView: View {
     }
     
     /// Applies the content filter (mine/shared) to recipes
-    private func applyContentFilter(to recipes: [RecipeModel]) -> [RecipeModel] {
-        let currentUserID = CloudKitSharingService.shared.currentUserID
-        
+    private func applyContentFilter(to recipes: [any RecipeDisplayProtocol]) -> [any RecipeDisplayProtocol] {
         switch contentFilter {
         case .mine:
-            // Show ALL user's own recipes (including ones they've shared)
-            // Filter OUT recipes shared by OTHER users
-            let sharedByOthersIDs = Set(
-                sharedRecipes
-                    .filter { $0.isActive && $0.sharedByUserID != currentUserID }
-                    .compactMap { $0.recipeID }
-            )
-            return recipes.filter { !sharedByOthersIDs.contains($0.id) }
+            // Show only owned recipes (RecipeX)
+            return recipes.filter { !$0.isSharedRecipe }
             
         case .shared:
-            // Only show recipes shared by OTHER users
-            let sharedByOthersIDs = Set(
-                sharedRecipes
-                    .filter { $0.isActive && $0.sharedByUserID != currentUserID }
-                    .compactMap { $0.recipeID }
-            )
-            return recipes.filter { sharedByOthersIDs.contains($0.id) }
+            // Show only cached shared recipes (CachedSharedRecipe)
+            return recipes.filter { $0.isSharedRecipe }
         }
     }
     
     // MARK: - Recipe Loading
     
-    /// Load and cache all recipes from SwiftData (RecipeX only)
+    /// Load and cache all recipes from SwiftData (both owned and cached shared)
     private func refreshRecipeCache() {
-        logDebug("🔄 Refreshing recipe cache (RecipeX model)", category: "recipe")
-        logDebug("Saved recipes (RecipeX) count: \(savedRecipesX.count)", category: "recipe")
+        logDebug("🔄 Refreshing recipe cache", category: "recipe")
+        logDebug("Saved recipes count: \(savedRecipes.count)", category: "recipe")
+        logDebug("Cached shared recipes count: \(cachedSharedRecipes.count)", category: "recipe")
         
-        // Convert RecipeX to RecipeModel for display
-        let allRecipes = savedRecipesX.compactMap { recipeX in
-            recipeX.toRecipeModel()
-        }
+        // Combine both types of recipes into a single array
+        var allRecipes: [any RecipeDisplayProtocol] = []
         
-        logDebug("Available recipes count: \(allRecipes.count)", category: "recipe")
+        // Add owned recipes (RecipeX)
+        allRecipes.append(contentsOf: savedRecipes as [any RecipeDisplayProtocol])
+        
+        // Add cached shared recipes (CachedSharedRecipe)
+        allRecipes.append(contentsOf: cachedSharedRecipes as [any RecipeDisplayProtocol])
+        
+        logDebug("Total available recipes count: \(allRecipes.count)", category: "recipe")
         
         // Update cache
         cachedAllRecipes = allRecipes
@@ -151,50 +139,71 @@ struct ContentView: View {
             var combinedScores: [UUID: CombinedRecipeScore] = [:]
             var nutritionalScores: [UUID: NutritionalScore] = [:]
             
+            // Convert protocol recipes to a format analyzers can work with
+            // Analyzers need RecipeX or something with same properties
+            // For now, we'll only analyze RecipeX objects (owned recipes)
+            // Shared recipes won't have allergen/diabetes filtering
+            let recipeXObjects = recipesToProcess.compactMap { $0 as? RecipeX }
+            
             // Analyze for allergens if needed
             if currentMode.includesAllergenFilter, let profile = currentProfile {
-                allergenScores = AllergenAnalyzer.shared.analyzeRecipes(recipesToProcess, profile: profile)
+                allergenScores = AllergenAnalyzer.shared.analyzeRecipes(recipeXObjects, profile: profile)
             }
             
             // Analyze for diabetes if needed
             if currentMode.includesDiabetesFilter {
-                diabetesScores = DiabetesAnalyzer.shared.analyzeRecipes(recipesToProcess)
+                diabetesScores = DiabetesAnalyzer.shared.analyzeRecipes(recipeXObjects)
             }
             
             if currentMode.includesNutritionalFilter,
                let profile = currentProfile,
                let goals = profile.nutritionalGoals {
                 nutritionalScores = NutritionalAnalyzer.shared.analyzeRecipes(
-                    recipesToProcess,
+                    recipeXObjects,
                     goals: goals
                 )
             }
             
-            // Create combined scores
-            for recipe in recipesToProcess {
+            // Create combined scores (only for RecipeX)
+            for recipe in recipeXObjects {
                 let score = CombinedRecipeScore(
-                    recipeID: recipe.id,
-                    allergenScore: allergenScores[recipe.id],
-                    diabetesScore: diabetesScores[recipe.id],
-                    nutritionalScore: nutritionalScores[recipe.id],
+                    recipeID: recipe.safeID,
+                    allergenScore: allergenScores[recipe.safeID],
+                    diabetesScore: diabetesScores[recipe.safeID],
+                    nutritionalScore: nutritionalScores[recipe.safeID],
                     filterMode: currentMode
                 )
-                combinedScores[recipe.id] = score
+                combinedScores[recipe.safeID] = score
             }
             
             // Filter or sort based on settings
-            let filteredRecipes: [RecipeModel]
+            let filteredRecipes: [any RecipeDisplayProtocol]
             if shouldShowOnlySafe {
-                // Show only safe recipes
+                // Show only safe recipes (only applies to RecipeX)
                 filteredRecipes = recipesToProcess.filter { recipe in
-                    guard let score = combinedScores[recipe.id] else { return true }
+                    // If it's a shared recipe, include it (no filtering)
+                    if recipe.isSharedRecipe {
+                        return true
+                    }
+                    
+                    // For owned recipes, check safety score
+                    guard let score = combinedScores[recipe.displayID] else { return true }
                     return score.isSafe
                 }
             } else {
-                // Sort by safety score (safest first)
+                // Sort by safety score (safest first), shared recipes go to end
                 filteredRecipes = recipesToProcess.sorted { recipe1, recipe2 in
-                    let score1 = combinedScores[recipe1.id]?.overallScore ?? 0
-                    let score2 = combinedScores[recipe2.id]?.overallScore ?? 0
+                    // Shared recipes go to the end
+                    if recipe1.isSharedRecipe && !recipe2.isSharedRecipe {
+                        return false
+                    }
+                    if !recipe1.isSharedRecipe && recipe2.isSharedRecipe {
+                        return true
+                    }
+                    
+                    // Both same type - sort by score
+                    let score1 = combinedScores[recipe1.displayID]?.overallScore ?? 0
+                    let score2 = combinedScores[recipe2.displayID]?.overallScore ?? 0
                     return score1 < score2
                 }
             }
@@ -212,14 +221,20 @@ struct ContentView: View {
     }
     
     @MainActor
-    private func shareRecipe(_ recipe: RecipeModel) async {
+    private func shareRecipe(_ recipe: any RecipeDisplayProtocol) async {
+        // Only allow sharing of owned recipes (RecipeX), not cached shared recipes
+        guard let recipeX = recipe as? RecipeX else {
+            logWarning("Cannot share cached community recipes", category: "sharing")
+            return
+        }
+        
         do {
             _ = try await CloudKitSharingService.shared.shareRecipe(
-                recipe,
+                recipeX,
                 modelContext: modelContext
             )
             // Show success message
-            logInfo("Successfully shared recipe: \(recipe.title)", category: "sharing")
+            logInfo("Successfully shared recipe: \(recipe.displayTitle)", category: "sharing")
         } catch {
             // Show error
             logError("Failed to share recipe: \(error)", category: "sharing")
@@ -230,6 +245,7 @@ struct ContentView: View {
     
     /// Auto-sync community recipes when switching to Shared tab
     /// Only syncs once every 5 minutes to avoid excessive calls
+    /// Fetches ALL available community recipes using pagination
     private func syncCommunityRecipesIfNeeded() async {
         // Check if we need to sync (only if 5+ minutes have passed since last sync)
         if let lastSync = lastCommunitySync {
@@ -240,22 +256,47 @@ struct ContentView: View {
             }
         }
         
-        logInfo("🔄 Auto-syncing community recipes...", category: "sharing")
+        // Prevent concurrent syncs
+        guard !isSyncingCommunityRecipes else {
+            logDebug("Sync already in progress, skipping", category: "sharing")
+            return
+        }
+        
+        isSyncingCommunityRecipes = true
+        syncProgress = "Connecting to CloudKit..."
+        
+        logInfo("🔄 Auto-syncing ALL community recipes (paginated)...", category: "sharing")
         
         do {
+            // Use a high limit to fetch all recipes - CloudKit will paginate automatically
+            // The service uses 100-record batches internally with cursor-based pagination
+            syncProgress = "Fetching recipes..."
+            
             try await CloudKitSharingService.shared.syncCommunityRecipesForViewing(
                 modelContext: modelContext,
-                limit: 100
+                limit: Int.max // Fetch all available recipes
             )
             
             // Update last sync time
             lastCommunitySync = Date()
             
-            logInfo("✅ Auto-sync completed successfully", category: "sharing")
+            syncProgress = "Sync complete!"
+            logInfo("✅ Auto-sync completed successfully (all recipes synced)", category: "sharing")
+            
+            // Clear progress after delay
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            syncProgress = ""
         } catch {
             // Silently fail - manual sync still available
+            syncProgress = "Sync failed"
             logError("Auto-sync failed: \(error)", category: "sharing")
+            
+            // Clear error after delay
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            syncProgress = ""
         }
+        
+        isSyncingCommunityRecipes = false
     }
     
     var body: some View {
@@ -263,96 +304,139 @@ struct ContentView: View {
             // Global batch extraction status bar
             BatchExtractionStatusBar(manager: BatchExtractionManager.shared)
             
-            NavigationSplitView {
-                VStack(spacing: 0) {
-                    // Content filter picker (Mine/Shared) - ALWAYS visible
-                    ContentFilterPicker(
-                        selectedFilter: $contentFilter,
-                        contentType: "Recipes"
-                    )
-                    
-                    if availableRecipes.isEmpty {
-                        // Empty state when no recipes exist (but filter picker still visible above)
-                        emptyStateViewContent
-                    } else {
-                        // Recipe list when recipes are available
-                        recipeListContent
-                    }
+            mainNavigationView
+        }
+    }
+    
+    // MARK: - Main Navigation View
+    
+    private var mainNavigationView: some View {
+        navigationSplitViewWithLifecycle
+            .modifier(FilterObserversModifier(
+                filterMode: filterMode,
+                showOnlySafe: showOnlySafe,
+                activeProfile: activeProfile,
+                onFilterChange: processFilter
+            ))
+            .modifier(RecipeObserversModifier(
+                savedRecipesCount: savedRecipes.count,
+                cachedRecipesCount: cachedSharedRecipes.count,
+                selectedRecipe: selectedRecipe,
+                selectedRecipeID: selectedRecipeID,
+                contentFilter: contentFilter,
+                onRecipeCountChange: handleRecipeCountChange,
+                onSelectedRecipeChange: { appState.selectedRecipeId = $0?.displayID },
+                onSelectedIDChange: updateSelectedRecipe,
+                onContentFilterChange: handleContentFilterChange
+            ))
+    }
+    
+    private var navigationSplitViewWithLifecycle: some View {
+        NavigationSplitView {
+            sidebarContent
+        } detail: {
+            detailContent
+        }
+        .onAppear(perform: handleOnAppear)
+        .task(priority: .background, handleRecoveryTask)
+    }
+    
+    private func handleOnAppear() {
+        restoreSelectedRecipe()
+        refreshRecipeCache()
+    }
+    
+    @Sendable
+    private func handleRecoveryTask() async {
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        
+        let stats = DatabaseRecoveryLogger.shared.getRecoveryStatistics()
+        if stats.totalAttempts > 0 {
+            DatabaseRecoveryLogger.shared.logRecoveryStatistics()
+        }
+    }
+    
+    private func handleRecipeCountChange() {
+        refreshRecipeCache()
+        if filterMode != .none {
+            processFilter()
+        }
+    }
+    
+    private func updateSelectedRecipe(_ newID: UUID?) {
+        if let newID = newID {
+            selectedRecipe = availableRecipes.first { $0.displayID == newID }
+        } else {
+            selectedRecipe = nil
+        }
+    }
+    
+    private func handleContentFilterChange(_ newValue: ContentFilterMode) {
+        if newValue == .shared {
+            Task {
+                await syncCommunityRecipesIfNeeded()
+            }
+        }
+    }
+    
+    // MARK: - Sidebar Content
+    
+    private var sidebarContent: some View {
+        VStack(spacing: 0) {
+            // Content filter picker (Mine/Shared) - ALWAYS visible
+            ContentFilterPicker(
+                selectedFilter: $contentFilter,
+                contentType: "Recipes"
+            )
+            
+            // Sync progress indicator (only when syncing community recipes)
+            if isSyncingCommunityRecipes {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(syncProgress)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-            } detail: {
-                if let recipe = selectedRecipe {
-                    RecipeDetailView(
-                        recipe: recipe,
-                        isSaved: isRecipeSaved(recipe),
-                        onSave: { saveRecipe(recipe) }
-                    )
-                    .id("\(recipe.id)-\(recipe.imageName ?? "no-image")")  // Force view refresh when recipe or image changes
-                } else {
-                    ContentUnavailableView(
-                        "Select a Recipe",
-                        systemImage: "book.closed",
-                        description: Text("Choose a recipe from the list to view its details")
-                    )
-                }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Color.blue.opacity(0.1))
             }
-            .onAppear {
-                restoreSelectedRecipe()
-                // Initialize recipe cache
-                refreshRecipeCache()
+            
+            if availableRecipes.isEmpty {
+                // Empty state when no recipes exist (but filter picker still visible above)
+                emptyStateViewContent
+            } else {
+                // Recipe list when recipes are available
+                recipeListContent
             }
-            .task {
-                // Wait for container initialization
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                
-                let stats = DatabaseRecoveryLogger.shared.getRecoveryStatistics()
-                if stats.totalAttempts > 0 {
-                    DatabaseRecoveryLogger.shared.logRecoveryStatistics()
-                }
+        }
+    }
+    
+    // MARK: - Detail Content
+    
+    private var detailContent: some View {
+        Group {
+            if let recipe = selectedRecipe {
+                selectedRecipeDetailView(recipe)
+            } else {
+                ContentUnavailableView(
+                    "Select a Recipe",
+                    systemImage: "book.closed",
+                    description: Text("Choose a recipe from the list to view its details")
+                )
             }
-            .onChange(of: filterMode) { _, _ in
-                processFilter()
-            }
-            .onChange(of: showOnlySafe) { _, _ in
-                if filterMode != .none {
-                    processFilter()
-                }
-            }
-            .onChange(of: activeProfile?.id) { _, _ in
-                if filterMode.includesAllergenFilter {
-                    processFilter()
-                }
-            }
-            .onChange(of: activeProfile?.diabetesStatus) { _, _ in
-                if filterMode.includesDiabetesFilter {
-                    processFilter()
-                }
-            }
-            .onChange(of: savedRecipes.count) { _, _ in
-                // Recipes changed, refresh cache and reprocess filter if needed
-                refreshRecipeCache()
-                if filterMode != .none {
-                    processFilter()
-                }
-            }
-            .onChange(of: savedRecipesX.count) { _, _ in
-                // RecipeX changed, refresh cache and reprocess filter if needed
-                refreshRecipeCache()
-                if filterMode != .none {
-                    processFilter()
-                }
-            }
-            .onChange(of: selectedRecipe) { _, newRecipe in
-                // Save selected recipe to app state when it changes
-                appState.selectedRecipeId = newRecipe?.id
-            }
-            .onChange(of: contentFilter) { _, newValue in
-                // Auto-sync when switching to Shared tab
-                if newValue == .shared {
-                    Task {
-                        await syncCommunityRecipesIfNeeded()
-                    }
-                }
-            }
+        }
+    }
+    
+    @ViewBuilder
+    private func selectedRecipeDetailView(_ recipe: any RecipeDisplayProtocol) -> some View {
+        if let recipeX = recipe as? RecipeX {
+            RecipeDetailView(recipe: recipeX)
+                .id("\(String(describing: recipeX.id))-\(recipeX.imageName ?? "no-image")")
+        } else if let cachedRecipe = recipe as? CachedSharedRecipe {
+            CachedRecipeDetailView(cachedRecipe: cachedRecipe)
+                .id("\(cachedRecipe.id)-\(cachedRecipe.imageName ?? "no-image")")
         }
     }
     
@@ -362,31 +446,48 @@ struct ContentView: View {
         VStack {
             Spacer()
             
-            ContentUnavailableView {
-                Label(emptyStateTitle, systemImage: "book.closed")
-            } description: {
-                Text(emptyStateDescription)
-            } actions: {
-                if contentFilter != .mine {
-                    Button {
-                        contentFilter = .mine
-                    } label: {
-                        Label("Show My Recipes", systemImage: "person.fill")
-                    }
-                }
-                
-                Button {
-                    showingRecipeExtractor = true
-                } label: {
-                    Label("Extract Recipe", systemImage: "plus.circle.fill")
-                }
-            }
+            emptyStateContent
             
             Spacer()
         }
         .navigationTitle("Recipes")
         .sheet(isPresented: $showingRecipeExtractor) {
             RecipeExtractorView(apiKey: getAPIKey())
+        }
+    }
+    
+    private var emptyStateContent: some View {
+        ContentUnavailableView {
+            emptyStateLabel
+        } description: {
+            emptyStateDescriptionView
+        } actions: {
+            emptyStateActions
+        }
+    }
+    
+    private var emptyStateLabel: some View {
+        Label(emptyStateTitle, systemImage: "book.closed")
+    }
+    
+    private var emptyStateDescriptionView: some View {
+        Text(emptyStateDescription)
+    }
+    
+    @ViewBuilder
+    private var emptyStateActions: some View {
+        if contentFilter != .mine {
+            Button {
+                contentFilter = .mine
+            } label: {
+                Label("Show My Recipes", systemImage: "person.fill")
+            }
+        }
+        
+        Button {
+            showingRecipeExtractor = true
+        } label: {
+            Label("Extract Recipe", systemImage: "plus.circle.fill")
         }
     }
     
@@ -422,6 +523,26 @@ struct ContentView: View {
                 }
             )
             
+            // Recipe count display (especially useful for community recipes)
+            if contentFilter == .shared && !cachedSharedRecipes.isEmpty {
+                HStack {
+                    Image(systemName: "person.3.fill")
+                        .foregroundStyle(.blue)
+                    Text("\(availableRecipes.count) Community \(availableRecipes.count == 1 ? "Recipe" : "Recipes")")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    if availableRecipes.count != cachedSharedRecipes.count {
+                        Text("(\(cachedSharedRecipes.count) total)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+            }
+            
             // Loading indicator when processing filter
             if isProcessingFilter {
                 HStack {
@@ -436,76 +557,35 @@ struct ContentView: View {
                 .background(Color(.systemGray6))
             }
             
-            List(selection: $selectedRecipe) {
+            List(selection: $selectedRecipeID) {
                 Section {
-                    ForEach(availableRecipes) { recipe in
+                    ForEach(availableRecipes, id: \.displayID) { recipe in
                         Button {
                             selectedRecipe = recipe
+                            selectedRecipeID = recipe.displayID
                         } label: {
                             recipeRow(recipe: recipe)
                         }
                         .buttonStyle(.plain)
+                        .tag(recipe.displayID)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deleteRecipe(recipe)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                            // Only allow deleting owned recipes
+                            if let recipeX = recipe as? RecipeX {
+                                Button(role: .destructive) {
+                                    deleteRecipe(recipeX)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                         }
                         .contextMenu {
-                            // Add to Book submenu
-                            Menu {
-                                if books.isEmpty {
-                                    Button {
-                                        // Switch to books tab to create a book
-                                        appState.currentTab = .books
-                                    } label: {
-                                        Label("Create First Book", systemImage: "plus.circle")
-                                    }
-                                } else {
-                                    ForEach(books) { book in
-                                        Button {
-                                            toggleRecipeInBook(recipe, book: book)
-                                        } label: {
-                                            HStack {
-                                                Text(book.name)
-                                                Spacer()
-                                                if book.recipeIDs.contains(recipe.id) {
-                                                    Image(systemName: "checkmark")
-                                                        .foregroundStyle(.blue)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Button {
-                                        // Switch to books tab to create a new book
-                                        appState.currentTab = .books
-                                    } label: {
-                                        Label("Create New Book", systemImage: "plus.circle")
-                                    }
-                                }
-                            } label: {
-                                Label("Add to Book", systemImage: "book.closed")
-                            }
-                            
-                            Divider()
-                            
-                            Button {
-                                Task {
-                                    await shareRecipe(recipe)
-                                }
-                            } label: {
-                                Label("Share with Community", systemImage: "square.and.arrow.up")
-                            }
-                            
-                            
-                            Button(role: .destructive) {
-                                deleteRecipe(recipe)
-                            } label: {
-                                Label("Delete Recipe", systemImage: "trash")
+                            // Context menu options depend on recipe type
+                            if let recipeX = recipe as? RecipeX {
+                                // Full menu for owned recipes
+                                ownedRecipeContextMenu(recipe: recipeX)
+                            } else if recipe is CachedSharedRecipe {
+                                // Limited menu for cached shared recipes
+                                sharedRecipeContextMenu(recipe: recipe)
                             }
                         }
                     }
@@ -526,94 +606,64 @@ struct ContentView: View {
             .navigationTitle("Recipes")
             .toolbar {
 #if os(iOS)
+                #if DEBUG
                 ToolbarItem(placement: .navigationBarLeading) {
                     Menu {
-                        Button {
-                            showingImageAssignment = true
-                        } label: {
-                            Label("Assign Images", systemImage: "photo.on.rectangle")
-                        }
-                        
-                        Button {
-                            showingSavedLinks = true
-                        } label: {
-                            Label("Saved Links", systemImage: "link.circle")
-                        }
-                        
-                        Divider()
-                        
-                        Button {
-                            showingLegacyMigration = true
-                        } label: {
-                            Label("Migrate to New Models", systemImage: "arrow.triangle.2.circlepath.circle")
-                        }
-                        
-                        #if DEBUG
-                        Divider()
-                        
-                        Menu {
-                            Button("Test Recovery Success") {
-                                DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
-                                
-                                let testError = NSError(
-                                    domain: "NSCocoaErrorDomain",
-                                    code: 134504,
-                                    userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
-                                )
-                                
-                                DatabaseRecoveryLogger.shared.logRecoverySuccess(
-                                    error: testError,
-                                    filesDeleted: ["CloudKitModel.sqlite", "CloudKitModel.sqlite-shm"],
-                                    cloudKitEnabled: true,
-                                    databaseSizeMB: 10.5
-                                )
-                            }
+                        Button("Test Recovery Success") {
+                            DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
                             
-                            Button("Test Recovery Failure") {
-                                DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
-                                
-                                let testError = NSError(
-                                    domain: "NSCocoaErrorDomain",
-                                    code: 134504,
-                                    userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
-                                )
-                                
-                                let secondaryError = NSError(
-                                    domain: "SwiftData.SwiftDataError",
-                                    code: 1,
-                                    userInfo: [NSLocalizedDescriptionKey: "Failed to recreate container"]
-                                )
-                                
-                                DatabaseRecoveryLogger.shared.logRecoveryFailure(
-                                    error: testError,
-                                    filesDeleted: ["CloudKitModel.sqlite"],
-                                    cloudKitEnabled: true,
-                                    secondaryError: secondaryError
-                                )
-                            }
+                            let testError = NSError(
+                                domain: "NSCocoaErrorDomain",
+                                code: 134504,
+                                userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
+                            )
                             
-                            Button("View Recovery Stats") {
-                                DatabaseRecoveryLogger.shared.logRecoveryStatistics()
-                            }
-                            
-                            Button("Clear Recovery History") {
-                                DatabaseRecoveryLogger.shared.clearHistory()
-                            }
-                        } label: {
-                            Label("Debug Recovery Logger", systemImage: "ladybug")
+                            DatabaseRecoveryLogger.shared.logRecoverySuccess(
+                                error: testError,
+                                filesDeleted: ["CloudKitModel.sqlite", "CloudKitModel.sqlite-shm"],
+                                cloudKitEnabled: true,
+                                databaseSizeMB: 10.5
+                            )
                         }
-                        #endif
+                        
+                        Button("Test Recovery Failure") {
+                            DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                            
+                            let testError = NSError(
+                                domain: "NSCocoaErrorDomain",
+                                code: 134504,
+                                userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
+                            )
+                            
+                            let secondaryError = NSError(
+                                domain: "SwiftData.SwiftDataError",
+                                code: 1,
+                                userInfo: [NSLocalizedDescriptionKey: "Failed to recreate container"]
+                            )
+                            
+                            DatabaseRecoveryLogger.shared.logRecoveryFailure(
+                                error: testError,
+                                filesDeleted: ["CloudKitModel.sqlite"],
+                                cloudKitEnabled: true,
+                                secondaryError: secondaryError
+                            )
+                        }
+                        
+                        Button("View Recovery Stats") {
+                            DatabaseRecoveryLogger.shared.logRecoveryStatistics()
+                        }
+                        
+                        Button("Clear Recovery History") {
+                            DatabaseRecoveryLogger.shared.clearHistory()
+                        }
                     } label: {
-                        Label("More", systemImage: "ellipsis.circle")
+                        Label("Debug Recovery Logger", systemImage: "ladybug")
                     }
                 }
+                #endif
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     CloudKitSyncBadge()
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    MigrationBadgeView()
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -646,22 +696,6 @@ struct ContentView: View {
                 
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showingImageAssignment = true
-                    } label: {
-                        Label("Assign Images", systemImage: "photo.on.rectangle")
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingSavedLinks = true
-                    } label: {
-                        Label("Saved Links", systemImage: "link.circle")
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
                         showingSearch = true
                     } label: {
                         Label("Search Recipes", systemImage: "magnifyingglass")
@@ -676,9 +710,6 @@ struct ContentView: View {
                     }
                 }
 #endif
-            }
-            .sheet(isPresented: $showingImageAssignment) {
-                RecipeImageAssignmentView()
             }
             .sheet(isPresented: $showingRecipeExtractor) {
                 RecipeExtractorView(apiKey: getAPIKey())
@@ -695,46 +726,44 @@ struct ContentView: View {
                     selectedRecipe: $selectedRecipe
                 )
             }
-            .sheet(isPresented: $showingSavedLinks) {
-                SavedLinksView()
-            }
-            .sheet(isPresented: $showingLegacyMigration) {
-                LegacyMigrationView()
-            }
         }
     }
     
     // MARK: - Recipe Row
     
-    /// Returns the SharedRecipe entry for a recipe if it exists
-    private func sharedRecipeEntry(for recipe: RecipeModel) -> SharedRecipe? {
-        sharedRecipes.first { $0.recipeID == recipe.id && $0.isActive }
-    }
-    
-    private func recipeRow(recipe: RecipeModel) -> some View {
-        HStack(spacing: 12) {
+    private func recipeRow(recipe: any RecipeDisplayProtocol) -> some View {
+        return HStack(spacing: 12) {
             // Thumbnail or placeholder
-            if let imageName = recipe.imageName {
-                RecipeImageView(
-                    imageName: imageName,
-                    size: CGSize(width: 50, height: 50),
-                    cornerRadius: 6
-                )
-            } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.gray.opacity(0.1))
-                    .frame(width: 50, height: 50)
-                    .overlay(
-                        Text("Assign\nImage")
-                            .font(.caption2)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+            if let recipeX = recipe as? RecipeX {
+                // RecipeX has both imageData (modern) and imageName (legacy)
+                if recipeX.imageData != nil || recipeX.imageName != nil {
+                    RecipeImageView(
+                        imageName: recipeX.imageName,
+                        imageData: recipeX.imageData,
+                        size: CGSize(width: 50, height: 50),
+                        cornerRadius: 6
                     )
+                } else {
+                    placeholderImage
+                }
+            } else if let cachedRecipe = recipe as? CachedSharedRecipe {
+                // CachedSharedRecipe only has imageName
+                if let imageName = cachedRecipe.imageName {
+                    RecipeImageView(
+                        imageName: imageName,
+                        imageData: nil,
+                        size: CGSize(width: 50, height: 50),
+                        cornerRadius: 6
+                    )
+                } else {
+                    placeholderImage
+                }
+            } else {
+                placeholderImage
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title)
+                Text(recipe.displayTitle)
                     .font(.headline)
                     .foregroundStyle(.primary)
                 
@@ -745,25 +774,25 @@ struct ContentView: View {
                         .lineLimit(1)
                 }
                 
-                // Show who shared this recipe if it's shared
-                if contentFilter != .mine, let sharedEntry = sharedRecipeEntry(for: recipe) {
+                // Show who shared this recipe if it's a shared recipe
+                if recipe.isSharedRecipe, let sharedBy = recipe.sharedByUserName {
                     HStack(spacing: 4) {
                         Image(systemName: "person.crop.circle.fill")
                             .font(.caption2)
                             .foregroundStyle(.blue)
-                        Text("Shared by \(sharedEntry.sharedByUserName ?? "Someone")")
+                        Text("Shared by \(sharedBy)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
                 
-                // Show books this recipe is in
-                if !booksContaining(recipe).isEmpty {
+                // Show books this recipe is in (only for RecipeX)
+                if let recipeX = recipe as? RecipeX, !booksContaining(recipeX).isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "book.closed.fill")
                             .font(.caption2)
                             .foregroundStyle(.purple)
-                        Text(bookBadgeText(for: recipe))
+                        Text(bookBadgeText(for: recipeX))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -773,28 +802,42 @@ struct ContentView: View {
             Spacer()
             
             // Combined badge (shows allergen, diabetes, or both based on filter mode)
-            if filterMode != .none, let score = combinedScores[recipe.id] {
+            // Only show for RecipeX (owned recipes)
+            if !recipe.isSharedRecipe, filterMode != .none, let score = combinedScores[recipe.displayID] {
                 CombinedRecipeBadge(score: score, compact: true)
             }
-            if (filterMode == .nutrition || filterMode == .all),
-               let score = cachedNutritionalScores[recipe.id] {
+            if !recipe.isSharedRecipe, (filterMode == .nutrition || filterMode == .all),
+               let score = cachedNutritionalScores[recipe.displayID] {
                 NutritionalBadge(score: score, compact: true)
             }
         }
     }
     
+    private var placeholderImage: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color.gray.opacity(0.1))
+            .frame(width: 50, height: 50)
+            .overlay(
+                Text("No\nImage")
+                    .font(.caption2)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            )
+    }
+    
     // MARK: - Book Helper Methods
     
     /// Returns all books that contain the given recipe
-    private func booksContaining(_ recipe: RecipeModel) -> [RecipeBook] {
-        books.filter { $0.recipeIDs.contains(recipe.id) }
+    private func booksContaining(_ recipe: RecipeX) -> [Book] {
+        books.filter { ($0.recipeIDs ?? []).contains(recipe.safeID) }
     }
     
     /// Returns a formatted string describing which books contain this recipe
-    private func bookBadgeText(for recipe: RecipeModel) -> String {
+    private func bookBadgeText(for recipe: RecipeX) -> String {
         let containingBooks = booksContaining(recipe)
         if containingBooks.count == 1 {
-            return "in \(containingBooks[0].name)"
+            return "in \(containingBooks[0].name ?? "Untitled Book")"
         } else if containingBooks.count > 1 {
             return "in \(containingBooks.count) books"
         }
@@ -802,7 +845,7 @@ struct ContentView: View {
     }
     
     /// Returns the primary color for a book, or a default color
-    private func bookColor(for book: RecipeBook) -> Color {
+    private func bookColor(for book: Book) -> Color {
         if let colorHex = book.color {
             return Color(hex: colorHex) ?? .purple
         }
@@ -811,16 +854,107 @@ struct ContentView: View {
     
     // MARK: - Helper Methods
     
-    private func toggleRecipeInBook(_ recipe: RecipeModel, book: RecipeBook) {
+    /// Context menu for owned recipes (RecipeX)
+    @ViewBuilder
+    private func ownedRecipeContextMenu(recipe: RecipeX) -> some View {
+        // Add to Book submenu
+        Menu {
+            if books.isEmpty {
+                Button {
+                    // Switch to books tab to create a book
+                    appState.currentTab = .books
+                } label: {
+                    Label("Create First Book", systemImage: "plus.circle")
+                }
+            } else {
+                ForEach(books) { book in
+                    Button {
+                        toggleRecipeInBook(recipe, book: book)
+                    } label: {
+                        HStack {
+                            Text(book.name ?? "Untitled Book")
+                            Spacer()
+                            if (book.recipeIDs ?? []).contains(recipe.safeID) {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                Button {
+                    // Switch to books tab to create a new book
+                    appState.currentTab = .books
+                } label: {
+                    Label("Create New Book", systemImage: "plus.circle")
+                }
+            }
+        } label: {
+            Label("Add to Book", systemImage: "book.closed")
+        }
+        
+        Divider()
+        
+        Button {
+            Task {
+                await shareRecipe(recipe)
+            }
+        } label: {
+            Label("Share with Community", systemImage: "square.and.arrow.up")
+        }
+        
+        Button(role: .destructive) {
+            deleteRecipe(recipe)
+        } label: {
+            Label("Delete Recipe", systemImage: "trash")
+        }
+    }
+    
+    /// Context menu for cached shared recipes (CachedSharedRecipe)
+    @ViewBuilder
+    private func sharedRecipeContextMenu(recipe: any RecipeDisplayProtocol) -> some View {
+        Button {
+            // Import to permanent collection
+            if let cachedRecipe = recipe as? CachedSharedRecipe {
+                importCachedRecipe(cachedRecipe)
+            }
+        } label: {
+            Label("Add to My Recipes", systemImage: "plus.square.on.square")
+        }
+        
+        // Option to view in browser if it has a reference
+        if let reference = recipe.reference, let url = URL(string: reference) {
+            Button {
+                UIApplication.shared.open(url)
+            } label: {
+                Label("View Original", systemImage: "safari")
+            }
+        }
+    }
+    
+    /// Import a cached shared recipe into permanent collection
+    private func importCachedRecipe(_ cachedRecipe: CachedSharedRecipe) {
+        do {
+            try CloudKitSharingService.shared.importCachedRecipe(cachedRecipe, modelContext: modelContext)
+            logInfo("Imported cached recipe: \(cachedRecipe.title)", category: "sharing")
+        } catch {
+            logError("Failed to import cached recipe: \(error)", category: "sharing")
+        }
+    }
+    
+    private func toggleRecipeInBook(_ recipe: RecipeX, book: Book) {
         withAnimation {
-            if book.recipeIDs.contains(recipe.id) {
+            let recipeIDs = book.recipeIDs ?? []
+            if recipeIDs.contains(recipe.safeID) {
                 // Remove from book
-                book.removeRecipe(recipe.id)
-                logInfo("Removed '\(recipe.title)' from book '\(book.name)'", category: "books")
+                book.removeRecipe(recipe.safeID)
+                logInfo("Removed '\(recipe.safeTitle)' from book '\(book.name ?? "Unknown")'", category: "books")
             } else {
                 // Add to book
-                book.addRecipe(recipe.id)
-                logInfo("Added '\(recipe.title)' to book '\(book.name)'", category: "books")
+                book.addRecipe(recipe.safeID)
+                logInfo("Added '\(recipe.safeTitle)' to book '\(book.name ?? "Unknown")'", category: "books")
             }
             
             // Save the context
@@ -835,81 +969,49 @@ struct ContentView: View {
     private func restoreSelectedRecipe() {
         // Restore selected recipe from app state if available
         if let recipeId = appState.selectedRecipeId {
-            // Find the recipe in available recipes
-            if let recipe = availableRecipes.first(where: { $0.id == recipeId }) {
+            // Find the recipe in available recipes (both RecipeX and CachedSharedRecipe)
+            if let recipe = availableRecipes.first(where: { $0.displayID == recipeId }) {
                 selectedRecipe = recipe
-                logInfo("Restored selected recipe: \(recipe.title)", category: "state")
+                selectedRecipeID = recipeId
+                logInfo("Restored selected recipe: \(recipe.displayTitle)", category: "state")
             } else {
                 // Recipe no longer exists, clear the selection
                 appState.selectedRecipeId = nil
+                selectedRecipeID = nil
             }
         }
     }
     
-    private func isRecipeSaved(_ recipe: RecipeModel) -> Bool {
-        // Check if the recipe ID exists in savedRecipes (RecipeX)
-        return savedRecipes.contains { $0.id == recipe.id }
-    }
-    
-    private func deleteRecipe(_ recipe: RecipeModel) {
+    private func deleteRecipe(_ recipe: RecipeX) {
         withAnimation {
-            if let savedRecipe = savedRecipes.first(where: { $0.id == recipe.id }) {
-                logInfo("Deleting recipe: \(savedRecipe.title ?? "Untitled") (ID: \(savedRecipe.id ?? UUID()))", category: "recipe")
-                
-                // Delete associated image file if it exists
-                if let imageName = savedRecipe.imageName {
-                    let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    let fileURL = documentsPath.appendingPathComponent(imageName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                    logInfo("Deleted image file: \(imageName)", category: "storage")
-                }
-                
-                // Delete any RecipeImageAssignments for this recipe
-                let assignmentsToDelete = imageAssignments.filter { $0.recipeID == recipe.id }
-                for assignment in assignmentsToDelete {
-                    modelContext.delete(assignment)
-                    logDebug("Deleted image assignment for recipe", category: "storage")
-                }
-                
-                // Delete the recipe itself
-                modelContext.delete(savedRecipe)
-                
-                // Save the context to persist the deletion
-                do {
-                    try modelContext.save()
-                    logInfo("Recipe deleted and changes saved", category: "recipe")
-                } catch {
-                    logError("Failed to save deletion: \(error)", category: "storage")
-                }
-            }
-        }
-    }
-    
-    private func saveRecipe(_ recipe: RecipeModel) {
-        withAnimation {
-            // Include the current image name (if any) when saving
-            var recipeToSave = recipe
-            if let assignedImage = imageName(for: recipe.id) {
-                recipeToSave = recipe.withImageName(assignedImage)
+            logInfo("Deleting recipe: \(recipe.safeTitle) (ID: \(recipe.safeID))", category: "recipe")
+            
+            // Delete associated image file if it exists
+            if let imageName = recipe.imageName {
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let fileURL = documentsPath.appendingPathComponent(imageName)
+                try? FileManager.default.removeItem(at: fileURL)
+                logInfo("Deleted image file: \(imageName)", category: "storage")
             }
             
-            // Save as RecipeX (new unified model)
-            let newRecipe = RecipeX(from: recipeToSave)
-            modelContext.insert(newRecipe)
+            // Delete any RecipeImageAssignments for this recipe
+            let assignmentsToDelete = imageAssignments.filter { $0.recipeID == recipe.safeID }
+            for assignment in assignmentsToDelete {
+                modelContext.delete(assignment)
+                logDebug("Deleted image assignment for recipe", category: "storage")
+            }
             
-            // Save the context
+            // Delete the recipe itself
+            modelContext.delete(recipe)
+            
+            // Save the context to persist the deletion
             do {
                 try modelContext.save()
-                logInfo("Recipe saved: \(newRecipe.title ?? "Untitled")", category: "recipe")
+                logInfo("Recipe deleted and changes saved", category: "recipe")
             } catch {
-                logError("Failed to save recipe: \(error)", category: "storage")
+                logError("Failed to save deletion: \(error)", category: "storage")
             }
         }
-    }
-    
-    /// Helper to get assigned image name for a recipe
-    private func imageName(for recipeID: UUID) -> String? {
-        return imageAssignments.first(where: { $0.recipeID == recipeID })?.imageName
     }
     
     private func getAPIKey() -> String {
@@ -919,19 +1021,83 @@ struct ContentView: View {
     }
 }
 
+// MARK: - View Modifiers for Change Observers
+
+/// View modifier to handle filter-related changes
+private struct FilterObserversModifier: ViewModifier {
+    let filterMode: RecipeFilterMode
+    let showOnlySafe: Bool
+    let activeProfile: UserAllergenProfile?
+    let onFilterChange: () -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: filterMode) { _, _ in
+                onFilterChange()
+            }
+            .onChange(of: showOnlySafe) { _, _ in
+                if filterMode != .none {
+                    onFilterChange()
+                }
+            }
+            .onChange(of: activeProfile?.id) { _, _ in
+                if filterMode.includesAllergenFilter {
+                    onFilterChange()
+                }
+            }
+            .onChange(of: activeProfile?.diabetesStatus) { _, _ in
+                if filterMode.includesDiabetesFilter {
+                    onFilterChange()
+                }
+            }
+    }
+}
+
+/// View modifier to handle recipe and selection changes
+private struct RecipeObserversModifier: ViewModifier {
+    let savedRecipesCount: Int
+    let cachedRecipesCount: Int
+    let selectedRecipe: (any RecipeDisplayProtocol)?
+    let selectedRecipeID: UUID?
+    let contentFilter: ContentFilterMode
+    let onRecipeCountChange: () -> Void
+    let onSelectedRecipeChange: ((any RecipeDisplayProtocol)?) -> Void
+    let onSelectedIDChange: (UUID?) -> Void
+    let onContentFilterChange: (ContentFilterMode) -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: savedRecipesCount) { _, _ in
+                onRecipeCountChange()
+            }
+            .onChange(of: cachedRecipesCount) { _, _ in
+                onRecipeCountChange()
+            }
+            .onChange(of: selectedRecipe?.displayID) { _, _ in
+                onSelectedRecipeChange(selectedRecipe)
+            }
+            .onChange(of: selectedRecipeID) { _, newID in
+                onSelectedIDChange(newID)
+            }
+            .onChange(of: contentFilter) { _, newValue in
+                onContentFilterChange(newValue)
+            }
+    }
+}
+
 #Preview {
     ContentView()
-        .modelContainer(for: [RecipeX.self, RecipeImageAssignment.self, UserAllergenProfile.self, RecipeBook.self, SavedLink.self], inMemory: true)
+        .modelContainer(for: [RecipeX.self, RecipeImageAssignment.self, UserAllergenProfile.self, Book.self, SavedLink.self], inMemory: true)
         .environmentObject(AppStateManager.shared)
 }
 // MARK: - Recipe Book Badge View
 
 /// A compact badge showing which books contain a recipe
-struct RecipeBookBadge: View {
-    let books: [RecipeBook]
+struct BookBadge: View {
+    let books: [Book]
     let compact: Bool
     
-    init(books: [RecipeBook], compact: Bool = true) {
+    init(books: [Book], compact: Bool = true) {
         self.books = books
         self.compact = compact
     }
@@ -953,7 +1119,7 @@ struct RecipeBookBadge: View {
                 .foregroundStyle(.purple)
             
             if books.count == 1 {
-                Text("in \(books[0].name)")
+                Text("in \(books[0].name ?? "Untitled Book")")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
@@ -977,7 +1143,7 @@ struct RecipeBookBadge: View {
                         .fill(bookColor(for: book))
                         .frame(width: 6, height: 6)
                     
-                    Text(book.name)
+                    Text(book.name ?? "Untitled Book")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     
@@ -994,7 +1160,7 @@ struct RecipeBookBadge: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     
-    private func bookColor(for book: RecipeBook) -> Color {
+    private func bookColor(for book: Book) -> Color {
         if let colorHex = book.color {
             return Color(hex: colorHex) ?? .purple
         }

@@ -16,6 +16,9 @@ struct ReadOnlyRecipeDetailView: View {
     let recipe: CloudKitRecipe
     let preview: CloudKitRecipePreview
     
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+    
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
@@ -157,7 +160,7 @@ struct ReadOnlyRecipeDetailView: View {
             }
         }
         .sheet(isPresented: $showingCookingMode) {
-            CookingModeView(recipe: toRecipeModel(scaledRecipe))
+            CookingModeView(recipe: toRecipeX(scaledRecipe))
         }
         .sheet(isPresented: $showingImportSheet) {
             ImportSharedRecipeView(
@@ -438,7 +441,7 @@ struct ReadOnlyRecipeDetailView: View {
     }
     
     // Helper to get color for note type
-    private func colorForNoteType(_ type: RecipeNote.NoteType) -> Color {
+    private func colorForNoteType(_ type: RecipeNoteType) -> Color {
         switch type {
         case .tip:
             return .blue
@@ -490,7 +493,7 @@ struct ReadOnlyRecipeDetailView: View {
         print("[Sharing] Adding shared recipe to shopping list")
     }
     
-    private func handleImport(_ importedRecipe: Recipe) {
+    private func handleImport(_ importedRecipe: RecipeX) {
         importSuccess = true
         showingImportAlert = true
         print("[Sharing] Successfully imported shared recipe: '\(recipe.title)'")
@@ -513,16 +516,22 @@ struct ReadOnlyRecipeDetailView: View {
         return documentsPath.appendingPathComponent(filename)
     }
     
-    private func toRecipeModel(_ cloudRecipe: CloudKitRecipe) -> RecipeModel {
-        RecipeModel(
+    private func toRecipeX(_ cloudRecipe: CloudKitRecipe) -> RecipeX {
+        
+        // Properly encode the data
+        let ingredientSectionsData = try? encoder.encode(cloudRecipe.ingredientSections)
+        let instructionSectionsData = try? encoder.encode(cloudRecipe.instructionSections)
+        let notesData = try? encoder.encode(cloudRecipe.notes)
+        
+        return RecipeX(
             id: cloudRecipe.id,
             title: cloudRecipe.title,
             headerNotes: cloudRecipe.headerNotes,
-            yield: cloudRecipe.yield,
-            ingredientSections: cloudRecipe.ingredientSections,
-            instructionSections: cloudRecipe.instructionSections,
-            notes: cloudRecipe.notes,
+            recipeYield: cloudRecipe.yield,
             reference: cloudRecipe.reference,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
+            notesData: notesData,
             imageName: cloudRecipe.imageName,
             additionalImageNames: cloudRecipe.additionalImageNames
         )
@@ -533,7 +542,7 @@ struct ReadOnlyRecipeDetailView: View {
 
 struct ImportSharedRecipeView: View {
     let recipe: CloudKitRecipe
-    let onImport: (Recipe) -> Void
+    let onImport: (RecipeX) -> Void
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -542,7 +551,7 @@ struct ImportSharedRecipeView: View {
     @State private var includeNotes = true
     @State private var isImporting = false
     
-    init(recipe: CloudKitRecipe, onImport: @escaping (Recipe) -> Void) {
+    init(recipe: CloudKitRecipe, onImport: @escaping (RecipeX) -> Void) {
         self.recipe = recipe
         self.onImport = onImport
         _recipeTitle = State(initialValue: recipe.title)
@@ -597,26 +606,31 @@ struct ImportSharedRecipeView: View {
     private func importRecipe() {
         isImporting = true
         
+        // Encode the sections as Data
+        let encoder = JSONEncoder()
+        let ingredientSectionsData = try? encoder.encode(recipe.ingredientSections)
+        let instructionSectionsData = try? encoder.encode(recipe.instructionSections)
+        let notesData = includeNotes ? try? encoder.encode(recipe.notes) : nil
+        
         // Create a new recipe with a new ID
-        let recipeModel = RecipeModel(
+        let recipea = RecipeX(
             id: UUID(), // New ID to avoid conflicts
             title: recipeTitle,
             headerNotes: recipe.headerNotes,
-            yield: recipe.yield,
-            ingredientSections: recipe.ingredientSections,
-            instructionSections: recipe.instructionSections,
-            notes: includeNotes ? recipe.notes : [],
+            recipeYield: recipe.yield,
             reference: recipe.reference,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
+            notesData: notesData,
             imageName: recipe.imageName,
             additionalImageNames: recipe.additionalImageNames
         )
         
-        let newRecipe = Recipe(from: recipeModel)
-        modelContext.insert(newRecipe)
+        modelContext.insert(recipea)
         
         do {
             try modelContext.save()
-            onImport(newRecipe)
+            onImport(recipea)
             dismiss()
         } catch {
             print("[Sharing] Failed to import recipe: \(error)")
@@ -654,11 +668,11 @@ struct ImportSharedRecipeView: View {
             InstructionSection(
                 title: nil,
                 steps: [
-                    InstructionStep(text: "Bring a large pot of salted water to a boil and cook the spaghetti until al dente."),
-                    InstructionStep(text: "While pasta cooks, fry the guanciale in a pan until crispy."),
-                    InstructionStep(text: "Whisk egg yolks with grated pecorino in a bowl."),
-                    InstructionStep(text: "Drain pasta, reserving 1 cup of pasta water. Add hot pasta to the guanciale pan."),
-                    InstructionStep(text: "Remove from heat and quickly stir in the egg mixture, adding pasta water to create a creamy sauce.")
+                    InstructionStep(stepNumber: 1, text: "Bring a large pot of salted water to a boil and cook the spaghetti until al dente."),
+                    InstructionStep(stepNumber: 2, text: "While pasta cooks, fry the guanciale in a pan until crispy."),
+                    InstructionStep(stepNumber: 3, text: "Whisk egg yolks with grated pecorino in a bowl."),
+                    InstructionStep(stepNumber: 4, text: "Drain pasta, reserving 1 cup of pasta water. Add hot pasta to the guanciale pan."),
+                    InstructionStep(stepNumber: 5, text: "Remove from heat and quickly stir in the egg mixture, adding pasta water to create a creamy sauce.")
                 ]
             )
         ],
@@ -689,5 +703,5 @@ struct ImportSharedRecipeView: View {
     NavigationStack {
         ReadOnlyRecipeDetailView(recipe: recipe, preview: preview)
     }
-    .modelContainer(for: Recipe.self)
+    .modelContainer(for: RecipeX.self)
 }

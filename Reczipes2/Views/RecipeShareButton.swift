@@ -10,7 +10,7 @@ import Combine
 
 /// A reusable button for sharing recipes via email, text, or other methods
 struct RecipeShareButton: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     @StateObject private var sharingService = RecipeSharingService()
     @State private var showingShareOptions = false
     @State private var showingSetupHelp = false
@@ -132,7 +132,7 @@ struct RecipeShareButton: View {
 
 /// An expanded share view with preview of the recipe card
 struct RecipeShareView: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     @StateObject private var sharingService = RecipeSharingService()
     @Environment(\.dismiss) private var dismiss
     @State private var selectedSourceType: RecipeShareCardView.RecipeSourceType = .email
@@ -362,29 +362,32 @@ struct RecipeShareView: View {
 // MARK: - Preview
 
 #Preview("Share Button") {
-    NavigationStack {
+    let ingredientSections = [
+        IngredientSection(
+            ingredients: [
+                Ingredient(name: "Test ingredient")
+            ]
+        )
+    ]
+    let instructionSections = [
+        InstructionSection(
+            steps: [
+                InstructionStep(stepNumber: 1, text: "Test step")
+            ]
+        )
+    ]
+    
+    let recipe = RecipeX(
+        title: "Test Recipe",
+        recipeYield: "Serves 4",
+        ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+        instructionSectionsData: try? JSONEncoder().encode(instructionSections)
+    )
+    
+    return NavigationStack {
         List {
             Section {
-                RecipeShareButton(
-                    recipe: RecipeModel(
-                        title: "Test Recipe",
-                        yield: "Serves 4",
-                        ingredientSections: [
-                            IngredientSection(
-                                ingredients: [
-                                    Ingredient(name: "Test ingredient")
-                                ]
-                            )
-                        ],
-                        instructionSections: [
-                            InstructionSection(
-                                steps: [
-                                    InstructionStep(text: "Test step")
-                                ]
-                            )
-                        ]
-                    )
-                )
+                RecipeShareButton(recipe: recipe)
             }
         }
         .navigationTitle("Recipe")
@@ -392,50 +395,56 @@ struct RecipeShareView: View {
 }
 
 #Preview("Share View") {
-    RecipeShareView(
-        recipe: RecipeModel(
-            title: "Classic Chocolate Chip Cookies",
-            headerNotes: "Soft, chewy, and absolutely delicious!",
-            yield: "Makes 24 cookies",
-            ingredientSections: [
-                IngredientSection(
-                    title: "Dry Ingredients",
-                    ingredients: [
-                        Ingredient(quantity: "2¼", unit: "cups", name: "all-purpose flour"),
-                        Ingredient(quantity: "1", unit: "tsp", name: "baking soda"),
-                        Ingredient(quantity: "1", unit: "tsp", name: "salt")
-                    ]
-                ),
-                IngredientSection(
-                    title: "Wet Ingredients",
-                    ingredients: [
-                        Ingredient(quantity: "1", unit: "cup", name: "butter", preparation: "softened"),
-                        Ingredient(quantity: "¾", unit: "cup", name: "granulated sugar"),
-                        Ingredient(quantity: "¾", unit: "cup", name: "brown sugar"),
-                        Ingredient(quantity: "2", unit: "", name: "large eggs"),
-                        Ingredient(quantity: "2", unit: "tsp", name: "vanilla extract")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(stepNumber: 1, text: "Preheat oven to 375°F (190°C)."),
-                        InstructionStep(stepNumber: 2, text: "Mix flour, baking soda, and salt in a bowl."),
-                        InstructionStep(stepNumber: 3, text: "Beat butter and sugars until creamy."),
-                        InstructionStep(stepNumber: 4, text: "Add eggs and vanilla, beat well."),
-                        InstructionStep(stepNumber: 5, text: "Gradually blend in flour mixture."),
-                        InstructionStep(stepNumber: 6, text: "Stir in chocolate chips."),
-                        InstructionStep(stepNumber: 7, text: "Drop rounded tablespoons onto ungreased cookie sheets."),
-                        InstructionStep(stepNumber: 8, text: "Bake 9-11 minutes or until golden brown.")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "For chewier cookies, slightly underbake them."),
-                RecipeNote(type: .timing, text: "Cookies will continue to cook on the baking sheet after removing from oven.")
-            ],
-            reference: "Family recipe from Grandma"
+    let ingredientSections = [
+        IngredientSection(
+            title: "Dry Ingredients",
+            ingredients: [
+                Ingredient(quantity: "2¼", unit: "cups", name: "all-purpose flour"),
+                Ingredient(quantity: "1", unit: "tsp", name: "baking soda"),
+                Ingredient(quantity: "1", unit: "tsp", name: "salt")
+            ]
+        ),
+        IngredientSection(
+            title: "Wet Ingredients",
+            ingredients: [
+                Ingredient(quantity: "1", unit: "cup", name: "butter", preparation: "softened"),
+                Ingredient(quantity: "¾", unit: "cup", name: "granulated sugar"),
+                Ingredient(quantity: "¾", unit: "cup", name: "brown sugar"),
+                Ingredient(quantity: "2", unit: "", name: "large eggs"),
+                Ingredient(quantity: "2", unit: "tsp", name: "vanilla extract")
+            ]
         )
+    ]
+    
+    let instructionSections = [
+        InstructionSection(
+            steps: [
+                InstructionStep(stepNumber: 1, text: "Preheat oven to 375°F (190°C)."),
+                InstructionStep(stepNumber: 2, text: "Mix flour, baking soda, and salt in a bowl."),
+                InstructionStep(stepNumber: 3, text: "Beat butter and sugars until creamy."),
+                InstructionStep(stepNumber: 4, text: "Add eggs and vanilla, beat well."),
+                InstructionStep(stepNumber: 5, text: "Gradually blend in flour mixture."),
+                InstructionStep(stepNumber: 6, text: "Stir in chocolate chips."),
+                InstructionStep(stepNumber: 7, text: "Drop rounded tablespoons onto ungreased cookie sheets."),
+                InstructionStep(stepNumber: 8, text: "Bake 9-11 minutes or until golden brown.")
+            ]
+        )
+    ]
+    
+    let notes = [
+        RecipeNote(type: .tip, text: "For chewier cookies, slightly underbake them."),
+        RecipeNote(type: .timing, text: "Cookies will continue to cook on the baking sheet after removing from oven.")
+    ]
+    
+    let recipe = RecipeX(
+        title: "Classic Chocolate Chip Cookies",
+        headerNotes: "Soft, chewy, and absolutely delicious!",
+        recipeYield: "Makes 24 cookies",
+        reference: "Family recipe from Grandma",
+        ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+        instructionSectionsData: try? JSONEncoder().encode(instructionSections),
+        notesData: try? JSONEncoder().encode(notes)
     )
+    
+    return RecipeShareView(recipe: recipe)
 }

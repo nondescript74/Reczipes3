@@ -53,25 +53,6 @@ class ModelContainerManager: ObservableObject {
             logInfo("🔍 Performing startup health check...", category: "storage")
             let isHealthy = await self.verifyContainerHealth()
             
-            if isHealthy {
-                // Run image migration if needed (one-time migration from file-based to SwiftData)
-                if ImageMigrationService.needsMigration {
-                    logInfo("🔄 Image migration needed - starting migration...", category: "storage")
-                    let migratedCount = await ImageMigrationService.migrateAllRecipes(context: self.container.mainContext)
-                    
-                    if migratedCount > 0 {
-                        logInfo("✅ Successfully migrated \(migratedCount) recipe images", category: "storage")
-                        
-                        // Optional: Clean up file-based images after successful migration
-                        // Uncomment this after confirming CloudKit sync is working
-                        // let cleanedCount = await ImageMigrationService.cleanupFileBasedImages(context: self.container.mainContext)
-                        // logInfo("🗑️ Cleaned up \(cleanedCount) file-based images", category: "storage")
-                    }
-                } else {
-                    logInfo("✅ Image migration already completed: \(ImageMigrationService.getMigrationStatus())", category: "storage")
-                }
-            }
-            
             if !isHealthy {
                 logWarning("⚠️ Container health check failed on startup", category: "storage")
                 logWarning("   Attempting automatic recovery...", category: "storage")
@@ -164,18 +145,15 @@ class ModelContainerManager: ObservableObject {
         logInfo("📦 Attempting to create ModelContainer with CloudKit...", category: "storage")
         do {
             let container = try ModelContainer(
-                for: Recipe.self,
-                RecipeX.self,               // NEW: Unified recipe model (CloudKit compatible)
+                for: RecipeX.self,              // Unified recipe model (CloudKit compatible)
+                Book.self,                      // Unified book model (CloudKit compatible)
                 RecipeImageAssignment.self,
                 UserAllergenProfile.self,
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
-                RecipeBook.self,
-                Book.self,                  // NEW: Unified book model (CloudKit compatible)
                 CookingSession.self,
-                SharedRecipe.self,          // DEPRECATED: Will be replaced by RecipeX
-                SharedRecipeBook.self,      // NEW: CloudKit sharing models
-                SharingPreferences.self,    // NEW: CloudKit sharing models
+                SharedRecipeBook.self,          // CloudKit sharing models
+                SharingPreferences.self,        // CloudKit sharing models
                 CachedSharedRecipe.self,
                 CloudKitRecipePreview.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
@@ -233,18 +211,15 @@ class ModelContainerManager: ObservableObject {
                     // Try creating container again
                     do {
                         let container = try ModelContainer(
-                            for: Recipe.self,
-                            RecipeX.self,               // NEW: Unified recipe model (CloudKit compatible)
+                            for: RecipeX.self,              // Unified recipe model (CloudKit compatible)
+                            Book.self,                      // Unified book model (CloudKit compatible)
                             RecipeImageAssignment.self,
                             UserAllergenProfile.self,
                             CachedDiabeticAnalysis.self,
                             SavedLink.self,
-                            RecipeBook.self,
-                            Book.self,                  // NEW: Unified book model (CloudKit compatible)
                             CookingSession.self,
-                            SharedRecipe.self,          // DEPRECATED: Will be replaced by RecipeX
-                            SharedRecipeBook.self,      // NEW: CloudKit sharing models
-                            SharingPreferences.self,    // NEW: CloudKit sharing models
+                            SharedRecipeBook.self,          // CloudKit sharing models
+                            SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
                             CloudKitRecipePreview.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
@@ -333,18 +308,15 @@ class ModelContainerManager: ObservableObject {
                     // Try creating container again with clean slate
                     do {
                         let container = try ModelContainer(
-                            for: Recipe.self,
-                            RecipeX.self,               // NEW: Unified recipe model (CloudKit compatible)
+                            for: RecipeX.self,              // Unified recipe model (CloudKit compatible)
+                            Book.self,                      // Unified book model (CloudKit compatible)
                             RecipeImageAssignment.self,
                             UserAllergenProfile.self,
                             CachedDiabeticAnalysis.self,
                             SavedLink.self,
-                            RecipeBook.self,
-                            Book.self,                  // NEW: Unified book model (CloudKit compatible)
                             CookingSession.self,
-                            SharedRecipe.self,          // DEPRECATED: Will be replaced by RecipeX
-                            SharedRecipeBook.self,
-                            SharingPreferences.self,
+                            SharedRecipeBook.self,          // CloudKit sharing models
+                            SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
                             CloudKitRecipePreview.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
@@ -377,18 +349,15 @@ class ModelContainerManager: ObservableObject {
         
         do {
             let container = try ModelContainer(
-                for: Recipe.self,
-                RecipeX.self,               // NEW: Unified recipe model (CloudKit compatible)
+                for: RecipeX.self,              // Unified recipe model (CloudKit compatible)
+                Book.self,                      // Unified book model (CloudKit compatible)
                 RecipeImageAssignment.self,
                 UserAllergenProfile.self,
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
-                RecipeBook.self,
-                Book.self,                  // NEW: Unified book model (CloudKit compatible)
                 CookingSession.self,
-                SharedRecipe.self,          // DEPRECATED: Will be replaced by RecipeX
-                SharedRecipeBook.self,      // NEW: CloudKit sharing models
-                SharingPreferences.self,    // NEW: CloudKit sharing models
+                SharedRecipeBook.self,          // CloudKit sharing models
+                SharingPreferences.self,        // CloudKit sharing models
                 CachedSharedRecipe.self,
                 CloudKitRecipePreview.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
@@ -448,18 +417,15 @@ class ModelContainerManager: ObservableObject {
                     // Try creating container again with clean slate
                     do {
                         let container = try ModelContainer(
-                            for: Recipe.self,
-                            RecipeX.self,               // NEW: Unified recipe model (CloudKit compatible)
+                            for: RecipeX.self,              // Unified recipe model (CloudKit compatible)
+                            Book.self,                      // Unified book model (CloudKit compatible)
                             RecipeImageAssignment.self,
                             UserAllergenProfile.self,
                             CachedDiabeticAnalysis.self,
                             SavedLink.self,
-                            RecipeBook.self,
-                            Book.self,                  // NEW: Unified book model (CloudKit compatible)
                             CookingSession.self,
-                            SharedRecipe.self,          // DEPRECATED: Will be replaced by RecipeX
-                            SharedRecipeBook.self,
-                            SharingPreferences.self,
+                            SharedRecipeBook.self,          // CloudKit sharing models
+                            SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
                             CloudKitRecipePreview.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
@@ -752,20 +718,16 @@ class ModelContainerManager: ObservableObject {
         do {
             let context = container.mainContext
             
-            // Try fetching from both legacy and new models to verify container health
-            var legacyDescriptor = FetchDescriptor<Recipe>(predicate: nil)
-            legacyDescriptor.fetchLimit = 1
-            _ = try context.fetch(legacyDescriptor)
-            
-            var newDescriptor = FetchDescriptor<RecipeX>(predicate: nil)
-            newDescriptor.fetchLimit = 1
-            _ = try context.fetch(newDescriptor)
+            // Try fetching from the new unified models to verify container health
+            var recipeDescriptor = FetchDescriptor<RecipeX>(predicate: nil)
+            recipeDescriptor.fetchLimit = 1
+            _ = try context.fetch(recipeDescriptor)
             
             var bookDescriptor = FetchDescriptor<Book>(predicate: nil)
             bookDescriptor.fetchLimit = 1
             _ = try context.fetch(bookDescriptor)
             
-            logInfo("✅ Container health check passed (Recipe, RecipeX, Book models verified)", category: "storage")
+            logInfo("✅ Container health check passed (RecipeX, Book models verified)", category: "storage")
             return true
         } catch {
             logError("❌ Container health check failed: \(error)", category: "storage")
@@ -916,10 +878,6 @@ class ModelContainerManager: ObservableObject {
         logInfo("📊 Data Counts:", category: "storage")
         let context = container.mainContext
         do {
-            // Legacy models (for migration tracking)
-            let legacyRecipeCount = try context.fetchCount(FetchDescriptor<Recipe>())
-            let legacyBookCount = try context.fetchCount(FetchDescriptor<RecipeBook>())
-            
             // New unified models (RecipeX and Book)
             let recipeXCount = try context.fetchCount(FetchDescriptor<RecipeX>())
             let bookCount = try context.fetchCount(FetchDescriptor<Book>())
@@ -930,37 +888,15 @@ class ModelContainerManager: ObservableObject {
             let sharedBookCount = try context.fetchCount(FetchDescriptor<SharedRecipeBook>())
             let savedLinkCount = try context.fetchCount(FetchDescriptor<SavedLink>())
             
-            logInfo("   === Legacy Models (Migration) ===", category: "storage")
-            logInfo("   Recipes (legacy): \(legacyRecipeCount)", category: "storage")
-            logInfo("   Recipe Books (legacy): \(legacyBookCount)", category: "storage")
-            
-            logInfo("   === New Unified Models ===", category: "storage")
-            logInfo("   RecipeX (new): \(recipeXCount)", category: "storage")
-            logInfo("   Books (new): \(bookCount)", category: "storage")
+            logInfo("   === Unified Models ===", category: "storage")
+            logInfo("   Recipes: \(recipeXCount)", category: "storage")
+            logInfo("   Books: \(bookCount)", category: "storage")
             
             logInfo("   === Other Data ===", category: "storage")
             logInfo("   Cooking Sessions: \(sessionCount)", category: "storage")
             logInfo("   Saved Links: \(savedLinkCount)", category: "storage")
             logInfo("   Shared Recipes: \(sharedRecipeCount)", category: "storage")
             logInfo("   Shared Recipe Books: \(sharedBookCount)", category: "storage")
-            
-            // Calculate migration progress
-            let totalRecipes = legacyRecipeCount + recipeXCount
-            let totalBooks = legacyBookCount + bookCount
-            
-            if legacyRecipeCount > 0 || legacyBookCount > 0 {
-                logWarning("   ⚠️ Migration Status:", category: "storage")
-                if legacyRecipeCount > 0 {
-                    let percentage = totalRecipes > 0 ? Int((Double(recipeXCount) / Double(totalRecipes)) * 100) : 0
-                    logWarning("   - \(legacyRecipeCount) legacy recipes need migration (\(percentage)% complete)", category: "storage")
-                }
-                if legacyBookCount > 0 {
-                    let percentage = totalBooks > 0 ? Int((Double(bookCount) / Double(totalBooks)) * 100) : 0
-                    logWarning("   - \(legacyBookCount) legacy books need migration (\(percentage)% complete)", category: "storage")
-                }
-            } else {
-                logInfo("   ✅ All data migrated to new models", category: "storage")
-            }
             
         } catch {
             logError("   ❌ Error fetching counts: \(error)", category: "storage")

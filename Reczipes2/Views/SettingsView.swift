@@ -103,10 +103,6 @@ struct SettingsView: View {
                             Label("iCloud Sync Settings", systemImage: "icloud.fill")
                         }
                         
-                        NavigationLink(destination: RecipeImageMigrationView()) {
-                            Label("Image Migration", systemImage: "photo.stack")
-                        }
-                        
                         NavigationLink(destination: UserContentBackupView()) {
                             Label("User Content Import/Export", systemImage: "arrow.up.arrow.down.circle")
                         }
@@ -209,6 +205,18 @@ struct SettingsView: View {
                     
                     Section {
                         NavigationLink {
+                            RecipeDataDiagnosticView()
+                        } label: {
+                            HStack {
+                                Label("Recipe Data Diagnostics", systemImage: "cross.case.fill")
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.green)
+                                    .font(.caption)
+                            }
+                        }
+                        
+                        NavigationLink {
                             DatabaseMaintenanceView()
                         } label: {
                             HStack {
@@ -264,7 +272,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Developer Tools")
                     } footer: {
-                        Text("Database Maintenance: Comprehensive cleanup tools. Duplicate Detector: Find and remove duplicate recipes (you have ~27 duplicates). Database Investigation shows all database files and their contents.")
+                        Text("Recipe Data Diagnostics: Check for recipes with missing ingredients, instructions, or notes. Database Maintenance: Comprehensive cleanup tools. Duplicate Detector: Find and remove duplicate recipes.")
                             .font(.caption)
                     }
 

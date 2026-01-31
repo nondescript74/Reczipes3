@@ -10,13 +10,13 @@ import SwiftUI
 import SwiftData
 
 struct DuplicateResolutionView: View {
-    let existingRecipe: Recipe
-    let newRecipe: RecipeModel
+    let existingRecipe: RecipeX
+    let newRecipe: RecipeX
     let duplicateMatch: DuplicateMatch
     
     @Environment(\.dismiss) private var dismiss
     
-    var onKeepBoth: () -> Void
+
     var onReplaceOriginal: () -> Void
     var onKeepOriginal: () -> Void
     
@@ -84,10 +84,9 @@ struct DuplicateResolutionView: View {
                         showingComparison = false
                         onKeepOriginal()
                         dismiss()
-                    },
-                    onKeepBoth: {
+                    }, onKeepBoth: {
                         showingComparison = false
-                        onKeepBoth()
+                        onKeepOriginal()
                         dismiss()
                     },
                     onKeepNew: {
@@ -143,7 +142,7 @@ struct DuplicateResolutionView: View {
                 .font(.headline)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text(existingRecipe.title)
+                Text(existingRecipe.title ?? "No title")
                     .font(.title3)
                     .fontWeight(.semibold)
                 
@@ -220,11 +219,11 @@ struct DuplicateResolutionView: View {
             // Option 1: Keep Both
             actionButton(
                 title: "Keep Both Recipes",
-                subtitle: "New will be saved as \"\(newRecipe.title) (2)\"",
+                subtitle: "New will be saved as \"\(String(describing: newRecipe.title)) (2)\"",
                 icon: "doc.on.doc.fill",
                 color: .green
             ) {
-                onKeepBoth()
+                onKeepOriginal()
                 dismiss()
             }
             

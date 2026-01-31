@@ -160,7 +160,7 @@ class BackgroundProcessingManager: ObservableObject {
                 successCount += 1
                 backgroundProgress = Double(successCount + failureCount) / Double(pendingExtractions.count)
                 
-                logInfo("Successfully extracted recipe in background: \(recipe.title)", category: "background")
+                logInfo("Successfully extracted recipe in background: \(String(describing: recipe.title))", category: "background")
                 
             } catch {
                 logError("Failed to extract recipe in background: \(error)", category: "background")
@@ -205,8 +205,7 @@ class BackgroundProcessingManager: ObservableObject {
     
     // MARK: - Helper Methods
     
-    private func saveRecipe(_ recipeModel: RecipeModel, withImageData imageData: Data, modelContext: ModelContext) async {
-        let recipe = Recipe(from: recipeModel)
+    private func saveRecipe(_ recipe: RecipeX, withImageData imageData: Data, modelContext: ModelContext) async {
         
         // Convert Data back to UIImage for saving
         if let image = UIImage(data: imageData) {
@@ -216,7 +215,7 @@ class BackgroundProcessingManager: ObservableObject {
         modelContext.insert(recipe)
         
         if let imageName = recipe.imageName {
-            let assignment = RecipeImageAssignment(recipeID: recipe.id, imageName: imageName)
+            let assignment = RecipeImageAssignment(recipeID: recipe.id!, imageName: imageName)
             modelContext.insert(assignment)
         }
         

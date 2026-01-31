@@ -532,19 +532,21 @@ struct IngredientRowWithFODMAP: View {
 // MARK: - Preview
 
 #Preview("Substitution Section") {
-    let recipe = RecipeModel(
-        title: "Test Recipe",
-        ingredientSections: [
-            IngredientSection(
-                ingredients: [
-                    Ingredient(quantity: "1", unit: "medium", name: "onion"),
-                    Ingredient(quantity: "3", unit: "cloves", name: "garlic"),
-                    Ingredient(quantity: "1", unit: "cup", name: "milk")
-                ]
-            )
-        ],
-        instructionSections: []
-    )
+    let ingredientSections = [
+        IngredientSection(
+            ingredients: [
+                Ingredient(quantity: "1", unit: "medium", name: "onion"),
+                Ingredient(quantity: "3", unit: "cloves", name: "garlic"),
+                Ingredient(quantity: "1", unit: "cup", name: "milk")
+            ]
+        )
+    ]
+    
+    let recipe = RecipeX()
+    recipe.id = UUID()
+    recipe.title = "Test Recipe"
+    recipe.ingredientSectionsData = try? JSONEncoder().encode(ingredientSections)
+    recipe.instructionSectionsData = try? JSONEncoder().encode([InstructionSection]())
     
     let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
     

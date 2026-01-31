@@ -15,7 +15,7 @@ struct RecipeEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
-    let recipe: Recipe
+    let recipe: RecipeX
     
     // Editable properties
     @State private var title: String
@@ -38,11 +38,11 @@ struct RecipeEditorView: View {
     @State private var showingNotes = false
     @State private var showingImages = false
     
-    init(recipe: Recipe) {
+    init(recipe: RecipeX) {
         self.recipe = recipe
         
         // Initialize state from recipe
-        _title = State(initialValue: recipe.title)
+        _title = State(initialValue: recipe.title ?? "")
         _headerNotes = State(initialValue: recipe.headerNotes ?? "")
         _recipeYield = State(initialValue: recipe.recipeYield ?? "")
         _reference = State(initialValue: recipe.reference ?? "")
@@ -325,16 +325,23 @@ struct RecipeEditorView: View {
         recipe.instructionSectionsData = try? encoder.encode(instructionSectionModels)
         recipe.notesData = try? encoder.encode(noteModels)
         
-        // Update ingredients with version tracking if they changed
+        // Always save ingredients, but only update hash/version if they changed
         if ingredientsChanged, let ingredientsData = newIngredientsData {
             print("📝 Ingredients changed - updating version and hash")
             recipe.updateIngredients(ingredientsData)
             
             // Clear any cached diabetic analysis since ingredients changed
             Task {
-                DiabeticInfoCache.shared.clear(recipeId: recipe.id)
-                print("🗑️ Cleared in-memory diabetic cache for recipe: \(recipe.title)")
+                if let recipeID = recipe.id {
+                    DiabeticInfoCache.shared.clear(recipeId: recipeID)
+                    print("🗑️ Cleared in-memory diabetic cache for recipe: \(recipe.title ?? "Unknown")")
+                }
             }
+        } else if let ingredientsData = newIngredientsData {
+            // Even if ingredients didn't change, still save them (for consistency)
+            recipe.ingredientSectionsData = ingredientsData
+            // Still update lastModified even if ingredients didn't change
+            recipe.lastModified = Date()
         } else {
             // Still update lastModified even if ingredients didn't change
             recipe.lastModified = Date()
@@ -995,26 +1002,26 @@ struct NotesEditorView: View {
                 }
                 .listRowBackground(Color.clear)
             } else {
-                ForEach($notes) { $note in
+                ForEach($notes, id: \.id) { note in
                     Section {
                         NavigationLink {
                             NoteDetailView(
-                                note: $note,
+                                note: note,
                                 hasUnsavedChanges: $hasUnsavedChanges
                             )
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: note.type.icon)
-                                    .foregroundColor(note.type.color)
+                                Image(systemName: "circle")   // note.iconName
+                                    .foregroundColor(.secondary)
                                     .frame(width: 30)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(note.type.displayName)
+                                    Text("This is a note")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                     
-                                    Text(note.text.isEmpty ? "New Note" : note.text)
-                                        .lineLimit(2)
+//                                    Text(note.text.isEmpty ? "New Note" : note.text)
+//                                        .lineLimit(2)
                                 }
                             }
                         }
@@ -1066,7 +1073,7 @@ struct NoteDetailView: View {
         Form {
             Section {
                 Picker("Note Type", selection: $note.type) {
-                    ForEach(RecipeNote.NoteType.allCases, id: \.self) { type in
+                    ForEach(RecipeNoteType.allCases, id: \.self) { type in
                         Label(type.displayName, systemImage: type.icon)
                             .tag(type)
                     }
@@ -1104,7 +1111,7 @@ struct NoteDetailView: View {
 // MARK: - Recipe Images Editor View
 
 struct RecipeImagesEditorView: View {
-    let recipe: Recipe
+    let recipe: RecipeX
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -1122,6 +1129,7 @@ struct RecipeImagesEditorView: View {
                     VStack(spacing: 16) {
                         RecipeImageView(
                             imageName: mainImage,
+                            imageData: recipe.imageData,
                             size: CGSize(width: 300, height: 300),
                             cornerRadius: 12
                         )
@@ -1146,6 +1154,7 @@ struct RecipeImagesEditorView: View {
                         HStack {
                             RecipeImageView(
                                 imageName: imageName,
+                                imageData: nil,
                                 size: CGSize(width: 80, height: 80),
                                 cornerRadius: 8
                             )
@@ -1277,7 +1286,8 @@ struct RecipeImagesEditorView: View {
             }
             
             // Save the image
-            let imageName = "recipe_\(recipe.id.uuidString)_\(UUID().uuidString).jpg"
+            let recipeID = recipe.id ?? UUID()
+            let imageName = "recipe_\(recipeID.uuidString)_\(UUID().uuidString).jpg"
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let fileURL = documentsPath.appendingPathComponent(imageName)
             
@@ -1331,54 +1341,6 @@ struct RecipeImagesEditorView: View {
         }
         
         imageToDelete = nil
-    }
-}
-
-// MARK: - RecipeNote.NoteType Extension
-
-extension RecipeNote.NoteType {
-    var displayName: String {
-        switch self {
-        case .general: return "General"
-        case .tip: return "Tip"
-        case .substitution: return "Substitution"
-        case .warning: return "Warning"
-        case .timing: return "Timing"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .general: return "note.text"
-        case .tip: return "lightbulb.fill"
-        case .substitution: return "arrow.left.arrow.right"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .timing: return "clock.fill"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .general: return .blue
-        case .tip: return .yellow
-        case .substitution: return .green
-        case .warning: return .red
-        case .timing: return .orange
-        }
-    }
-    
-    var helpText: String {
-        switch self {
-        case .general: return "General information or notes about the recipe"
-        case .tip: return "Helpful tips to improve the recipe or technique"
-        case .substitution: return "Alternative ingredients or methods"
-        case .warning: return "Important warnings or things to watch out for"
-        case .timing: return "Timing-related notes and guidance"
-        }
-    }
-    
-    static var allCases: [RecipeNote.NoteType] {
-        [.general, .tip, .substitution, .warning, .timing]
     }
 }
 
@@ -1496,14 +1458,14 @@ struct EditableInstructionStep: Identifiable {
     
     init(from step: InstructionStep) {
         self.id = step.id
-        self.stepNumber = step.stepNumber.map { String($0) } ?? ""
+        self.stepNumber = step.stepNumber.description
         self.text = step.text
     }
     
     func toModel() -> InstructionStep {
         InstructionStep(
             id: id,
-            stepNumber: Int(stepNumber),
+            stepNumber: Int(stepNumber) ?? 0,
             text: text
         )
     }
@@ -1511,10 +1473,10 @@ struct EditableInstructionStep: Identifiable {
 
 struct EditableRecipeNote: Identifiable {
     let id: UUID
-    var type: RecipeNote.NoteType
+    var type: RecipeNoteType
     var text: String
     
-    init(id: UUID = UUID(), type: RecipeNote.NoteType = .general, text: String = "") {
+    init(id: UUID = UUID(), type: RecipeNoteType = .general, text: String = "") {
         self.id = id
         self.type = type
         self.text = text
@@ -1634,11 +1596,11 @@ struct RecipeNoteEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Picker("Note Type", selection: $note.type) {
-                Text("General").tag(RecipeNote.NoteType.general)
-                Text("Tip").tag(RecipeNote.NoteType.tip)
-                Text("Substitution").tag(RecipeNote.NoteType.substitution)
-                Text("Warning").tag(RecipeNote.NoteType.warning)
-                Text("Timing").tag(RecipeNote.NoteType.timing)
+                Text("General").tag(RecipeNoteType.general)
+                Text("Tip").tag(RecipeNoteType.tip)
+                Text("Substitution").tag(RecipeNoteType.substitution)
+                Text("Warning").tag(RecipeNoteType.warning)
+                Text("Timing").tag(RecipeNoteType.timing)
             }
             .onChange(of: note.type) { onChange() }
             
@@ -1652,13 +1614,24 @@ struct RecipeNoteEditor: View {
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Recipe.self, configurations: config)
+    let container = try! ModelContainer(for: RecipeX.self, configurations: config)
     
     // Create a sample recipe
-    let recipe = Recipe(
+    let encoder = JSONEncoder()
+    let recipe = RecipeX(
         title: "Sample Recipe",
         headerNotes: "A delicious recipe",
-        recipeYield: "Serves 4"
+        recipeYield: "Serves 4",
+        ingredientSectionsData: try? encoder.encode([
+            IngredientSection(ingredients: [
+                Ingredient(quantity: "2", unit: "cups", name: "flour")
+            ])
+        ]),
+        instructionSectionsData: try? encoder.encode([
+            InstructionSection(steps: [
+                InstructionStep(stepNumber: 1, text: "Mix ingredients")
+            ])
+        ])
     )
     container.mainContext.insert(recipe)
     

@@ -11,7 +11,7 @@ import Observation
 
 @Observable
 final class CookingViewModel {
-    var selectedRecipes: [Recipe?] = [nil, nil]
+    var selectedRecipes: [RecipeX?] = [nil, nil]
     var currentRecipeIndex: Int = 0
     
     // Use the shared singleton instead of creating a new instance
@@ -48,7 +48,7 @@ final class CookingViewModel {
         }
     }
     
-    func selectRecipe(_ recipe: Recipe, slot: Int) {
+    func selectRecipe(_ recipe: RecipeX, slot: Int) {
         guard slot >= 0 && slot < 2 else { return }
         selectedRecipes[slot] = recipe
         session?.updateRecipe(recipe.id, slot: slot)
@@ -100,10 +100,10 @@ final class CookingViewModel {
         ]
     }
     
-    private func loadRecipe(by id: UUID?) -> Recipe? {
+    private func loadRecipe(by id: UUID?) -> RecipeX? {
         guard let id = id else { return nil }
         
-        let descriptor = FetchDescriptor<Recipe>(
+        let descriptor = FetchDescriptor<RecipeX>(
             predicate: #Predicate { recipe in
                 recipe.id == id
             }

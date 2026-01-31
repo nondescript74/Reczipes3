@@ -7,34 +7,29 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct RecipeBookDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Query private var savedRecipes: [Recipe]
+    @Query private var savedRecipes: [RecipeX]  // ✅ Changed from Recipe to RecipeX
     
-    let book: RecipeBook
+    let book: Book
     
     @State private var currentPage = 0
     @State private var showingRecipeSelector = false
     @State private var showingBookEditor = false
-    @State private var showingExportOptions = false
-    @State private var isExporting = false
-    @State private var exportedFileURL: URL?
-    @State private var showingShareSheet = false
-    @State private var exportError: Error?
-    @State private var showingExportError = false
     
     private var isPad: Bool {
         horizontalSizeClass == .regular
     }
     
     // Get recipes in the book, maintaining order
-    private var bookRecipes: [RecipeModel] {
-        book.recipeIDs.compactMap { recipeID in
-            savedRecipes.first { $0.id == recipeID }?.toRecipeModel()
-        }
+    private var bookRecipes: [RecipeX] {  // ✅ Changed from RecipeModel to RecipeX
+        book.recipeIDs?.compactMap { recipeID in
+            savedRecipes.first { $0.id == recipeID }  // ✅ Return RecipeX directly
+        } ?? []
     }
     
     private var bookColor: Color {
@@ -53,7 +48,7 @@ struct RecipeBookDetailView: View {
                     recipePageView
                 }
             }
-            .navigationTitle(book.name)
+            .navigationTitle(book.name ?? "No Name")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -75,79 +70,24 @@ struct RecipeBookDetailView: View {
                         } label: {
                             Label("Edit Book", systemImage: "pencil")
                         }
-                        
-                        Divider()
-                        
-                        Button {
-                            showingExportOptions = true
-                        } label: {
-                            Label("Export Book", systemImage: "square.and.arrow.up")
-                        }
-                        .disabled(bookRecipes.isEmpty)
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }
                 }
             }
             .sheet(isPresented: $showingRecipeSelector) {
-                RecipeBookRecipeSelectorView(book: book)
-#if os(iOS)
-                    .presentationDetents(isPad ? [.large] : [.medium, .large])
-                    .presentationDragIndicator(.visible)
-#endif
+                NavigationStack {
+                    RecipeBookRecipeSelectorView(book: book)
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingBookEditor) {
-                RecipeBookEditorView(book: book)
-#if os(iOS)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-#endif
-            }
-            .confirmationDialog("Export Recipe Book", isPresented: $showingExportOptions) {
-                Button("Export with Images") {
-                    Task {
-                        await exportBook(includeImages: true)
-                    }
+                NavigationStack {
+                    RecipeBookEditorView(book: book)
                 }
-                
-                Button("Export without Images") {
-                    Task {
-                        await exportBook(includeImages: false)
-                    }
-                }
-                
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("Choose whether to include images in the export. Files with images will be larger but more complete.")
-            }
-            .sheet(isPresented: $showingShareSheet) {
-                if let url = exportedFileURL {
-                    ShareSheet_RBDV(activityItems: [url])
-                }
-            }
-            .alert("Export Failed", isPresented: $showingExportError) {
-                Button("OK") { }
-            } message: {
-                if let error = exportError {
-                    Text(error.localizedDescription)
-                }
-            }
-            .overlay {
-                if isExporting {
-                    ZStack {
-                        Color.black.opacity(0.4)
-                            .ignoresSafeArea()
-                        
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                            Text("Exporting Recipe Book...")
-                                .font(.headline)
-                        }
-                        .padding(32)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    }
-                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
     }
@@ -158,7 +98,7 @@ struct RecipeBookDetailView: View {
         ContentUnavailableView {
             Label("Empty Book", systemImage: "book.closed")
         } description: {
-            Text("Add recipes to \"\(book.name)\" to get started")
+            Text("Add recipes to \"\(String(describing: book.name))\" to get started")
         } actions: {
             Button {
                 showingRecipeSelector = true
@@ -212,8 +152,8 @@ struct RecipeBookDetailView: View {
             TabView(selection: $currentPage) {
                 ForEach(Array(bookRecipes.enumerated()), id: \.element.id) { index, recipe in
                     RecipePageView(
-                        recipe: recipe, 
-                        pageNumber: index + 1, 
+                        recipe: recipe,
+                        pageNumber: index + 1,
                         bookColor: bookColor,
                         savedRecipes: savedRecipes
                     )
@@ -224,43 +164,15 @@ struct RecipeBookDetailView: View {
             .indexViewStyle(.page(backgroundDisplayMode: .never))
         }
     }
-    
-    // MARK: - Export
-    
-    private func exportBook(includeImages: Bool) async {
-        isExporting = true
-        exportError = nil
-        
-        do {
-            let url = try await RecipeBookExportService.exportBook(
-                book,
-                recipes: bookRecipes,
-                includeImages: includeImages
-            )
-            
-            await MainActor.run {
-                exportedFileURL = url
-                isExporting = false
-                showingShareSheet = true
-            }
-        } catch {
-            await MainActor.run {
-                exportError = error
-                isExporting = false
-                showingExportError = true
-            }
-            logError("Export failed: \(error)", category: "book-export")
-        }
-    }
 }
 
 // MARK: - Recipe Page View
 
 struct RecipePageView: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX  // ✅ Changed from RecipeModel to RecipeX
     let pageNumber: Int
     let bookColor: Color
-    let savedRecipes: [Recipe]
+    let savedRecipes: [RecipeX]  // ✅ Changed from Recipe to RecipeX
     
     @State private var showingFullDetail = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -279,9 +191,10 @@ struct RecipePageView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Recipe image
-                    if let imageName = recipe.imageName {
+                    if recipe.imageData != nil || recipe.imageName != nil {  // ✅ Access directly from RecipeX
                         RecipeImageView(
-                            imageName: imageName,
+                            imageName: recipe.imageName,
+                            imageData: recipe.imageData,  // ✅ Access directly from RecipeX
                             size: CGSize(width: geometry.size.width, height: 300),
                             cornerRadius: 0
                         )
@@ -301,7 +214,7 @@ struct RecipePageView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 
-                                Text(recipe.title)
+                                Text(recipe.title ?? "Untitled")  // ✅ Handle optional title
                                     .font(.title)
                                     .fontWeight(.bold)
                             }
@@ -335,7 +248,7 @@ struct RecipePageView: View {
                         }
                         
                         // Yield
-                        if let recipeYield = recipe.yield {
+                        if let recipeYield = recipe.recipeYield {  // ✅ Use recipeYield instead of yield
                             HStack {
                                 Image(systemName: "person.2")
                                     .foregroundStyle(bookColor)
@@ -451,48 +364,37 @@ struct RecipePageView: View {
                     .padding()
                 }
             }
-        }
-        .if(isPad) { view in
-            view.fullScreenCover(isPresented: $showingFullDetail) {
+            .fullScreenCover(isPresented: $showingFullDetail) {
                 NavigationStack {
-                    RecipeDetailView(
-                        recipe: recipe,
-                        isSaved: isSaved,
-                        onSave: { }
-                    )
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button {
-                                showingFullDetail = false
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.title3)
-                                        .symbolRenderingMode(.hierarchical)
-                                    Text("Close")
-                                        .font(.body)
+                    RecipeDetailView(recipe: recipe)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button {
+                                    showingFullDetail = false
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title3)
+                                            .symbolRenderingMode(.hierarchical)
+                                        Text("Close")
+                                            .font(.body)
+                                    }
+                                    .foregroundStyle(.secondary)
                                 }
-                                .foregroundStyle(.secondary)
                             }
                         }
-                    }
                 }
             }
-        } else: { view in
-            view.sheet(isPresented: $showingFullDetail) {
+            .sheet(isPresented: $showingFullDetail) {
                 NavigationStack {
-                    RecipeDetailView(
-                        recipe: recipe,
-                        isSaved: isSaved,
-                        onSave: { }
-                    )
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
-                                showingFullDetail = false
+                    RecipeDetailView(recipe: recipe)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingFullDetail = false
+                                }
                             }
                         }
-                    }
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -501,12 +403,15 @@ struct RecipePageView: View {
     }
 }
 
+
+
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: RecipeBook.self, Recipe.self, configurations: config)
+    let schema = Schema([Book.self, RecipeX.self])
+    let container = try! ModelContainer(for: schema, configurations: config)
     
     // Create a sample book
-    let book = RecipeBook(
+    let book = Book(
         name: "Favorites",
         bookDescription: "My favorite recipes",
         color: "FF6B6B"
@@ -517,43 +422,4 @@ struct RecipePageView: View {
     return RecipeBookDetailView(book: book)
         .modelContainer(container)
 }
-// MARK: - Share Sheet
-
-#if os(iOS)
-import UIKit
-#endif
-struct ShareSheet_RBDV: UIViewControllerRepresentable {
-    let activityItems: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(
-            activityItems: activityItems,
-            applicationActivities: nil
-        )
-        return controller
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
-        // No updates needed
-    }
-}
-
-// MARK: - View Extension for Conditional Modifiers
-
-extension View {
-    /// Applies a transformation to a view if a condition is true, otherwise applies an alternative transformation
-    @ViewBuilder
-    func `if`<TrueContent: View, FalseContent: View>(
-        _ condition: Bool,
-        then trueTransform: (Self) -> TrueContent,
-        else falseTransform: (Self) -> FalseContent
-    ) -> some View {
-        if condition {
-            trueTransform(self)
-        } else {
-            falseTransform(self)
-        }
-    }
-}
-
 

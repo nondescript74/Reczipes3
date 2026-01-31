@@ -10,17 +10,17 @@ import SwiftData
 
 struct RecipePickerSheet: View {
     let currentRecipeID: UUID?
-    let onSelect: (Recipe) -> Void
+    let onSelect: (RecipeX) -> Void
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     
-    @Query(sort: \Recipe.title) private var allRecipes: [Recipe]
+    @Query(sort: \RecipeX.title) private var allRecipes: [RecipeX]
     
     @State private var searchText = ""
     @State private var selectedCuisine: String?
     
-    private var filteredRecipes: [Recipe] {
+    private var filteredRecipes: [RecipeX] {
         var recipes = allRecipes
         
         // Filter out currently selected recipe
@@ -31,7 +31,7 @@ struct RecipePickerSheet: View {
         // Apply search filter
         if !searchText.isEmpty {
             recipes = recipes.filter { recipe in
-                recipe.title.localizedCaseInsensitiveContains(searchText) ||
+                recipe.title?.localizedCaseInsensitiveContains(searchText) == true ||
                 recipe.cuisine?.localizedCaseInsensitiveContains(searchText) == true
             }
         }
@@ -136,7 +136,7 @@ struct RecipePickerSheet: View {
 // MARK: - Recipe Row
 
 struct RecipeRow: View {
-    let recipe: Recipe
+    let recipe: RecipeX
     
     var body: some View {
         HStack(spacing: 12) {
@@ -159,7 +159,7 @@ struct RecipeRow: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title)
+                Text(recipe.title ?? "Untitled Recipe")
                     .font(.headline)
                     .foregroundStyle(.primary)
                 
@@ -191,5 +191,5 @@ struct RecipeRow: View {
         currentRecipeID: nil,
         onSelect: { _ in }
     )
-    .modelContainer(for: Recipe.self, inMemory: true)
+    .modelContainer(for: RecipeX.self, inMemory: true)
 }

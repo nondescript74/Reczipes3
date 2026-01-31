@@ -714,40 +714,65 @@ struct FlowLayoutFAV: Layout {
 
 // MARK: - Previews
 
-#Preview("FODMAP Badge - Safe") {
-    FODMAPBadgeView(recommendation: .safe)
-        .padding()
-}
-
-#Preview("FODMAP Badge - Avoid") {
-    FODMAPBadgeView(recommendation: .avoid)
-        .padding()
+#Preview("FODMAP Badges") {
+    VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Compact Badges")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                FODMAPBadgeView(recommendation: .safe)
+                FODMAPBadgeView(recommendation: .caution)
+                FODMAPBadgeView(recommendation: .modify)
+                FODMAPBadgeView(recommendation: .avoid)
+            }
+        }
+        
+        Divider()
+        
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Loading States")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                StandardLoadingBadge()
+                CompactLoadingBadge()
+            }
+        }
+    }
+    .padding()
 }
 
 #Preview("FODMAP Analysis Detail") {
     // Create sample data
-    let sampleRecipe = RecipeModel(
-        title: "Pasta with Garlic and Mushrooms",
-        yield: "4 servings",
-        ingredientSections: [
-            IngredientSection(
-                title: "Main Ingredients",
-                ingredients: [
-                    Ingredient(name: "pasta"),
-                    Ingredient(name: "garlic"),
-                    Ingredient(name: "button mushrooms")
-                ]
-            )
-        ],
-        instructionSections: [
-            InstructionSection(
-                title: "Cooking",
-                steps: [
-                    InstructionStep(text: "Cook pasta according to package directions.")
-                ]
-            )
+    let sampleRecipe = RecipeX()
+    sampleRecipe.id = UUID()
+    sampleRecipe.title = "Pasta with Garlic and Mushrooms"
+    sampleRecipe.recipeYield = "4 servings"
+    
+    // Create ingredient sections
+    let ingredientSection = IngredientSection(
+        title: "Main Ingredients",
+        ingredients: [
+            Ingredient(name: "pasta"),
+            Ingredient(name: "garlic"),
+            Ingredient(name: "button mushrooms")
         ]
     )
+    if let ingredientData = try? JSONEncoder().encode([ingredientSection]) {
+        sampleRecipe.ingredientSectionsData = ingredientData
+    }
+    
+    // Create instruction sections
+    let instructionSection = InstructionSection(
+        title: "Cooking",
+        steps: [
+            InstructionStep(stepNumber: 1, text: "Cook pasta according to package directions.")
+        ]
+    )
+    if let instructionData = try? JSONEncoder().encode([instructionSection]) {
+        sampleRecipe.instructionSectionsData = instructionData
+    }
     
     let sampleFoodData1 = FODMAPFoodData(
         name: "garlic",
@@ -776,7 +801,7 @@ struct FlowLayoutFAV: Layout {
     ]
     
     let basicAnalysis = FODMAPAnalysisResult(
-        recipeID: sampleRecipe.id,
+        recipeID: sampleRecipe.id ?? UUID(),
         overallScore: 13.0,
         categoryBreakdown: categoryBreakdown,
         detectedFoods: detectedFoods,
@@ -794,6 +819,6 @@ struct FlowLayoutFAV: Layout {
         recipe: sampleRecipe
     )
     
-    FODMAPAnalysisDetailView(score: enhancedScore)
+    return FODMAPAnalysisDetailView(score: enhancedScore)
 }
 

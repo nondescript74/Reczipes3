@@ -55,7 +55,7 @@ struct RecipeAllergenBadge: View {
 // MARK: - Detailed Allergen Analysis View
 
 struct RecipeAllergenDetailView: View {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let score: RecipeAllergenScore
     @Environment(\.dismiss) private var dismiss
     
@@ -127,7 +127,7 @@ struct RecipeAllergenDetailView: View {
                     Text("Recommendation")
                 }
             }
-            .navigationTitle(recipe.title)
+            .navigationTitle(recipe.title ?? "Untitled Recipe")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

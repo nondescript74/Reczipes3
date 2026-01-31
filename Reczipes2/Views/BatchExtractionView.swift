@@ -267,7 +267,7 @@ struct BatchExtractionView: View {
                         .font(.title3)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(recipe.title)
+                        Text(recipe.title ?? "Unknown Recipe")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .lineLimit(1)
@@ -291,7 +291,7 @@ struct BatchExtractionView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
-    private func currentRecipePreview(_ recipe: RecipeModel) -> some View {
+    private func currentRecipePreview(_ recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
@@ -303,11 +303,11 @@ struct BatchExtractionView: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
-                Text(recipe.title)
+                Text(recipe.title ?? "untitled")
                     .font(.title3)
                     .fontWeight(.semibold)
                 
-                if let yield = recipe.yield {
+                if let yield = recipe.recipeYield {
                     HStack {
                         Image(systemName: "person.2")
                             .font(.caption)
@@ -324,8 +324,8 @@ struct BatchExtractionView: View {
                             .foregroundStyle(.secondary)
                     }
                     
-                    if let imageURLs = recipe.imageURLs {
-                        Label("\(imageURLs.count) image(s)", systemImage: "photo")
+                    if recipe.imageCount > 0 {
+                        Label("\(recipe.imageCount) image(s)", systemImage: "photo")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

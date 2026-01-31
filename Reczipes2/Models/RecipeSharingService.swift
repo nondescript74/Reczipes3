@@ -47,12 +47,12 @@ class RecipeSharingService: ObservableObject {
     // MARK: - Generate Recipe Content
     
     /// Generate a formatted text version of the recipe
-    func generateRecipeText(from recipe: RecipeModel) -> String {
+    func generateRecipeText(from recipe: RecipeX) -> String {
         var text = ""
         
         // Title
-        text += "🍽️ \(recipe.title)\n"
-        text += String(repeating: "=", count: recipe.title.count + 3) + "\n\n"
+        text += "🍽️ \(String(describing: recipe.title))\n"
+        text += String(repeating: "=", count: (recipe.title?.count ?? 0) + 3) + "\n\n"
         
         // Header notes
         if let headerNotes = recipe.headerNotes {
@@ -98,8 +98,8 @@ class RecipeSharingService: ObservableObject {
                 text += "\n\(title):\n"
             }
             for step in section.steps {
-                if let stepNum = step.stepNumber {
-                    text += "\n\(stepNum). \(step.text)\n"
+                if step.stepNumber > 0 {
+                    text += "\n\(step.stepNumber). \(step.text)\n"
                 } else {
                     text += "\n• \(step.text)\n"
                 }
@@ -128,7 +128,7 @@ class RecipeSharingService: ObservableObject {
     }
     
     /// Generate HTML version of the recipe for email
-    func generateRecipeHTML(from recipe: RecipeModel, sourceType: RecipeShareCardView.RecipeSourceType) -> String {
+    func generateRecipeHTML(from recipe: RecipeX, sourceType: RecipeShareCardView.RecipeSourceType) -> String {
         var html = """
         <!DOCTYPE html>
         <html>
@@ -272,7 +272,7 @@ class RecipeSharingService: ObservableObject {
             <div class="card">
                 <div class="header">
                     <div class="badge">\(sourceType == .email ? "📧" : "💬") Shared via \(sourceType == .email ? "Email" : "Text")</div>
-                    <div class="title">\(recipe.title)</div>
+                    <div class="title">\(String(describing: recipe.title))</div>
         """
         
         if let headerNotes = recipe.headerNotes {
@@ -381,10 +381,10 @@ class RecipeSharingService: ObservableObject {
             }
             
             for step in section.steps {
-                if let stepNum = step.stepNumber {
+                if step.stepNumber > 0 {
                     html += """
                         <div class="step">
-                            <div class="step-number">\(stepNum)</div>
+                            <div class="step-number">\(step.stepNumber)</div>
                             <div>\(step.text)</div>
                         </div>
                     """
@@ -449,7 +449,7 @@ class RecipeSharingService: ObservableObject {
     
     /// Generate a shareable image of the recipe card
     @MainActor
-    func generateRecipeCardImage(from recipe: RecipeModel, sourceType: RecipeShareCardView.RecipeSourceType) -> UIImage? {
+    func generateRecipeCardImage(from recipe: RecipeX, sourceType: RecipeShareCardView.RecipeSourceType) -> UIImage? {
         #if os(iOS)
         let cardView = RecipeShareCardView(recipe: recipe, sourceType: sourceType)
         let hostingController = UIHostingController(rootView: cardView)
@@ -471,7 +471,7 @@ class RecipeSharingService: ObservableObject {
     // MARK: - Share Actions
     
     /// Prepare to share recipe via email
-    func shareViaEmail(recipe: RecipeModel) {
+    func shareViaEmail(recipe: RecipeX) {
         guard canSendEmail else {
             errorMessage = "Email is not configured on this device. Please set up Mail in Settings."
             showingError = true
@@ -481,7 +481,7 @@ class RecipeSharingService: ObservableObject {
     }
     
     /// Prepare to share recipe via text message
-    func shareViaText(recipe: RecipeModel) {
+    func shareViaText(recipe: RecipeX) {
         guard canSendText else {
             errorMessage = "Text messaging is not available on this device."
             showingError = true
@@ -491,7 +491,7 @@ class RecipeSharingService: ObservableObject {
     }
     
     /// Prepare to share recipe using the system share sheet
-    func shareViaShareSheet(recipe: RecipeModel, sourceType: RecipeShareCardView.RecipeSourceType = .app) {
+    func shareViaShareSheet(recipe: RecipeX, sourceType: RecipeShareCardView.RecipeSourceType = .app) {
         let recipeText = generateRecipeText(from: recipe)
         
         var items: [Any] = [recipeText]
@@ -507,7 +507,7 @@ class RecipeSharingService: ObservableObject {
     
     // MARK: - Helper Methods
     
-    private func iconForNoteType(_ type: RecipeNote.NoteType) -> String {
+    private func iconForNoteType(_ type: RecipeNoteType) -> String {
         switch type {
         case .tip: return "💡"
         case .substitution: return "🔄"
@@ -522,14 +522,14 @@ class RecipeSharingService: ObservableObject {
 
 #if os(iOS)
 struct MailComposerView: UIViewControllerRepresentable {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let sharingService: RecipeSharingService
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let composer = MFMailComposeViewController()
         composer.mailComposeDelegate = context.coordinator
-        composer.setSubject("Recipe: \(recipe.title)")
+        composer.setSubject("Recipe: \(String(describing: recipe.title))")
         
         // Generate HTML body
         let htmlBody = sharingService.generateRecipeHTML(from: recipe, sourceType: .email)
@@ -538,7 +538,7 @@ struct MailComposerView: UIViewControllerRepresentable {
         // Attach recipe card image if possible
         if let cardImage = sharingService.generateRecipeCardImage(from: recipe, sourceType: .email),
            let imageData = cardImage.pngData() {
-            composer.addAttachmentData(imageData, mimeType: "image/png", fileName: "\(recipe.title.replacingOccurrences(of: " ", with: "_"))_recipe.png")
+            composer.addAttachmentData(imageData, mimeType: "image/png", fileName: "\(String(describing: recipe.title?.replacingOccurrences(of: " ", with: "_")))_recipe.png")
         }
         
         return composer
@@ -570,7 +570,7 @@ struct MailComposerView: UIViewControllerRepresentable {
 // MARK: - Message Composer View
 
 struct MessageComposerView: UIViewControllerRepresentable {
-    let recipe: RecipeModel
+    let recipe: RecipeX
     let sharingService: RecipeSharingService
     @Environment(\.dismiss) private var dismiss
     
@@ -585,7 +585,7 @@ struct MessageComposerView: UIViewControllerRepresentable {
         // Try to attach recipe card image
         if let cardImage = sharingService.generateRecipeCardImage(from: recipe, sourceType: .text),
            let imageData = cardImage.pngData() {
-            composer.addAttachmentData(imageData, typeIdentifier: "public.png", filename: "\(recipe.title.replacingOccurrences(of: " ", with: "_"))_recipe.png")
+            composer.addAttachmentData(imageData, typeIdentifier: "public.png", filename: "\(String(describing: recipe.title?.replacingOccurrences(of: " ", with: "_")))_recipe.png")
         }
         
         return composer

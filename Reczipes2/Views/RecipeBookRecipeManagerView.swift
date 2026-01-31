@@ -11,9 +11,9 @@ import SwiftData
 struct RecipeBookRecipeManagerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var savedRecipes: [Recipe]
+    @Query private var savedRecipes: [RecipeX]
     
-    let book: RecipeBook
+    let book: Book
     
     @State private var searchText = ""
     @State private var selectedTab: ManagerTab = .current
@@ -27,37 +27,38 @@ struct RecipeBookRecipeManagerView: View {
     }
     
     // Recipes currently in the book
-    private var currentRecipes: [Recipe] {
-        book.recipeIDs.compactMap { recipeID in
+    private var currentRecipes: [RecipeX] {
+        book.recipeIDs?.compactMap { recipeID in
             savedRecipes.first { $0.id == recipeID }
-        }
+        } ?? []
     }
     
     // Recipes available to add (not currently in book)
-    private var availableRecipes: [Recipe] {
+    private var availableRecipes: [RecipeX] {
         savedRecipes.filter { recipe in
-            !book.recipeIDs.contains(recipe.id)
+            guard let recipeID = recipe.id else { return false }
+            return !(book.recipeIDs?.contains(recipeID) ?? false)
         }
     }
     
     // Filtered current recipes based on search
-    private var filteredCurrentRecipes: [Recipe] {
+    private var filteredCurrentRecipes: [RecipeX] {
         if searchText.isEmpty {
             return currentRecipes
         } else {
             return currentRecipes.filter { recipe in
-                recipe.title.localizedCaseInsensitiveContains(searchText)
+                recipe.title?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
     }
     
     // Filtered available recipes based on search
-    private var filteredAvailableRecipes: [Recipe] {
+    private var filteredAvailableRecipes: [RecipeX] {
         if searchText.isEmpty {
             return availableRecipes
         } else {
             return availableRecipes.filter { recipe in
-                recipe.title.localizedCaseInsensitiveContains(searchText)
+                recipe.title?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
     }
@@ -152,13 +153,15 @@ struct RecipeBookRecipeManagerView: View {
                 List(filteredCurrentRecipes) { recipe in
                     RecipeManagementRow(
                         recipe: recipe,
-                        isSelected: recipesToRemove.contains(recipe.id),
+                        isSelected: recipesToRemove.contains(recipe.id ?? UUID()),
                         bookColor: bookColor,
                         mode: .remove
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        toggleRemoveSelection(recipe.id)
+                        if let recipeID = recipe.id {
+                            toggleRemoveSelection(recipeID)
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -186,13 +189,15 @@ struct RecipeBookRecipeManagerView: View {
                 List(filteredAvailableRecipes) { recipe in
                     RecipeManagementRow(
                         recipe: recipe,
-                        isSelected: recipesToAdd.contains(recipe.id),
+                        isSelected: recipesToAdd.contains(recipe.id ?? UUID()),
                         bookColor: bookColor,
                         mode: .add
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        toggleAddSelection(recipe.id)
+                        if let recipeID = recipe.id {
+                            toggleAddSelection(recipeID)
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -220,15 +225,13 @@ struct RecipeBookRecipeManagerView: View {
     
     private func removeSelectedRecipes() {
         // Remove the selected recipe IDs from the book
-        book.recipeIDs.removeAll { recipeID in
-            recipesToRemove.contains(recipeID)
+        for recipeID in recipesToRemove {
+            book.removeRecipe(recipeID)
         }
-        
-        book.dateModified = Date()
         
         do {
             try modelContext.save()
-            logInfo("Removed \(recipesToRemove.count) recipes from book: \(book.name)", category: "book")
+            logInfo("Removed \(recipesToRemove.count) recipes from book: \(book.name ?? "Unknown")", category: "book")
             recipesToRemove.removeAll()
         } catch {
             logError("Failed to remove recipes from book: \(error)", category: "book")
@@ -238,16 +241,12 @@ struct RecipeBookRecipeManagerView: View {
     private func addSelectedRecipes() {
         // Add the selected recipe IDs to the book
         for recipeID in recipesToAdd {
-            if !book.recipeIDs.contains(recipeID) {
-                book.recipeIDs.append(recipeID)
-            }
+            book.addRecipe(recipeID)
         }
-        
-        book.dateModified = Date()
         
         do {
             try modelContext.save()
-            logInfo("Added \(recipesToAdd.count) recipes to book: \(book.name)", category: "book")
+            logInfo("Added \(recipesToAdd.count) recipes to book: \(book.name ?? "Unknown")", category: "book")
             recipesToAdd.removeAll()
             // Switch back to current tab to show the newly added recipes
             selectedTab = .current
@@ -260,7 +259,7 @@ struct RecipeBookRecipeManagerView: View {
 // MARK: - Recipe Management Row
 
 struct RecipeManagementRow: View {
-    let recipe: Recipe
+    let recipe: RecipeX
     let isSelected: Bool
     let bookColor: Color
     let mode: Mode
@@ -310,7 +309,7 @@ struct RecipeManagementRow: View {
             
             // Recipe info
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title)
+                Text(recipe.title ?? "Untitled Recipe")
                     .font(.headline)
                     .lineLimit(2)
                 
@@ -330,48 +329,39 @@ struct RecipeManagementRow: View {
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: RecipeBook.self, Recipe.self, configurations: config)
+    let container = try! ModelContainer(for: Book.self, RecipeX.self, configurations: config)
     
     // Create a sample book
-    let book = RecipeBook(
-        name: "Favorites",
-        bookDescription: "My favorite recipes",
-        color: "FF6B6B"
-    )
+    let book = Book()
+    book.id = UUID()
+    book.name = "Favorites"
+    book.bookDescription = "My favorite recipes"
+    book.color = "FF6B6B"
     
     // Create some sample recipes
-    let recipe1 = Recipe(
-        id: UUID(),
-        title: "Chocolate Chip Cookies",
-        headerNotes: "Classic homemade cookies",
-        recipeYield: "24 cookies",
-        reference: nil,
-        dateAdded: Date(),
-        imageName: nil
-    )
+    let recipe1 = RecipeX()
+    recipe1.id = UUID()
+    recipe1.title = "Chocolate Chip Cookies"
+    recipe1.headerNotes = "Classic homemade cookies"
+    recipe1.recipeYield = "24 cookies"
+    recipe1.dateAdded = Date()
     
-    let recipe2 = Recipe(
-        id: UUID(),
-        title: "Apple Pie",
-        headerNotes: "Traditional American dessert",
-        recipeYield: "8 servings",
-        reference: nil,
-        dateAdded: Date(),
-        imageName: nil
-    )
+    let recipe2 = RecipeX()
+    recipe2.id = UUID()
+    recipe2.title = "Apple Pie"
+    recipe2.headerNotes = "Traditional American dessert"
+    recipe2.recipeYield = "8 servings"
+    recipe2.dateAdded = Date()
     
-    let recipe3 = Recipe(
-        id: UUID(),
-        title: "Spaghetti Carbonara",
-        headerNotes: "Italian pasta classic",
-        recipeYield: "4 servings",
-        reference: nil,
-        dateAdded: Date(),
-        imageName: nil
-    )
+    let recipe3 = RecipeX()
+    recipe3.id = UUID()
+    recipe3.title = "Spaghetti Carbonara"
+    recipe3.headerNotes = "Italian pasta classic"
+    recipe3.recipeYield = "4 servings"
+    recipe3.dateAdded = Date()
     
     // Add some recipes to the book
-    book.recipeIDs = [recipe1.id, recipe2.id]
+    book.recipeIDs = [recipe1.id, recipe2.id].compactMap { $0 }
     
     container.mainContext.insert(book)
     container.mainContext.insert(recipe1)

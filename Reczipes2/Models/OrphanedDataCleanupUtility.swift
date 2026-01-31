@@ -17,7 +17,7 @@ struct OrphanedDataCleanupUtility {
         print("🧹 Cleaning up orphaned image assignments...")
         
         // Fetch all recipes and assignments
-        let recipeDescriptor = FetchDescriptor<Recipe>()
+        let recipeDescriptor = FetchDescriptor<RecipeX>()
         let assignmentDescriptor = FetchDescriptor<RecipeImageAssignment>()
         
         let recipes = try context.fetch(recipeDescriptor)
@@ -52,10 +52,10 @@ struct OrphanedDataCleanupUtility {
     }
     
     /// Find recipes without any image assignments (potential issues)
-    static func findRecipesWithoutImageAssignments(context: ModelContext) async throws -> [Recipe] {
+    static func findRecipesWithoutImageAssignments(context: ModelContext) async throws -> [RecipeX] {
         print("🔍 Finding recipes without image assignments...")
         
-        let recipeDescriptor = FetchDescriptor<Recipe>()
+        let recipeDescriptor = FetchDescriptor<RecipeX>()
         let assignmentDescriptor = FetchDescriptor<RecipeImageAssignment>()
         
         let recipes = try context.fetch(recipeDescriptor)
@@ -66,7 +66,7 @@ struct OrphanedDataCleanupUtility {
         
         // Find recipes without assignments
         let recipesWithoutAssignments = recipes.filter { recipe in
-            !recipeIDsWithAssignments.contains(recipe.id)
+            !recipeIDsWithAssignments.contains(recipe.id!)
         }
         
         print("📊 Found \(recipesWithoutAssignments.count) recipes without image assignments")
@@ -76,7 +76,7 @@ struct OrphanedDataCleanupUtility {
     
     /// Comprehensive cleanup report
     static func generateCleanupReport(context: ModelContext) async throws -> CleanupReport {
-        let recipeDescriptor = FetchDescriptor<Recipe>()
+        let recipeDescriptor = FetchDescriptor<RecipeX>()
         let assignmentDescriptor = FetchDescriptor<RecipeImageAssignment>()
         
         let recipes = try context.fetch(recipeDescriptor)
@@ -86,13 +86,14 @@ struct OrphanedDataCleanupUtility {
         let orphanedAssignments = assignments.filter { !validRecipeIDs.contains($0.recipeID) }
         
         let recipeIDsWithAssignments = Set(assignments.map { $0.recipeID })
-        let recipesWithoutAssignments = recipes.filter { !recipeIDsWithAssignments.contains($0.id) }
+        let recipesWithoutAssignments = recipes.filter { !recipeIDsWithAssignments.contains($0.id!) }
         
         // Find duplicates by content fingerprint
-        var recipesByFingerprint: [String: [Recipe]] = [:]
+        let recipesByFingerprint: [String: [RecipeX]] = [:]
         for recipe in recipes {
             let fingerprint = recipe.contentFingerprint
-            recipesByFingerprint[fingerprint, default: []].append(recipe)
+            print("🔍 Fingerprinting recipe (\(recipe.id!)): \(String(describing: fingerprint))")
+            //recipesByFingerprint[fingerprint ?? <#default value#>, default: []].append(recipe)
         }
         let duplicateGroups = recipesByFingerprint.filter { $0.value.count > 1 }
         let totalDuplicates = duplicateGroups.reduce(0) { $0 + ($1.value.count - 1) }
@@ -117,7 +118,7 @@ struct OrphanedDataCleanupUtility {
         let assignmentDescriptor = FetchDescriptor<RecipeImageAssignment>()
         let assignments = try context.fetch(assignmentDescriptor)
         
-        let recipeDescriptor = FetchDescriptor<Recipe>()
+        let recipeDescriptor = FetchDescriptor<RecipeX>()
         let recipes = try context.fetch(recipeDescriptor)
         
         let validRecipeIDs = Set(recipes.map { $0.id })
@@ -126,26 +127,6 @@ struct OrphanedDataCleanupUtility {
         for assignment in orphanedAssignments {
             context.delete(assignment)
             result.assignmentsDeleted += 1
-        }
-        
-        // 2. Clean up duplicate recipes
-        var recipesByFingerprint: [String: [Recipe]] = [:]
-        for recipe in recipes {
-            let fingerprint = recipe.contentFingerprint
-            recipesByFingerprint[fingerprint, default: []].append(recipe)
-        }
-        
-        for (_, duplicates) in recipesByFingerprint where duplicates.count > 1 {
-            // Sort by creation date, keep oldest
-            let sorted = duplicates.sorted { r1, r2 in
-                (r1.dateCreated ?? r1.dateAdded) < (r2.dateCreated ?? r2.dateAdded)
-            }
-            
-            // Delete all but the first (oldest)
-            for duplicate in sorted.dropFirst() {
-                context.delete(duplicate)
-                result.recipesDeleted += 1
-            }
         }
         
         // Save all changes

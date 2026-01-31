@@ -240,7 +240,7 @@ struct CloudKitSyncStatusMonitorView: View {
         await monitor.checkAccountStatus()
         
         // Count recipes (legacy model)
-        let recipeDescriptor = FetchDescriptor<Recipe>()
+        let recipeDescriptor = FetchDescriptor<RecipeX>()
         if let recipes = try? modelContext.fetch(recipeDescriptor) {
             recipeCount = recipes.count
         }
@@ -298,7 +298,7 @@ struct CloudKitSyncStatusMonitorView: View {
             let oldBookCount = bookCount
             
             // Refresh all counts
-            let recipeDescriptor = FetchDescriptor<Recipe>()
+            let recipeDescriptor = FetchDescriptor<RecipeX>()
             if let recipes = try? modelContext.fetch(recipeDescriptor) {
                 recipeCount = recipes.count
             }

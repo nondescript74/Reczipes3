@@ -259,7 +259,7 @@ struct BatchExtractionDetailsSheet: View {
         .cornerRadius(12)
     }
     
-    private func currentRecipeSection(recipe: RecipeModel) -> some View {
+    private func currentRecipeSection(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Current Recipe")
                 .font(.headline)
@@ -267,7 +267,7 @@ struct BatchExtractionDetailsSheet: View {
             HStack {
                 Image(systemName: "book.fill")
                     .foregroundColor(.blue)
-                Text(recipe.title)
+                Text(recipe.title ?? "untitled")
                     .font(.subheadline)
                     .lineLimit(2)
             }
@@ -287,7 +287,7 @@ struct BatchExtractionDetailsSheet: View {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text(recipe.title)
+                    Text(recipe.title ?? "untitled")
                         .font(.subheadline)
                         .lineLimit(1)
                     Spacer()

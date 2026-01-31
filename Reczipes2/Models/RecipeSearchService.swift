@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// A service that provides comprehensive recipe search functionality
+/// A service that provides comprehensive recipe and book search functionality
 class RecipeSearchService {
     
     /// Search criteria for filtering recipes
@@ -19,6 +19,21 @@ class RecipeSearchService {
         
         var isEmpty: Bool {
             searchText.isEmpty && dishTypes.isEmpty && maxCookingTime == nil && author == nil
+        }
+    }
+    
+    /// Search criteria for filtering books
+    struct BookSearchCriteria {
+        var searchText: String = ""
+        var categories: Set<String> = []
+        var cuisines: Set<String> = []
+        var minRecipeCount: Int? = nil
+        var maxRecipeCount: Int? = nil
+        var author: String? = nil
+        
+        var isEmpty: Bool {
+            searchText.isEmpty && categories.isEmpty && cuisines.isEmpty && 
+            minRecipeCount == nil && maxRecipeCount == nil && author == nil
         }
     }
     
@@ -100,7 +115,7 @@ class RecipeSearchService {
     
     /// Search results with relevance scoring
     struct SearchResult {
-        let recipe: RecipeModel
+        let recipe: RecipeX
         let score: Double
         let matchedFields: [MatchField]
         
@@ -122,7 +137,7 @@ class RecipeSearchService {
     ///   - recipes: The recipes to search through
     ///   - criteria: The search criteria to apply
     /// - Returns: An array of search results, sorted by relevance score (highest first)
-    func search(recipes: [RecipeModel], criteria: SearchCriteria) -> [SearchResult] {
+    func search(recipes: [RecipeX], criteria: SearchCriteria) -> [SearchResult] {
         guard !criteria.isEmpty else {
             // Return all recipes with default score when no criteria
             return recipes.map { SearchResult(recipe: $0, score: 1.0, matchedFields: []) }
@@ -190,19 +205,19 @@ class RecipeSearchService {
     }
     
     /// Convenience method to get just the recipes without search metadata
-    func searchRecipes(recipes: [RecipeModel], criteria: SearchCriteria) -> [RecipeModel] {
+    func searchRecipes(recipes: [RecipeX], criteria: SearchCriteria) -> [RecipeX] {
         search(recipes: recipes, criteria: criteria).map { $0.recipe }
     }
     
     // MARK: - Private Helper Methods
     
-    private func searchText(in recipe: RecipeModel, searchText: String) -> (score: Double, fields: [SearchResult.MatchField]) {
+    private func searchText(in recipe: RecipeX, searchText: String) -> (score: Double, fields: [SearchResult.MatchField]) {
         var score: Double = 0
         var fields: [SearchResult.MatchField] = []
         let query = searchText.lowercased()
         
         // Title matching (highest weight)
-        if recipe.title.localizedCaseInsensitiveContains(query) {
+        if recipe.safeTitle.localizedCaseInsensitiveContains(query) {
             score += 10.0
             fields.append(.title)
         }
@@ -264,7 +279,7 @@ class RecipeSearchService {
         return (score, fields)
     }
     
-    private func matchDishTypes(in recipe: RecipeModel, types: Set<DishType>) -> [DishType] {
+    private func matchDishTypes(in recipe: RecipeX, types: Set<DishType>) -> [DishType] {
         var matches: [DishType] = []
         
         for dishType in types {
@@ -277,9 +292,9 @@ class RecipeSearchService {
     }
     
     /// Detect if a recipe matches a specific dish type
-    private func detectDishType(_ recipe: RecipeModel, type: DishType) -> Bool {
+    private func detectDishType(_ recipe: RecipeX, type: DishType) -> Bool {
         let searchableText = [
-            recipe.title,
+            recipe.safeTitle,
             recipe.headerNotes ?? "",
             recipe.notes.map { $0.text }.joined(separator: " ")
         ].joined(separator: " ").lowercased()
@@ -291,7 +306,13 @@ class RecipeSearchService {
     }
     
     /// Extract cooking time from recipe (in minutes)
-    private func extractCookingTime(from recipe: RecipeModel) -> Int? {
+    private func extractCookingTime(from recipe: RecipeX) -> Int? {
+        // First check if cookTimeMinutes is set
+        if let cookTime = recipe.cookTimeMinutes, cookTime > 0 {
+            return cookTime
+        }
+        
+        // Fall back to parsing text
         // Look for time mentions in header notes, instructions, and notes
         let searchableText = [
             recipe.headerNotes ?? "",
@@ -342,12 +363,12 @@ class RecipeSearchService {
     // MARK: - Helper Methods for UI
     
     /// Get all detected dish types for a recipe
-    func detectAllDishTypes(for recipe: RecipeModel) -> [DishType] {
+    func detectAllDishTypes(for recipe: RecipeX) -> [DishType] {
         DishType.allCases.filter { detectDishType(recipe, type: $0) }
     }
     
     /// Get cooking time display string for a recipe
-    func getCookingTimeString(for recipe: RecipeModel) -> String? {
+    func getCookingTimeString(for recipe: RecipeX) -> String? {
         guard let minutes = extractCookingTime(from: recipe) else { return nil }
         
         if minutes < 60 {
@@ -361,6 +382,162 @@ class RecipeSearchService {
                 return "\(hours) hr \(remainingMinutes) min"
             }
         }
+    }
+    
+    // MARK: - Book Search
+    
+    /// Search results for books with relevance scoring
+    struct BookSearchResult {
+        let book: Book
+        let score: Double
+        let matchedFields: [BookMatchField]
+        
+        enum BookMatchField: Equatable {
+            case name
+            case description
+            case author
+            case category
+            case cuisine
+            case recipeCount
+        }
+    }
+    
+    /// Search books based on the provided criteria
+    /// - Parameters:
+    ///   - books: The books to search through
+    ///   - criteria: The search criteria to apply
+    /// - Returns: An array of search results, sorted by relevance score (highest first)
+    func searchBooks(books: [Book], criteria: BookSearchCriteria) -> [BookSearchResult] {
+        guard !criteria.isEmpty else {
+            // Return all books with default score when no criteria
+            return books.map { BookSearchResult(book: $0, score: 1.0, matchedFields: []) }
+        }
+        
+        var results: [BookSearchResult] = []
+        
+        for book in books {
+            var score: Double = 0
+            var matchedFields: [BookSearchResult.BookMatchField] = []
+            
+            // Category filtering
+            if !criteria.categories.isEmpty {
+                if let category = book.category, criteria.categories.contains(category) {
+                    score += 8.0
+                    matchedFields.append(.category)
+                } else {
+                    // Book doesn't match required category - skip it
+                    continue
+                }
+            }
+            
+            // Cuisine filtering
+            if !criteria.cuisines.isEmpty {
+                if let cuisine = book.cuisine, criteria.cuisines.contains(cuisine) {
+                    score += 8.0
+                    matchedFields.append(.cuisine)
+                } else {
+                    // Book doesn't match required cuisine - skip it
+                    continue
+                }
+            }
+            
+            // Recipe count filtering
+            let recipeCount = book.recipeIDs?.count ?? 0
+            if let minCount = criteria.minRecipeCount, recipeCount < minCount {
+                continue
+            }
+            if let maxCount = criteria.maxRecipeCount, recipeCount > maxCount {
+                continue
+            }
+            if criteria.minRecipeCount != nil || criteria.maxRecipeCount != nil {
+                score += 5.0
+                matchedFields.append(.recipeCount)
+            }
+            
+            // Author filtering
+            if let authorQuery = criteria.author, !authorQuery.isEmpty {
+                guard let ownerName = book.ownerDisplayName, 
+                      ownerName.localizedCaseInsensitiveContains(authorQuery) else {
+                    continue
+                }
+                score += 10.0
+                matchedFields.append(.author)
+            }
+            
+            // Text search
+            if !criteria.searchText.isEmpty {
+                let textMatches = searchTextInBook(book, searchText: criteria.searchText)
+                if textMatches.score > 0 {
+                    score += textMatches.score
+                    matchedFields.append(contentsOf: textMatches.fields)
+                } else if !criteria.categories.isEmpty || !criteria.cuisines.isEmpty || 
+                          criteria.minRecipeCount != nil || criteria.maxRecipeCount != nil || 
+                          criteria.author != nil {
+                    // If there are other criteria and text search is specified,
+                    // the book must match the text search too
+                    continue
+                }
+            }
+            
+            // Only include books with matches
+            if score > 0 {
+                results.append(BookSearchResult(book: book, score: score, matchedFields: matchedFields))
+            }
+        }
+        
+        // Sort by score (highest first)
+        return results.sorted { $0.score > $1.score }
+    }
+    
+    /// Search text within a book
+    private func searchTextInBook(_ book: Book, searchText: String) -> (score: Double, fields: [BookSearchResult.BookMatchField]) {
+        var score: Double = 0
+        var fields: [BookSearchResult.BookMatchField] = []
+        let query = searchText.lowercased()
+        
+        // Name matching (highest weight)
+        if let name = book.name, name.localizedCaseInsensitiveContains(query) {
+            score += 10.0
+            fields.append(.name)
+        }
+        
+        // Description matching
+        if let description = book.bookDescription, description.localizedCaseInsensitiveContains(query) {
+            score += 8.0
+            fields.append(.description)
+        }
+        
+        // Category matching
+        if let category = book.category, category.localizedCaseInsensitiveContains(query) {
+            score += 5.0
+            fields.append(.category)
+        }
+        
+        // Cuisine matching
+        if let cuisine = book.cuisine, cuisine.localizedCaseInsensitiveContains(query) {
+            score += 5.0
+            fields.append(.cuisine)
+        }
+        
+        // Author matching
+        if let author = book.ownerDisplayName, author.localizedCaseInsensitiveContains(query) {
+            score += 7.0
+            fields.append(.author)
+        }
+        
+        return (score, fields)
+    }
+    
+    /// Get all unique categories from books
+    func extractCategories(from books: [Book]) -> [String] {
+        let categories = books.compactMap { $0.category }
+        return Array(Set(categories)).sorted()
+    }
+    
+    /// Get all unique cuisines from books
+    func extractCuisines(from books: [Book]) -> [String] {
+        let cuisines = books.compactMap { $0.cuisine }
+        return Array(Set(cuisines)).sorted()
     }
 }
 

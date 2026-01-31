@@ -131,11 +131,13 @@ actor DiabeticAnalysisService {
     /// - Returns: Diabetic analysis information
     @MainActor
     func analyzeDiabeticImpact(
-        recipe: Recipe,
+        recipe: RecipeX,
         modelContainer: ModelContainer,
         forceRefresh: Bool = false
     ) async throws -> DiabeticInfo {
-        let recipeId = recipe.id
+        guard let recipeId = recipe.id else {
+            throw DiabeticAnalysisError.invalidRecipe
+        }
         
         // Check SwiftData cache first (with ingredient change detection)
         if !forceRefresh {
@@ -147,7 +149,7 @@ actor DiabeticAnalysisService {
                     recipeHash: recipe.ingredientsHash,
                     recipeModificationDate: recipe.modificationDate
                 ) {
-                    print("✅ Using cached diabetic analysis for recipe: \(recipe.title)")
+                    print("✅ Using cached diabetic analysis for recipe: \(String(describing: recipe.title))")
                     print("   Version: \(cachedData.recipeVersion), Hash: \(String(cachedData.ingredientsHash.prefix(8)))...")
                     
                     // Decode the analysis on MainActor
@@ -157,29 +159,25 @@ actor DiabeticAnalysisService {
                 } else {
                     // Cache is invalid - log why
                     if cachedData.isStale {
-                        print("⚠️ Cache expired (>30 days) for recipe: \(recipe.title)")
+                        print("⚠️ Cache expired (>30 days) for recipe: \(String(describing: recipe.title))")
                     } else if cachedData.isIngredientsOutdated(
                         recipeVersion: recipe.currentVersion,
                         recipeHash: recipe.ingredientsHash,
                         recipeModificationDate: recipe.modificationDate
                     ) {
-                        print("⚠️ Ingredients changed for recipe: \(recipe.title)")
+                        print("⚠️ Ingredients changed for recipe: \(String(describing: recipe.title))")
                         print("   Cached version: \(cachedData.recipeVersion) vs current: \(recipe.currentVersion)")
                         print("   Cached hash: \(String(cachedData.ingredientsHash.prefix(8)))... vs current: \(String((recipe.ingredientsHash ?? "").prefix(8)))...")
                     }
                 }
             }
         } else {
-            print("🔄 Force refresh requested for recipe: \(recipe.title)")
+            print("🔄 Force refresh requested for recipe: \(String(describing: recipe.title))")
         }
         
-        // Convert to RecipeModel for easier access
-        guard let recipeModel = recipe.toRecipeModel() else {
-            throw DiabeticAnalysisError.invalidRecipe
-        }
         
         // Build comprehensive prompt following guidelines
-        let prompt = await buildAnalysisPrompt(recipeModel)
+        let prompt = buildAnalysisPrompt(recipe)
         
         // Request Claude analysis using existing extractRecipe method pattern
         let response = try await callClaudeAPI(with: prompt)
@@ -188,7 +186,7 @@ actor DiabeticAnalysisService {
         let diabeticInfo = try parseAndValidate(response, recipeId: recipeId)
         
         // Cache result in SwiftData with current recipe state
-        print("💾 Caching new analysis for recipe: \(recipe.title)")
+        print("💾 Caching new analysis for recipe: \(String(describing: recipe.title))")
         print("   Version: \(recipe.currentVersion), Hash: \(String((recipe.ingredientsHash ?? "").prefix(8)))...")
         
         // Encode the diabetic info
@@ -198,7 +196,7 @@ actor DiabeticAnalysisService {
         
         let modelActor = DiabeticAnalysisModelActor(modelContainer: modelContainer)
         try await modelActor.saveCachedAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipeId,
             analysisData: analysisData,
             recipeVersion: recipe.currentVersion,
             ingredientsHash: recipe.ingredientsHash ?? "",
@@ -238,9 +236,12 @@ actor DiabeticAnalysisService {
     ///   - recipe: The recipe to check
     ///   - modelContainer: SwiftData container
     /// - Returns: True if valid cache exists
-    func hasCachedAnalysis(for recipe: Recipe, modelContainer: ModelContainer) async throws -> Bool {
+    func hasCachedAnalysis(for recipe: RecipeX, modelContainer: ModelContainer) async throws -> Bool {
+        guard let recipeId = recipe.id else {
+            return false
+        }
         let modelActor = DiabeticAnalysisModelActor(modelContainer: modelContainer)
-        guard let cachedData = try await modelActor.fetchCachedAnalysis(recipeId: recipe.id) else {
+        guard let cachedData = try await modelActor.fetchCachedAnalysis(recipeId: recipeId) else {
             return false
         }
         return cachedData.isValid(
@@ -252,7 +253,8 @@ actor DiabeticAnalysisService {
     
     // MARK: - Private Methods
     
-    private func buildAnalysisPrompt(_ recipe: RecipeModel) -> String {
+    @MainActor
+    private func buildAnalysisPrompt(_ recipe: RecipeX) -> String {
         // Extract all ingredients with details
         let ingredientsList = recipe.ingredientSections
             .flatMap { section -> [String] in
@@ -268,16 +270,16 @@ actor DiabeticAnalysisService {
             }
             .joined(separator: "\n")
         
-        // Extract all instructions
-        let instructionsList = recipe.instructionSections
-            .flatMap { section -> [String] in
-                let sectionTitle = section.title.map { "[\($0)]" } ?? ""
-                return section.steps.map { step in
-                    let prefix = step.stepNumber.map { "\($0). " } ?? "• "
-                    return sectionTitle.isEmpty ? "\(prefix)\(step.text)" : "\(sectionTitle) \(prefix)\(step.text)"
-                }
-            }
-            .joined(separator: "\n")
+//        // Extract all instructions
+//        let instructionsList = recipe.instructionSections
+//            .flatMap { section -> [String] in
+//                let sectionTitle = section.title.map { "[\($0)]" } ?? ""
+//                return section.steps.map { step in
+//                    let prefix = step.stepNumber.map { "\($0). " } ?? "• "
+//                    return sectionTitle.isEmpty ? "\(prefix)\(step.text)" : "\(sectionTitle) \(prefix)\(step.text)"
+//                }
+//            }
+//            .joined(separator: "\n")
         
         let systemPrompt = """
         You are a certified diabetes educator and registered dietitian analyzing recipes for diabetic dietary considerations.
@@ -317,7 +319,7 @@ actor DiabeticAnalysisService {
         Analyze this recipe for diabetic-friendly dietary information:
         
         **Recipe Details:**
-        Title: \(recipe.title)
+        Title: \(String(describing: recipe.title))
         Yield: \(recipe.yield ?? "Not specified")
         Header Notes: \(recipe.headerNotes ?? "None")
         
@@ -325,7 +327,7 @@ actor DiabeticAnalysisService {
         \(ingredientsList)
         
         **Instructions:**
-        \(instructionsList)
+        
         
         **Required Analysis (Return as JSON):**
         

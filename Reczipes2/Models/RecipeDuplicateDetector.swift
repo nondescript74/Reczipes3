@@ -15,24 +15,25 @@ struct DuplicateGroup: Identifiable {
     let id = UUID()
     let fingerprint: String
     let title: String
-    let recipes: [Recipe]
+    let recipes: [RecipeX ]
     
     var duplicateCount: Int {
         recipes.count
     }
     
     /// The canonical (preferred) recipe to keep
-    var canonical: Recipe {
+    var canonical: RecipeX  {
         // Sort by creation date, keep oldest
         recipes.sorted { recipe1, recipe2 in
             let date1 = recipe1.dateCreated ?? recipe1.dateAdded
             let date2 = recipe2.dateCreated ?? recipe2.dateAdded
-            return date1 < date2
+            let aDate = Date()
+            return date1 ?? aDate < date2 ?? aDate
         }.first!
     }
     
     /// Recipes that should be deleted (all except canonical)
-    var duplicatesToDelete: [Recipe] {
+    var duplicatesToDelete: [RecipeX ] {
         recipes.filter { $0.id != canonical.id }
     }
 }
@@ -41,7 +42,8 @@ struct DuplicateGroup: Identifiable {
 
 struct RecipeDuplicateDetectorView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Recipe.title) private var allRecipes: [Recipe]
+    @Query(sort: \RecipeX .title) private var allRecipes: [RecipeX ]
+    @Query private var recipeXEntities: [RecipeX]
     
     @State private var duplicateGroups: [DuplicateGroup] = []
     @State private var orphanedAssignments: [RecipeImageAssignment] = []
@@ -204,9 +206,9 @@ struct RecipeDuplicateDetectorView: View {
         print("📊 Total recipes in database: \(allRecipes.count)")
         
         // Group recipes by content fingerprint
-        var recipesByFingerprint: [String: [Recipe]] = [:]
+        var recipesByFingerprint: [String: [RecipeX ]] = [:]
         for recipe in allRecipes {
-            let fingerprint = recipe.contentFingerprint
+            let fingerprint = recipe.contentFingerprint ?? "No contentFingerprint!"
             recipesByFingerprint[fingerprint, default: []].append(recipe)
         }
         
@@ -254,10 +256,10 @@ struct RecipeDuplicateDetectorView: View {
         let toDelete = group.duplicatesToDelete
         
         print("🗑️ Deleting \(toDelete.count) duplicates of '\(group.title)'")
-        print("✅ Keeping canonical recipe ID: \(group.canonical.id)")
+        print("✅ Keeping canonical recipe ID: \(String(describing: group.canonical.id))")
         
         for recipe in toDelete {
-            print("   🗑️ Deleting duplicate ID: \(recipe.id)")
+            print("   🗑️ Deleting duplicate ID: \(String(describing: recipe.id))")
             modelContext.delete(recipe)
         }
         
@@ -272,14 +274,14 @@ struct RecipeDuplicateDetectorView: View {
         }
     }
     
-    private func deleteSingleRecipe(_ recipe: Recipe, from group: DuplicateGroup) {
+    private func deleteSingleRecipe(_ recipe: RecipeX , from group: DuplicateGroup) {
         // Don't allow deleting the canonical recipe
         guard recipe.id != group.canonical.id else {
             print("⚠️ Cannot delete canonical recipe")
             return
         }
         
-        print("🗑️ Deleting single recipe: \(recipe.title) (ID: \(recipe.id))")
+        print("🗑️ Deleting single recipe: \(String(describing: recipe.title)) (ID: \(String(describing: recipe.id)))")
         modelContext.delete(recipe)
         
         do {
@@ -341,7 +343,7 @@ struct RecipeDuplicateDetectorView: View {
 struct DuplicateGroupRow: View {
     let group: DuplicateGroup
     let onDeleteDuplicates: () -> Void
-    let onDeleteSingle: (Recipe) -> Void
+    let onDeleteSingle: (RecipeX ) -> Void
     
     @State private var isExpanded = false
     
@@ -396,7 +398,7 @@ struct DuplicateGroupRow: View {
 // MARK: - Recipe Row View
 
 struct RecipeRowView: View {
-    let recipe: Recipe
+    let recipe: RecipeX 
     let isCanonical: Bool
     let onDelete: () -> Void
     
@@ -415,7 +417,7 @@ struct RecipeRowView: View {
                         .foregroundStyle(.green)
                 }
                 
-                Text("ID: \(recipe.id.uuidString.prefix(8))...")
+                Text("ID: \(recipe.id!.uuidString.prefix(8))...")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
@@ -425,7 +427,7 @@ struct RecipeRowView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                Text("Added: \(recipe.dateAdded, style: .date)")
+                Text("Added: \(recipe.dateAdded ?? Date(), style: .date)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -450,6 +452,6 @@ struct RecipeRowView: View {
 #Preview {
     NavigationStack {
         RecipeDuplicateDetectorView()
-            .modelContainer(for: [Recipe.self, RecipeImageAssignment.self])
+            .modelContainer(for: [RecipeX .self, RecipeImageAssignment.self])
     }
 }

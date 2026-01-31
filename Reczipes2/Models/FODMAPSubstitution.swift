@@ -151,11 +151,23 @@ class FODMAPSubstitutionDatabase {
     }
     
     /// Analyze a full recipe for FODMAP substitutions
-    func analyzeRecipe(_ recipe: RecipeModel) -> RecipeFODMAPSubstitutions {
+    func analyzeRecipe(_ recipe: RecipeX) -> RecipeFODMAPSubstitutions {
         var substitutionGroups: [IngredientSubstitutionGroup] = []
         
+        // Decode ingredient sections from RecipeX
+        guard let sectionsData = recipe.ingredientSectionsData,
+              let sections = try? JSONDecoder().decode([IngredientSection].self, from: sectionsData) else {
+            return RecipeFODMAPSubstitutions(
+                recipeID: recipe.safeID,
+                recipeTitle: recipe.safeTitle,
+                substitutions: [],
+                overallFODMAPScore: .low,
+                isSafeWithoutSubstitutions: true
+            )
+        }
+        
         // Analyze each ingredient section
-        for section in recipe.ingredientSections {
+        for section in sections {
             for ingredient in section.ingredients {
                 // Check if this ingredient has FODMAP concerns
                 if let substitution = getSubstitutions(for: ingredient.name) {
@@ -183,8 +195,8 @@ class FODMAPSubstitutionDatabase {
         }
         
         return RecipeFODMAPSubstitutions(
-            recipeID: recipe.id,
-            recipeTitle: recipe.title,
+            recipeID: recipe.safeID,
+            recipeTitle: recipe.safeTitle,
             substitutions: substitutionGroups,
             overallFODMAPScore: level,
             isSafeWithoutSubstitutions: isSafe

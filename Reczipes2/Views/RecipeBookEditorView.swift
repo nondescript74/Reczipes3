@@ -12,9 +12,9 @@ import PhotosUI
 struct RecipeBookEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var savedRecipes: [Recipe]
+    @Query private var savedRecipes: [RecipeX]
     
-    let book: RecipeBook?
+    let book: Book?
     
     @State private var name: String
     @State private var bookDescription: String
@@ -31,14 +31,53 @@ struct RecipeBookEditorView: View {
     ]
     
     // Get recipes currently in the book (for editing existing book)
-    private var bookRecipes: [Recipe] {
+    private var bookRecipes: [RecipeX] {
         guard let book = book else { return [] }
-        return book.recipeIDs.compactMap { recipeID in
+        return book.recipeIDs?.compactMap { recipeID in
             savedRecipes.first { $0.id == recipeID }
+        } ?? []
+    }
+    
+    private var hasCoverImage: Bool {
+        coverImageName != nil || coverImageData != nil
+    }
+    
+    @ViewBuilder
+    private var coverImageSection: some View {
+        if hasCoverImage {
+            HStack {
+                RecipeImageView(
+                    imageName: coverImageName,
+                    imageData: coverImageData,
+                    size: CGSize(width: 120, height: 160),
+                    cornerRadius: 8
+                )
+                
+                Spacer()
+                
+                Button("Remove", role: .destructive) {
+                    removeCoverImage()
+                }
+            }
+        }
+        
+        let hasImage = hasCoverImage
+        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+            Label(hasImage ? "Change Cover Image" : "Add Cover Image",
+                  systemImage: "photo")
+        }
+        .disabled(isProcessingImage)
+        
+        if isProcessingImage {
+            HStack {
+                ProgressView()
+                Text("Processing image...")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
     
-    init(book: RecipeBook? = nil) {
+    init(book: Book? = nil) {
         self.book = book
         _name = State(initialValue: book?.name ?? "")
         _bookDescription = State(initialValue: book?.bookDescription ?? "")
@@ -67,37 +106,7 @@ struct RecipeBookEditorView: View {
                 }
                 
                 Section("Cover Image") {
-                    if coverImageName != nil || coverImageData != nil {
-                        HStack {
-                            RecipeImageView(
-                                imageName: coverImageName,
-                                imageData: coverImageData,
-                                size: CGSize(width: 120, height: 160),
-                                cornerRadius: 8
-                            )
-                            
-                            Spacer()
-                            
-                            Button("Remove", role: .destructive) {
-                                removeCoverImage()
-                            }
-                        }
-                    }
-                    
-                    let hasCoverImage = coverImageName != nil || coverImageData != nil
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label(hasCoverImage ? "Change Cover Image" : "Add Cover Image",
-                              systemImage: "photo")
-                    }
-                    .disabled(isProcessingImage)
-                    
-                    if isProcessingImage {
-                        HStack {
-                            ProgressView()
-                            Text("Processing image...")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    coverImageSection
                 }
                 
                 Section("Color Theme") {
@@ -238,19 +247,19 @@ struct RecipeBookEditorView: View {
             book.color = colorHex
             book.dateModified = Date()
             
-            logInfo("Updated book: \(book.name)", category: "book")
+            logInfo("Updated book: \(String(describing: book.name))", category: "book")
         } else {
             // Create new book
-            let newBook = RecipeBook(
+            let newBook = Book(
                 name: trimmedName,
                 bookDescription: trimmedDescription.isEmpty ? nil : trimmedDescription,
-                coverImageName: coverImageName,
                 coverImageData: coverImageData,
+                coverImageName: coverImageName,
                 color: colorHex
             )
             modelContext.insert(newBook)
             
-            logInfo("Created new book: \(newBook.name)", category: "book")
+            logInfo("Created new book: \(String(describing: newBook.name))", category: "book")
         }
         
         do {
@@ -264,5 +273,5 @@ struct RecipeBookEditorView: View {
 
 #Preview {
     RecipeBookEditorView()
-        .modelContainer(for: RecipeBook.self, inMemory: true)
+        .modelContainer(for: Book.self, inMemory: true)
 }

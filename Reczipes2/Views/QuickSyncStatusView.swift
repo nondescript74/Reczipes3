@@ -113,7 +113,7 @@ struct QuickSyncStatusView: View {
         await monitor.checkAccountStatus()
         
         // Count recipes
-        let descriptor = FetchDescriptor<Recipe>()
+        let descriptor = FetchDescriptor<RecipeX>()
         if let recipes = try? modelContext.fetch(descriptor) {
             recipeCount = recipes.count
         }

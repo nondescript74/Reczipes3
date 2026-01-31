@@ -49,7 +49,7 @@ class DuplicateDetectionService {
     // MARK: - Content-Based Detection
     
     /// Find recipes with similar content
-    func findSimilarByContent(_ recipe: RecipeModel, threshold: Double = 0.8) async -> [DuplicateMatch] {
+    func findSimilarByContent(_ recipe: RecipeX, threshold: Double = 0.8) async -> [DuplicateMatch] {
         let descriptor = FetchDescriptor<RecipeX>()
         
         guard let allRecipes = try? modelContext.fetch(descriptor) else {
@@ -77,8 +77,8 @@ class DuplicateDetectionService {
     
     // MARK: - Similarity Calculation
     
-    func calculateSimilarity(newRecipe: RecipeModel, existingRecipe: RecipeX) -> DuplicateMatchScore {
-        let titleSim = titleSimilarity(newRecipe.title, existingRecipe.safeTitle)
+    func calculateSimilarity(newRecipe: RecipeX, existingRecipe: RecipeX) -> DuplicateMatchScore {
+        let titleSim = titleSimilarity(newRecipe.safeTitle, existingRecipe.safeTitle)
         let ingredientSim = ingredientSimilarity(newRecipe: newRecipe, existingRecipe: existingRecipe)
         
         // Weighted average: title 40%, ingredients 60%
@@ -108,7 +108,7 @@ class DuplicateDetectionService {
         return 1.0 - (Double(distance) / Double(maxLength))
     }
     
-    private func ingredientSimilarity(newRecipe: RecipeModel, existingRecipe: RecipeX) -> Double {
+    private func ingredientSimilarity(newRecipe: RecipeX, existingRecipe: RecipeX) -> Double {
         let newIngredients = extractIngredients(from: newRecipe)
         let existingIngredients = extractIngredients(from: existingRecipe)
         
@@ -121,12 +121,6 @@ class DuplicateDetectionService {
         guard union > 0 else { return 0.0 }
         
         return Double(intersection) / Double(union)
-    }
-    
-    private func extractIngredients(from recipe: RecipeModel) -> [String] {
-        recipe.ingredientSections.flatMap { section in
-            section.ingredients.map { formatIngredientText($0) }
-        }
     }
     
     private func extractIngredients(from recipe: RecipeX) -> [String] {

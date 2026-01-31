@@ -701,5 +701,5 @@ struct ImportLinksSheet: View {
 
 #Preview {
     SavedLinksView()
-        .modelContainer(for: [SavedLink.self, Recipe.self], inMemory: true)
+        .modelContainer(for: [SavedLink.self, RecipeX.self], inMemory: true)
 }

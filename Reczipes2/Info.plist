@@ -6,71 +6,8 @@
 	<array>
 		<string>recipe-extraction</string>
 	</array>
-	
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>processing</string>
-	</array>
-	
-	<!-- Exported Type Declarations: Registers file types that your app owns -->
-	<key>UTExportedTypeDeclarations</key>
-	<array>
-		<!-- Recipe Book Package Type -->
-		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.headydiscy.reczipes.recipebook</string>
-			<key>UTTypeDescription</key>
-			<string>Recipe Book Package</string>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.zip-archive</string>
-				<string>public.data</string>
-			</array>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>recipebook</string>
-				</array>
-				<key>public.mime-type</key>
-				<array>
-					<string>application/x-recipebook</string>
-				</array>
-			</dict>
-			<key>UTTypeIconFiles</key>
-			<array/>
-		</dict>
-		<!-- Reczipes Backup Type -->
-		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.reczipes.backup</string>
-			<key>UTTypeDescription</key>
-			<string>Reczipes Backup File</string>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.json</string>
-			</array>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>reczipes</string>
-				</array>
-				<key>public.mime-type</key>
-				<array>
-					<string>application/json</string>
-				</array>
-			</dict>
-			<key>UTTypeIcons</key>
-			<dict/>
-		</dict>
-	</array>
-	
-	<!-- Document Types: Declares that your app can open these file types -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
-		<!-- Recipe Book Document Type -->
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Recipe Book</string>
@@ -83,7 +20,6 @@
 				<string>com.headydiscy.reczipes.recipebook</string>
 			</array>
 		</dict>
-		<!-- Reczipes Backup Document Type -->
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Reczipes Backup</string>
@@ -95,6 +31,54 @@
 			<array>
 				<string>com.reczipes.backup</string>
 			</array>
+		</dict>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>processing</string>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Reczipes Recipe Backup</string>
+			<key>UTTypeIcons</key>
+			<dict/>
+			<key>UTTypeIdentifier</key>
+			<string>com.reczipes.backup</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>reczipes</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Reczipes Book Backup</string>
+			<key>UTTypeIcons</key>
+			<dict/>
+			<key>UTTypeIdentifier</key>
+			<string>com.reczipes.bookbackup</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>bookbackup</string>
+				</array>
+			</dict>
 		</dict>
 	</array>
 </dict>

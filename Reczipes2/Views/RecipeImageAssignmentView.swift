@@ -13,18 +13,18 @@ struct RecipeImageAssignmentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    @Query private var savedRecipes: [Recipe]
+    @Query private var savedRecipes: [RecipeX]
     
     @StateObject private var photoLibrary = PhotoLibraryManager()
     
-    // All recipes from RecipeCollection (stable UUIDs!)
-    private var allRecipes: [RecipeModel] {
-        RecipeCollection.shared.allRecipes(savedRecipes: savedRecipes)
+    // All recipes as RecipeModel (stable UUIDs!)
+    private var allRecipes: [RecipeX] {
+        savedRecipes.compactMap { $0 }
     }
     
-    // Helper to get Recipe entity from RecipeModel
-    private func getRecipe(for recipeModel: RecipeModel) -> Recipe? {
-        savedRecipes.first { $0.id == recipeModel.id }
+    // Helper to get RecipeX entity from RecipeModel
+    private func getRecipe(for recipe: RecipeX) -> RecipeX? {
+        savedRecipes.first { $0.id == recipe.id }
     }
     
     var body: some View {
@@ -169,8 +169,8 @@ struct RecipeImageAssignmentView: View {
 // MARK: - Recipe Photo Row
 
 struct RecipePhotoRow: View {
-    let recipe: RecipeModel
-    let recipeEntity: Recipe
+    let recipe: RecipeX
+    let recipeEntity: RecipeX
     let photoLibrary: PhotoLibraryManager
     let modelContext: ModelContext
     
@@ -224,7 +224,7 @@ struct RecipePhotoRow: View {
                 
                 // Recipe info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(recipe.title)
+                    Text(recipe.title ?? "No title")
                         .font(.headline)
                     
                     HStack(spacing: 4) {
@@ -305,8 +305,8 @@ struct RecipePhotoRow: View {
 struct MultiPhotoPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     
-    let recipe: RecipeModel
-    let recipeEntity: Recipe
+    let recipe: RecipeX
+    let recipeEntity: RecipeX
     let photoLibrary: PhotoLibraryManager
     let modelContext: ModelContext
     
@@ -396,7 +396,7 @@ struct MultiPhotoPickerSheet: View {
         // Save context
         if addedCount > 0 {
             try? modelContext.save()
-            print("✅ Added \(addedCount) additional images to recipe '\(recipe.title)' using setImage() (CloudKit-synced)")
+            print("✅ Added \(addedCount) additional images to recipe '\(String(describing: recipe.title))' using setImage() (CloudKit-synced)")
         }
     }
 }
@@ -451,5 +451,5 @@ struct SelectablePhotoThumbnailView: View {
 
 #Preview {
     RecipeImageAssignmentView()
-        .modelContainer(for: [Recipe.self], inMemory: true)
+        .modelContainer(for: [RecipeX.self], inMemory: true)
 }

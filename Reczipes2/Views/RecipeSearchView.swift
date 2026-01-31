@@ -10,11 +10,11 @@ import SwiftData
 import Combine
 
 struct RecipeSearchView: View {
-    @Binding var recipes: [RecipeModel]
-    @Binding var selectedRecipe: RecipeModel?
+    @Binding var recipes: [RecipeX]
+    @Binding var selectedRecipe: RecipeX?
     
     @Environment(\.modelContext) private var modelContext
-    @Query private var savedRecipes: [Recipe]
+    @Query private var recipeXEntities: [RecipeX]
     
     @State private var searchService = RecipeSearchService()
     @State private var searchText = ""
@@ -24,7 +24,7 @@ struct RecipeSearchView: View {
     @State private var showingFilters = false
     @State private var useCookingTimeFilter = false
     
-    private var searchResults: [RecipeModel] {
+    private var searchResults: [RecipeX] {
         let criteria = RecipeSearchService.SearchCriteria(
             searchText: searchText,
             dishTypes: selectedDishTypes,
@@ -48,11 +48,7 @@ struct RecipeSearchView: View {
             // Results list
             List(searchResults) { recipe in
                 NavigationLink {
-                    RecipeDetailView(
-                        recipe: recipe,
-                        isSaved: isRecipeSaved(recipe),
-                        onSave: { saveRecipe(recipe) }
-                    )
+                    RecipeDetailView(recipe: recipe)
                 } label: {
                     recipeRow(recipe: recipe)
                 }
@@ -188,11 +184,17 @@ struct RecipeSearchView: View {
     
     // MARK: - Recipe Row
     
-    private func recipeRow(recipe: RecipeModel) -> some View {
+    private func recipeRow(recipe: RecipeX) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 // Thumbnail
-                if let imageName = recipe.imageName {
+                if let imageData = recipe.imageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if let imageName = recipe.imageName {
                     RecipeImageView(
                         imageName: imageName,
                         size: CGSize(width: 60, height: 60),
@@ -209,7 +211,7 @@ struct RecipeSearchView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(recipe.title)
+                    Text(recipe.safeTitle)
                         .font(.headline)
                         .foregroundStyle(.primary)
                     
@@ -269,21 +271,8 @@ struct RecipeSearchView: View {
     
     // MARK: - Helper Methods
     
-    private func isRecipeSaved(_ recipe: RecipeModel) -> Bool {
-        savedRecipes.contains { $0.id == recipe.id }
-    }
-    
-    private func saveRecipe(_ recipe: RecipeModel) {
-        let newRecipe = Recipe(from: recipe)
-        modelContext.insert(newRecipe)
-        
-        do {
-            try modelContext.save()
-            logInfo("Recipe saved from search: \(newRecipe.title)", category: "recipe")
-        } catch {
-            logError("Failed to save recipe from search: \(error)", category: "storage")
-        }
-    }
+    // No longer needed - recipes are already RecipeX entities in SwiftData
+    // If you need to save a recipe, it's already in the database
     
     // MARK: - Filter Sheet
     
@@ -371,12 +360,25 @@ struct RecipeSearchView: View {
 /// A full-screen search view that can be presented modally
 struct RecipeSearchModalView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var recipes: [RecipeModel]
-    @Binding var selectedRecipe: RecipeModel?
+    @Binding var recipes: [any RecipeDisplayProtocol]
+    @Binding var selectedRecipe: (any RecipeDisplayProtocol)?
+    
+    // Extract RecipeX objects for the search view (which only works with RecipeX)
+    private var recipeXObjects: [RecipeX] {
+        recipes.compactMap { $0 as? RecipeX }
+    }
+    
+    // Binding adapter to convert between protocols
+    private var recipeXSelection: Binding<RecipeX?> {
+        Binding(
+            get: { selectedRecipe as? RecipeX },
+            set: { selectedRecipe = $0 }
+        )
+    }
     
     var body: some View {
         NavigationStack {
-            RecipeSearchView(recipes: $recipes, selectedRecipe: $selectedRecipe)
+            RecipeSearchView(recipes: .constant(recipeXObjects), selectedRecipe: recipeXSelection)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         CloudKitSyncBadge()
@@ -393,29 +395,44 @@ struct RecipeSearchModalView: View {
 }
 
 #Preview {
-    NavigationStack {
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: RecipeX.self, configurations: config)
+    let context = ModelContext(container)
+    
+    // Create a sample recipe
+    let sampleRecipe = RecipeX(
+        title: "Classic Tomato Soup",
+        headerNotes: "A warm and comforting soup perfect for cold days",
+        recipeYield: "4 servings",
+        reference: "Julia Child"
+    )
+    
+    // Encode sample data
+    let encoder = JSONEncoder()
+    if let ingredientsData = try? encoder.encode([
+        IngredientSection(ingredients: [
+            Ingredient(quantity: "2", unit: "lbs", name: "tomatoes"),
+            Ingredient(quantity: "1", unit: "cup", name: "cream")
+        ])
+    ]) {
+        sampleRecipe.ingredientSectionsData = ingredientsData
+    }
+    
+    if let instructionsData = try? encoder.encode([
+        InstructionSection(steps: [
+            InstructionStep(stepNumber: 1, text: "Cook for 30 minutes")
+        ])
+    ]) {
+        sampleRecipe.instructionSectionsData = instructionsData
+    }
+    
+    context.insert(sampleRecipe)
+    
+    return NavigationStack {
         RecipeSearchView(
-            recipes: .constant([
-                RecipeModel(
-                    title: "Classic Tomato Soup",
-                    headerNotes: "A warm and comforting soup perfect for cold days",
-                    yield: "4 servings",
-                    ingredientSections: [
-                        IngredientSection(ingredients: [
-                            Ingredient(quantity: "2", unit: "lbs", name: "tomatoes"),
-                            Ingredient(quantity: "1", unit: "cup", name: "cream")
-                        ])
-                    ],
-                    instructionSections: [
-                        InstructionSection(steps: [
-                            InstructionStep(stepNumber: 1, text: "Cook for 30 minutes")
-                        ])
-                    ],
-                    reference: "Julia Child"
-                )
-            ]),
+            recipes: .constant([sampleRecipe]),
             selectedRecipe: .constant(nil)
         )
     }
-    .modelContainer(for: [Recipe.self], inMemory: true)
+    .modelContainer(container)
 }
