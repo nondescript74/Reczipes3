@@ -301,8 +301,8 @@ class BatchImageExtractorViewModel: ObservableObject {
         do {
             currentStatus = "Extracting recipe from image \(imageIndex + 1)..."
             
-            // Reduce image size before sending
-            guard let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
+            // Reduce image size to 10-20KB before sending (text extraction only)
+            guard let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 20_000) else {
                 throw NSError(
                     domain: "BatchExtraction",
                     code: -1,
@@ -310,7 +310,7 @@ class BatchImageExtractorViewModel: ObservableObject {
                 )
             }
             
-            logInfo("Calling API for image \(imageIndex + 1), size: \(imageData.count) bytes", category: "batch")
+            logInfo("Calling API for image \(imageIndex + 1), size: \(imageData.count) bytes (~\(imageData.count / 1024)KB)", category: "batch")
             
             // Extract recipe using Claude API
             let recipe = try await apiClient.extractRecipe(
@@ -478,12 +478,15 @@ class BatchImageExtractorViewModel: ObservableObject {
         logInfo("Handing off \(processedImages.count) images to background extraction", category: "batch")
         
         // Start background task to allow continuation when app is backgrounded
-        backgroundManager.beginBackgroundTask(name: "Batch Recipe Extraction")
+        // This MUST be called on main thread since it's a UI operation
+        await MainActor.run {
+            backgroundManager.beginBackgroundTask(name: "Batch Recipe Extraction")
+        }
         
         // Convert images to Data and queue them for background processing
         var imageDataQueue: [(data: Data, index: Int)] = []
         for (image, index) in processedImages {
-            if let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 500_000) {
+            if let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 20_000) {
                 imageDataQueue.append((data: imageData, index: index))
             }
         }
@@ -496,7 +499,9 @@ class BatchImageExtractorViewModel: ObservableObject {
             // Check if stopped
             guard isExtracting else {
                 logInfo("Background extraction stopped", category: "batch")
-                backgroundManager.endBackgroundTask()
+                await MainActor.run {
+                    backgroundManager.endBackgroundTask()
+                }
                 break
             }
             
@@ -506,7 +511,9 @@ class BatchImageExtractorViewModel: ObservableObject {
             }
             
             guard isExtracting else { 
-                backgroundManager.endBackgroundTask()
+                await MainActor.run {
+                    backgroundManager.endBackgroundTask()
+                }
                 break 
             }
             
@@ -529,8 +536,10 @@ class BatchImageExtractorViewModel: ObservableObject {
         isExtracting = false
         currentBatch = []
         
-        // End background task
-        backgroundManager.endBackgroundTask()
+        // End background task on main thread
+        await MainActor.run {
+            backgroundManager.endBackgroundTask()
+        }
         backgroundManager.clearQueue()
         
         logInfo("Background extraction complete: \(successCount) success, \(failureCount) failures", category: "batch")

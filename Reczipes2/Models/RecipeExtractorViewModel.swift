@@ -99,26 +99,6 @@ class RecipeExtractorViewModel: ObservableObject {
         }
     }
     
-//    func handleKeepBoth(modelContext: ModelContext) {
-//        guard let recipe = extractedRecipe else { return }
-//        
-//        // Create a new RecipeModel with modified title
-//        let modifiedRecipe = RecipeModel(
-//            id: recipe.id,
-//            title: "\(recipe.title) (2)",
-//            headerNotes: recipe.headerNotes,
-//            yield: recipe.yield,
-//            ingredientSections: recipe.ingredientSections,
-//            instructionSections: recipe.instructionSections,
-//            notes: recipe.notes,
-//            reference: recipe.reference,
-//            imageName: recipe.imageName,
-//            additionalImageNames: recipe.additionalImageNames,
-//            imageURLs: recipe.imageURLs
-//        )
-//        
-//        saveRecipeDirectly(modifiedRecipe, modelContext: modelContext)
-//    }
     
     func handleReplaceOriginal(modelContext: ModelContext) {
         guard let newRecipe = extractedRecipe,
@@ -288,12 +268,13 @@ class RecipeExtractorViewModel: ObservableObject {
         }
         
         do {
-            // Reduce image size to 500KB max before sending to Claude
+            // Reduce image size to 10-20KB max before sending to Claude
+            // Since we're only extracting text, we don't need high resolution
             logInfo("Reducing image size before sending to Claude...", category: "extraction")
-            guard let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 500_000) else {
+            guard let imageData = imagePreprocessor.reduceImageSize(image, maxSizeBytes: 20_000) else {
                 throw ClaudeAPIError.invalidResponse
             }
-            logInfo("Image size after reduction: \(imageData.count) bytes", category: "extraction")
+            logInfo("Image size after reduction: \(imageData.count) bytes (~\(imageData.count / 1024)KB)", category: "extraction")
             
             logInfo("Calling Claude API for image extraction...", category: "extraction")
             let recipe = try await apiClient.extractRecipe(

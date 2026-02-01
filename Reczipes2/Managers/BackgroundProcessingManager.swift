@@ -12,22 +12,34 @@ import SwiftData
 import Combine
 
 /// Manager for handling background processing tasks when app is backgrounded
-@MainActor
 class BackgroundProcessingManager: ObservableObject {
     static let shared = BackgroundProcessingManager()
     
     // Background task identifier - must match Info.plist
     private let backgroundTaskIdentifier = "com.yourapp.reczipes.backgroundExtraction"
     
-    // Processing state
-    @Published var isBackgroundTaskActive = false
-    @Published var backgroundProgress: Double = 0.0
+    // Processing state (main actor isolated for UI updates)
+    @MainActor @Published var isBackgroundTaskActive = false
+    @MainActor @Published var backgroundProgress: Double = 0.0
     
-    // Background task reference
-    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    // Background task reference (accessed from multiple threads)
+    private let backgroundTaskLock = NSLock()
+    private var _backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var backgroundTask: UIBackgroundTaskIdentifier {
+        get {
+            backgroundTaskLock.lock()
+            defer { backgroundTaskLock.unlock() }
+            return _backgroundTask
+        }
+        set {
+            backgroundTaskLock.lock()
+            defer { backgroundTaskLock.unlock() }
+            _backgroundTask = newValue
+        }
+    }
     
-    // Queue for pending extractions
-    private var pendingExtractions: [(imageData: Data, index: Int)] = []
+    // Queue for pending extractions (thread-safe via actor)
+    private let extractionQueue = ExtractionQueue()
     private var apiKey: String?
     private var modelContext: ModelContext?
     
@@ -40,9 +52,30 @@ class BackgroundProcessingManager: ObservableObject {
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: backgroundTaskIdentifier,
             using: nil
-        ) { task in
-            Task { @MainActor in
-                await self.handleBackgroundProcessing(task: task as! BGProcessingTask)
+        ) { [weak self] task in
+            guard let self = self else { return }
+            
+            // Cast to BGProcessingTask
+            guard let processingTask = task as? BGProcessingTask else {
+                logError("Task is not a BGProcessingTask", category: "background")
+                task.setTaskCompleted(success: false)
+                return
+            }
+            
+            // Handle the task directly without Task.detached to avoid sendability issues
+            // The handler already runs on a background queue
+            Task { [weak self] in
+                guard let self = self else {
+                    processingTask.setTaskCompleted(success: false)
+                    return
+                }
+                
+                await self.handleBackgroundProcessing(
+                    task: processingTask,
+                    apiKey: self.apiKey,
+                    modelContext: self.modelContext,
+                    extractionQueue: self.extractionQueue
+                )
             }
         }
         
@@ -85,14 +118,18 @@ class BackgroundProcessingManager: ObservableObject {
     func beginBackgroundTask(name: String = "Recipe Extraction") {
         endBackgroundTask() // End any existing task
         
-        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: name) {
+        let newTask = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             // Task expiration handler
             logWarning("Background task expired, cleaning up", category: "background")
-            self.endBackgroundTask()
+            self?.endBackgroundTask()
         }
         
-        if backgroundTask != .invalid {
-            isBackgroundTaskActive = true
+        backgroundTask = newTask
+        
+        if newTask != .invalid {
+            Task { @MainActor in
+                self.isBackgroundTaskActive = true
+            }
             logInfo("Background task started: \(name)", category: "background")
         } else {
             logError("Failed to start background task", category: "background")
@@ -101,18 +138,27 @@ class BackgroundProcessingManager: ObservableObject {
     
     /// End the foreground background task
     func endBackgroundTask() {
-        guard backgroundTask != .invalid else { return }
+        let taskToEnd = backgroundTask
+        guard taskToEnd != .invalid else { return }
         
-        UIApplication.shared.endBackgroundTask(backgroundTask)
+        UIApplication.shared.endBackgroundTask(taskToEnd)
         backgroundTask = .invalid
-        isBackgroundTaskActive = false
+        
+        Task { @MainActor in
+            self.isBackgroundTaskActive = false
+        }
         logInfo("Background task ended", category: "background")
     }
     
     // MARK: - Background Processing Handler
     
-    /// Handle background processing task
-    private func handleBackgroundProcessing(task: BGProcessingTask) async {
+    /// Handle background processing task (runs on background queue)
+    private func handleBackgroundProcessing(
+        task: BGProcessingTask,
+        apiKey: String?,
+        modelContext: ModelContext?,
+        extractionQueue: ExtractionQueue
+    ) async {
         logInfo("Background processing task started", category: "background")
         
         // Track if task was expired
@@ -124,8 +170,11 @@ class BackgroundProcessingManager: ObservableObject {
             taskExpired = true
         }
         
+        // Get pending extractions safely
+        let extractionsToProcess = await extractionQueue.getAll()
+        
         // Process pending extractions
-        guard !pendingExtractions.isEmpty,
+        guard !extractionsToProcess.isEmpty,
               let apiKey = apiKey,
               let modelContext = modelContext else {
             logWarning("No pending extractions or missing configuration", category: "background")
@@ -133,13 +182,13 @@ class BackgroundProcessingManager: ObservableObject {
             return
         }
         
-        logInfo("Processing \(pendingExtractions.count) pending extractions in background", category: "background")
+        logInfo("Processing \(extractionsToProcess.count) pending extractions in background", category: "background")
         
         let apiClient = ClaudeAPIClient(apiKey: apiKey)
         var successCount = 0
         var failureCount = 0
         
-        for (imageData, index) in pendingExtractions {
+        for (imageData, index) in extractionsToProcess {
             // Check if task has expired
             guard !taskExpired else {
                 logInfo("Background task expired, stopping", category: "background")
@@ -154,24 +203,38 @@ class BackgroundProcessingManager: ObservableObject {
                     usePreprocessing: true
                 )
                 
-                // Save recipe
+                // Save recipe on background thread
                 await saveRecipe(recipe, withImageData: imageData, modelContext: modelContext)
                 
                 successCount += 1
-                backgroundProgress = Double(successCount + failureCount) / Double(pendingExtractions.count)
+                let progress = Double(successCount + failureCount) / Double(extractionsToProcess.count)
+                
+                // Update UI on main actor
+                await MainActor.run {
+                    self.backgroundProgress = progress
+                }
                 
                 logInfo("Successfully extracted recipe in background: \(String(describing: recipe.title))", category: "background")
                 
             } catch {
                 logError("Failed to extract recipe in background: \(error)", category: "background")
                 failureCount += 1
-                backgroundProgress = Double(successCount + failureCount) / Double(pendingExtractions.count)
+                let progress = Double(successCount + failureCount) / Double(extractionsToProcess.count)
+                
+                // Update UI on main actor
+                await MainActor.run {
+                    self.backgroundProgress = progress
+                }
             }
         }
         
-        // Clear queue
-        pendingExtractions.removeAll()
-        backgroundProgress = 0.0
+        // Clear queue safely
+        await extractionQueue.clear()
+        
+        // Reset progress on main actor
+        await MainActor.run {
+            self.backgroundProgress = 0.0
+        }
         
         logInfo("Background processing complete: \(successCount) success, \(failureCount) failures", category: "background")
         
@@ -186,21 +249,31 @@ class BackgroundProcessingManager: ObservableObject {
     
     /// Add images to the pending extraction queue
     func queueExtractions(images: [(data: Data, index: Int)]) {
-        let converted = images.map { (imageData: $0.data, index: $0.index) }
-        pendingExtractions.append(contentsOf: converted)
-        logInfo("Added \(images.count) images to extraction queue. Total: \(pendingExtractions.count)", category: "background")
+        Task {
+            let converted = images.map { (imageData: $0.data, index: $0.index) }
+            await extractionQueue.append(contentsOf: converted)
+            let count = await extractionQueue.count
+            logInfo("Added \(images.count) images to extraction queue. Total: \(count)", category: "background")
+        }
     }
     
     /// Clear the extraction queue
     func clearQueue() {
-        pendingExtractions.removeAll()
-        backgroundProgress = 0.0
-        logInfo("Extraction queue cleared", category: "background")
+        Task {
+            await extractionQueue.clear()
+            
+            await MainActor.run {
+                self.backgroundProgress = 0.0
+            }
+            logInfo("Extraction queue cleared", category: "background")
+        }
     }
     
     /// Get the number of pending extractions
     var pendingCount: Int {
-        pendingExtractions.count
+        get async {
+            await extractionQueue.count
+        }
     }
     
     // MARK: - Helper Methods
@@ -259,29 +332,36 @@ extension BackgroundProcessingManager {
     
     /// Call this when app enters background during extraction
     func handleAppDidEnterBackground() {
-        guard !pendingExtractions.isEmpty else {
-            logInfo("App entering background with no pending extractions", category: "background")
-            return
+        Task {
+            let count = await extractionQueue.count
+            guard count > 0 else {
+                logInfo("App entering background with no pending extractions", category: "background")
+                return
+            }
+            
+            logInfo("App entering background with \(count) pending extractions", category: "background")
+            
+            // Start a background task to give us more time
+            beginBackgroundTask(name: "Recipe Extraction Continuation")
+            
+            // Also schedule a background processing task for later
+            scheduleBackgroundExtraction()
         }
-        
-        logInfo("App entering background with \(pendingExtractions.count) pending extractions", category: "background")
-        
-        // Start a background task to give us more time
-        beginBackgroundTask(name: "Recipe Extraction Continuation")
-        
-        // Also schedule a background processing task for later
-        scheduleBackgroundExtraction()
     }
     
     /// Call this when app enters foreground
     func handleAppWillEnterForeground() {
         logInfo("App entering foreground", category: "background")
         
-        // Cancel any scheduled background tasks since we're back in foreground
-        if pendingExtractions.isEmpty {
-            cancelBackgroundTasks()
-        } else {
-            logInfo("Still have \(pendingExtractions.count) pending extractions, keeping background task active", category: "background")
+        Task {
+            let count = await extractionQueue.count
+            
+            // Cancel any scheduled background tasks since we're back in foreground
+            if count == 0 {
+                cancelBackgroundTasks()
+            } else {
+                logInfo("Still have \(count) pending extractions, keeping background task active", category: "background")
+            }
         }
         
         // End any active background tasks since we're in foreground now
@@ -293,14 +373,40 @@ extension BackgroundProcessingManager {
     
     /// Call this when app is about to terminate
     func handleAppWillTerminate() {
-        logInfo("App terminating with \(pendingExtractions.count) pending extractions", category: "background")
-        
-        // Schedule background task to finish later
-        if !pendingExtractions.isEmpty {
-            scheduleBackgroundExtraction()
+        Task {
+            let count = await extractionQueue.count
+            logInfo("App terminating with \(count) pending extractions", category: "background")
+            
+            // Schedule background task to finish later
+            if count > 0 {
+                scheduleBackgroundExtraction()
+            }
         }
         
         // Clean up any active background tasks
         endBackgroundTask()
     }
 }
+// MARK: - Extraction Queue Actor
+
+/// Thread-safe actor for managing the extraction queue
+private actor ExtractionQueue {
+    private var items: [(imageData: Data, index: Int)] = []
+    
+    func append(contentsOf newItems: [(imageData: Data, index: Int)]) {
+        items.append(contentsOf: newItems)
+    }
+    
+    func getAll() -> [(imageData: Data, index: Int)] {
+        return items
+    }
+    
+    func clear() {
+        items.removeAll()
+    }
+    
+    var count: Int {
+        items.count
+    }
+}
+
