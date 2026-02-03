@@ -22,7 +22,7 @@ struct BatchExtractionManagerTests {
     
     /// Creates a temporary in-memory model container for testing
     private func createTestModelContainer() throws -> ModelContainer {
-        let schema = Schema([Recipe.self, SavedLink.self, RecipeImageAssignment.self])
+        let schema = Schema([RecipeX.self, SavedLink.self, RecipeImageAssignment.self, VersionHistoryRecord.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         return try ModelContainer(for: schema, configurations: [configuration])
     }
@@ -367,11 +367,8 @@ struct BatchExtractionManagerTests {
         
         // Add 7 recipes
         for i in 0..<7 {
-            let recipe = RecipeModel(
-                title: "Recipe \(i)",
-                yield: nil as String?,
-                ingredientSections: [],
-                instructionSections: []
+            let recipe = RecipeX(
+                title: "Recipe \(i)"
             )
             
             manager.recentlyExtracted.insert(recipe, at: 0)

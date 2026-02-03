@@ -12,7 +12,7 @@ Fixed `LinkExtractionView.swift` to use `RecipeX` instead of the deprecated `Rec
 - Used old `Recipe` model properties
 
 **After:**
-- Creates `RecipeX` object from `RecipeModel` using convenience initializer
+- Creates `RecipeX` object from `RecipeModel` using convenience initializer - no
 - Sets proper extraction source (`"web"`)
 - Initializes CloudKit sync properties correctly
 - Uses `RecipeX.setImage()` for image storage

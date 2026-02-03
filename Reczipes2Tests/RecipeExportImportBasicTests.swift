@@ -2,9 +2,9 @@
 //  RecipeExportImportBasicTests.swift
 //  Reczipes2Tests
 //
-//  Basic tests for Recipe and RecipeModel encoding/decoding
+//  Basic tests for RecipeX
 //  Created on 1/5/26.
-//
+//  Modified 2/2/26
 
 import Testing
 import Foundation
@@ -17,105 +17,77 @@ struct RecipeExportImportBasicTests {
     
     // MARK: - Test Data Factories
     
-    /// Creates a complete RecipeModel with all fields populated
-    func createCompleteRecipeModel() -> RecipeModel {
-        return RecipeModel(
+    func createCompleteRecipeX() throws -> RecipeX {
+        let ingredientSections = [
+            IngredientSection(
+                title: "Main Ingredients",
+                ingredients: [
+                    Ingredient(quantity: "2", unit: "cups", name: "flour", preparation: "sifted", metricQuantity: "480", metricUnit: "mL"),
+                    Ingredient(quantity: "1", unit: "tsp", name: "salt")
+                ],
+                transitionNote: "Mix these first"
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                title: "Preparation",
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Preheat oven to 350°F"),
+                    InstructionStep(stepNumber: 2, text: "Mix ingredients")
+                ]
+            )
+        ]
+        
+        let notes = [
+            RecipeNote(type: .tip, text: "Works best at room temperature"),
+            RecipeNote(type: .warning, text: "Don't overmix")
+        ]
+        
+        let encoder = JSONEncoder()
+        let ingredientSectionsData = try encoder.encode(ingredientSections)
+        let instructionSectionsData = try encoder.encode(instructionSections)
+        let notesData = try encoder.encode(notes)
+        
+        return RecipeX(
             id: UUID(),
-            title: "Test Recipe: Complete Lasagna",
-            headerNotes: "A delicious Italian classic with layers of pasta, meat, and cheese",
-            yield: "Serves 8-10",
-            ingredientSections: [
-                IngredientSection(
-                    title: "For the Sauce",
-                    ingredients: [
-                        Ingredient(
-                            quantity: "2",
-                            unit: "lbs",
-                            name: "ground beef",
-                            preparation: "browned",
-                            metricQuantity: "900",
-                            metricUnit: "g"
-                        ),
-                        Ingredient(
-                            quantity: "1",
-                            unit: "jar",
-                            name: "marinara sauce",
-                            metricQuantity: "680",
-                            metricUnit: "mL"
-                        )
-                    ],
-                    transitionNote: "Sauce should simmer for 30 minutes"
-                ),
-                IngredientSection(
-                    title: "For the Filling",
-                    ingredients: [
-                        Ingredient(
-                            quantity: "15",
-                            unit: "oz",
-                            name: "ricotta cheese",
-                            metricQuantity: "425",
-                            metricUnit: "g"
-                        ),
-                        Ingredient(
-                            quantity: "2",
-                            unit: "cups",
-                            name: "mozzarella cheese",
-                            preparation: "shredded",
-                            metricQuantity: "500",
-                            metricUnit: "mL"
-                        )
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    title: "Prepare the Sauce",
-                    steps: [
-                        InstructionStep(stepNumber: 1, text: "Brown the ground beef in a large skillet"),
-                        InstructionStep(stepNumber: 2, text: "Add marinara sauce and simmer for 30 minutes")
-                    ]
-                ),
-                InstructionSection(
-                    title: "Assemble and Bake",
-                    steps: [
-                        InstructionStep(stepNumber: 3, text: "Layer pasta, sauce, and cheese in a 9x13 pan"),
-                        InstructionStep(stepNumber: 4, text: "Bake at 375°F for 45 minutes")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "Let the lasagna rest for 10 minutes before cutting"),
-                RecipeNote(type: .substitution, text: "Can use ground turkey instead of beef"),
-                RecipeNote(type: .warning, text: "Be careful not to overbake"),
-                RecipeNote(type: .timing, text: "Total prep and cook time: 2 hours")
-            ],
-            reference: "Grandma's recipe book, page 42",
-            imageName: "lasagna_main.jpg",
-            additionalImageNames: ["lasagna_slice.jpg", "lasagna_prep.jpg"],
-            imageURLs: ["https://example.com/image1.jpg"]
+            title: "Complete Test Recipe",
+            headerNotes: "A comprehensive test recipe",
+            recipeYield: "Serves 4",
+            reference: "Test Kitchen",
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
+            notesData: notesData,
+            imageName: "test-main.jpg",
+            additionalImageNames: ["test-1.jpg", "test-2.jpg"]
         )
     }
     
-    /// Creates a minimal RecipeModel with only required fields
-    func createMinimalRecipeModel() -> RecipeModel {
-        return RecipeModel(
-            title: "Simple Toast",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(name: "bread"),
-                        Ingredient(name: "butter")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(text: "Toast the bread"),
-                        InstructionStep(text: "Spread butter on toast")
-                    ]
-                )
-            ]
+    func createMinimalRecipeX() throws -> RecipeX {
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(name: "flour")
+                ]
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Mix well")
+                ]
+            )
+        ]
+        
+        let encoder = JSONEncoder()
+        let ingredientSectionsData = try encoder.encode(ingredientSections)
+        let instructionSectionsData = try encoder.encode(instructionSections)
+        
+        return RecipeX(
+            title: "Minimal Recipe",
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData
         )
     }
     
@@ -132,185 +104,89 @@ struct RecipeExportImportBasicTests {
         #expect(uuid.uuidString.count > 0)
     }
     
-    // MARK: - RecipeModel Encoding/Decoding Tests
+    // MARK: - RecipeX Encoding/Decoding Tests
     
-    @Test("RecipeModel complete encoding and decoding")
-    func testCompleteRecipeModelCoding() throws {
-        let original = createCompleteRecipeModel()
-        
-        // Encode
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(original)
-        
-        // Decode
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(RecipeModel.self, from: data)
+    @Test("RecipeX complete properties verification")
+    func testCompleteRecipeXProperties() throws {
+        let original = try createCompleteRecipeX()
         
         // Verify all fields
-        #expect(decoded.id == original.id)
-        #expect(decoded.title == original.title)
-        #expect(decoded.headerNotes == original.headerNotes)
-        #expect(decoded.yield == original.yield)
-        #expect(decoded.reference == original.reference)
-        #expect(decoded.imageName == original.imageName)
-        #expect(decoded.additionalImageNames?.count == original.additionalImageNames?.count)
-        #expect(decoded.imageURLs?.count == original.imageURLs?.count)
+        #expect(original.id != nil)
+        #expect(original.title == "Complete Test Recipe")
+        #expect(original.headerNotes == "A comprehensive test recipe")
+        #expect(original.yield == "Serves 4")
+        #expect(original.reference == "Test Kitchen")
+        #expect(original.imageName == "test-main.jpg")
+        #expect(original.additionalImageNames?.count == 2)
         
-        // Verify ingredient sections
-        #expect(decoded.ingredientSections.count == original.ingredientSections.count)
-        #expect(decoded.ingredientSections[0].title == original.ingredientSections[0].title)
-        #expect(decoded.ingredientSections[0].ingredients.count == original.ingredientSections[0].ingredients.count)
-        #expect(decoded.ingredientSections[0].transitionNote == original.ingredientSections[0].transitionNote)
+        // Verify ingredient sections (decoded from Data)
+        let ingredientSections = original.ingredientSections
+        #expect(ingredientSections.count == 1)
+        #expect(ingredientSections[0].title == "Main Ingredients")
+        #expect(ingredientSections[0].ingredients.count == 2)
+        #expect(ingredientSections[0].transitionNote == "Mix these first")
         
         // Verify ingredients details
-        let firstIngredient = decoded.ingredientSections[0].ingredients[0]
-        let originalFirstIngredient = original.ingredientSections[0].ingredients[0]
-        #expect(firstIngredient.name == originalFirstIngredient.name)
-        #expect(firstIngredient.quantity == originalFirstIngredient.quantity)
-        #expect(firstIngredient.unit == originalFirstIngredient.unit)
-        #expect(firstIngredient.preparation == originalFirstIngredient.preparation)
-        #expect(firstIngredient.metricQuantity == originalFirstIngredient.metricQuantity)
-        #expect(firstIngredient.metricUnit == originalFirstIngredient.metricUnit)
+        let firstIngredient = ingredientSections[0].ingredients[0]
+        #expect(firstIngredient.name == "flour")
+        #expect(firstIngredient.quantity == "2")
+        #expect(firstIngredient.unit == "cups")
+        #expect(firstIngredient.preparation == "sifted")
+        #expect(firstIngredient.metricQuantity == "480")
+        #expect(firstIngredient.metricUnit == "mL")
         
-        // Verify instruction sections
-        #expect(decoded.instructionSections.count == original.instructionSections.count)
-        #expect(decoded.instructionSections[0].title == original.instructionSections[0].title)
-        #expect(decoded.instructionSections[0].steps.count == original.instructionSections[0].steps.count)
+        // Verify instruction sections (decoded from Data)
+        let instructionSections = original.instructionSections
+        #expect(instructionSections.count == 1)
+        #expect(instructionSections[0].title == "Preparation")
+        #expect(instructionSections[0].steps.count == 2)
         
         // Verify instruction steps
-        let firstStep = decoded.instructionSections[0].steps[0]
-        let originalFirstStep = original.instructionSections[0].steps[0]
-        #expect(firstStep.text == originalFirstStep.text)
-        #expect(firstStep.stepNumber == originalFirstStep.stepNumber)
+        let firstStep = instructionSections[0].steps[0]
+        #expect(firstStep.text == "Preheat oven to 350°F")
+        #expect(firstStep.stepNumber == 1)
         
-        // Verify notes
-        #expect(decoded.notes.count == original.notes.count)
-        #expect(decoded.notes[0].type == original.notes[0].type)
-        #expect(decoded.notes[0].text == original.notes[0].text)
+        // Verify notes (decoded from Data)
+        let notes = original.notes
+        #expect(notes.count == 2)
+        #expect(notes[0].type == .tip)
+        #expect(notes[0].text == "Works best at room temperature")
     }
     
-    @Test("RecipeModel minimal encoding and decoding")
-    func testMinimalRecipeModelCoding() throws {
-        let original = createMinimalRecipeModel()
-        
-        // Encode
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(original)
-        
-        // Decode
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(RecipeModel.self, from: data)
+    @Test("RecipeX minimal properties verification")
+    func testMinimalRecipeXProperties() throws {
+        let original = try createMinimalRecipeX()
         
         // Verify required fields
-        #expect(decoded.title == original.title)
-        #expect(decoded.ingredientSections.count == 1)
-        #expect(decoded.instructionSections.count == 1)
+        #expect(original.title == "Minimal Recipe")
+        #expect(original.ingredientSections.count == 1)
+        #expect(original.instructionSections.count == 1)
         
         // Verify optional fields are nil
-        #expect(decoded.headerNotes == nil)
-        #expect(decoded.yield == nil)
-        #expect(decoded.reference == nil)
-        #expect(decoded.imageName == nil)
-        #expect(decoded.additionalImageNames == nil)
+        #expect(original.headerNotes == nil)
+        #expect(original.yield == nil)
+        #expect(original.reference == nil)
+        #expect(original.imageName == nil)
+        #expect(original.additionalImageNames == nil)
     }
     
-    @Test("RecipeModel handles empty arrays")
-    func testRecipeModelWithEmptyArrays() throws {
-        let model = RecipeModel(
+    @Test("RecipeX handles empty section arrays")
+    func testRecipeXWithEmptyArrays() throws {
+        let encoder = JSONEncoder()
+        let emptyIngredientsData = try encoder.encode([IngredientSection]())
+        let emptyInstructionsData = try encoder.encode([InstructionSection]())
+        let emptyNotesData = try encoder.encode([RecipeNote]())
+        
+        let model = RecipeX(
             title: "Empty Recipe",
-            ingredientSections: [],
-            instructionSections: [],
-            notes: []
+            ingredientSectionsData: emptyIngredientsData,
+            instructionSectionsData: emptyInstructionsData,
+            notesData: emptyNotesData
         )
         
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(model)
-        
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(RecipeModel.self, from: data)
-        
-        #expect(decoded.ingredientSections.isEmpty)
-        #expect(decoded.instructionSections.isEmpty)
-        #expect(decoded.notes.isEmpty)
-    }
-    
-    // MARK: - Recipe to RecipeModel Conversion Tests
-    
-    @Test("Recipe initializes from RecipeModel with all fields")
-    func testRecipeInitFromCompleteRecipeModel() throws {
-        let model = createCompleteRecipeModel()
-        
-        // Create in-memory ModelContainer for this test
-        let schema = Schema([Recipe.self, RecipeBook.self])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        let context = container.mainContext
-        
-        // Create and insert the recipe
-        let recipe = Recipe(from: model)
-        context.insert(recipe)
-        
-        // Verify basic fields
-        #expect(recipe.id == model.id)
-        #expect(recipe.title == model.title)
-        #expect(recipe.headerNotes == model.headerNotes)
-        #expect(recipe.recipeYield == model.yield)
-        #expect(recipe.reference == model.reference)
-        #expect(recipe.imageName == model.imageName)
-        #expect(recipe.additionalImageNames?.count == model.additionalImageNames?.count)
-        
-        // Verify encoded data exists
-        #expect(recipe.ingredientSectionsData != nil)
-        #expect(recipe.instructionSectionsData != nil)
-        #expect(recipe.notesData != nil)
-        
-        // Decode and verify ingredient sections
-        let decoder = JSONDecoder()
-        if let data = recipe.ingredientSectionsData {
-            let sections = try decoder.decode([IngredientSection].self, from: data)
-            #expect(sections.count == model.ingredientSections.count)
-            #expect(sections[0].title == model.ingredientSections[0].title)
-        }
-        
-        // Decode and verify instruction sections
-        if let data = recipe.instructionSectionsData {
-            let sections = try decoder.decode([InstructionSection].self, from: data)
-            #expect(sections.count == model.instructionSections.count)
-            #expect(sections[0].title == model.instructionSections[0].title)
-        }
-        
-        // Decode and verify notes
-        if let data = recipe.notesData {
-            let notes = try decoder.decode([RecipeNote].self, from: data)
-            #expect(notes.count == model.notes.count)
-            #expect(notes[0].type == model.notes[0].type)
-        }
-        
-        // Verify version tracking
-        #expect(recipe.version != nil)
-        #expect(recipe.lastModified != nil)
-    }
-    
-    @Test("Recipe initializes from minimal RecipeModel")
-    func testRecipeInitFromMinimalRecipeModel() throws {
-        let model = createMinimalRecipeModel()
-        
-        // Create in-memory ModelContainer for this test
-        let schema = Schema([Recipe.self, RecipeBook.self])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        let context = container.mainContext
-        
-        let recipe = Recipe(from: model)
-        context.insert(recipe)
-        
-        #expect(recipe.title == model.title)
-        #expect(recipe.headerNotes == nil)
-        #expect(recipe.recipeYield == nil)
-        #expect(recipe.ingredientSectionsData != nil)
-        #expect(recipe.instructionSectionsData != nil)
+        #expect(model.ingredientSections.isEmpty)
+        #expect(model.instructionSections.isEmpty)
+        #expect(model.notes.isEmpty)
     }
     
     // MARK: - Component Tests
@@ -363,94 +239,118 @@ struct RecipeExportImportBasicTests {
         #expect(decoded[4].type == .general)
     }
     
-    @Test("Recipe computed properties work correctly")
+    @Test("RecipeX computed properties work correctly")
     func testRecipeComputedProperties() throws {
-        let model = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(name: "flour"),
+                    Ingredient(name: "sugar")
+                ]
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Mix ingredients")
+                ]
+            )
+        ]
+        
+        let encoder = JSONEncoder()
+        let ingredientSectionsData = try encoder.encode(ingredientSections)
+        let instructionSectionsData = try encoder.encode(instructionSections)
+        
+        let model = RecipeX(
             title: "Test Recipe",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(name: "flour"),
-                        Ingredient(name: "sugar")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(text: "Mix ingredients")
-                    ]
-                )
-            ],
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
             imageName: "main.jpg",
             additionalImageNames: ["photo1.jpg", "photo2.jpg"]
         )
         
         // Create in-memory ModelContainer for this test
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
         
-        let recipe = Recipe(from: model)
-        context.insert(recipe)
+        context.insert(model)
         
-        // Test allImageNames computed property (from RecipeModel)
+        // Test allImageNames computed property
         #expect(model.allImageNames.count == 3)
         #expect(model.allImageNames.contains("main.jpg"))
         #expect(model.allImageNames.contains("photo1.jpg"))
         
-        // Test imageCount computed property
-        #expect(model.imageCount == 3)
+        // Test imageCount computed property (should be 0 since we only have filenames, not imageData)
+        #expect(model.imageCount == 0)
         
-        // Test currentVersion computed property (from Recipe)
-        #expect(recipe.currentVersion >= 1)
+        // Test currentVersion computed property
+        #expect(model.currentVersion >= 1)
         
         // Test modificationDate computed property
-        #expect(recipe.modificationDate <= Date())
+        #expect(model.modificationDate <= Date())
+        
+        // Test decoded sections
+        #expect(model.ingredientSections.count == 1)
+        #expect(model.ingredientSections[0].ingredients.count == 2)
+        #expect(model.instructionSections.count == 1)
+        #expect(model.instructionSections[0].steps.count == 1)
     }
     
     // MARK: - Backward Compatibility Tests
     
-    @Test("Old RecipeModel format without new fields still decodes")
-    func testBackwardCompatibility() throws {
-        // Simulate an old JSON format without additionalImageNames or imageURLs
-        let oldJSON = """
-        {
-            "id": "12345678-1234-1234-1234-123456789012",
-            "title": "Old Recipe",
-            "ingredientSections": [
-                {
-                    "id": "87654321-4321-4321-4321-210987654321",
-                    "ingredients": [
-                        {
-                            "id": "11111111-1111-1111-1111-111111111111",
-                            "name": "flour"
-                        }
-                    ]
-                }
-            ],
-            "instructionSections": [
-                {
-                    "id": "22222222-2222-2222-2222-222222222222",
-                    "steps": [
-                        {
-                            "id": "33333333-3333-3333-3333-333333333333",
-                            "text": "Mix well"
-                        }
-                    ]
-                }
-            ],
-            "notes": []
-        }
-        """
+    @Test("RecipeX can be created with minimal data")
+    func testMinimalRecipeXCreation() throws {
+        // Simulate creating a RecipeX with just title and sections
+        let ingredientSections = [
+            IngredientSection(
+                id: UUID(uuidString: "87654321-4321-4321-4321-210987654321")!,
+                ingredients: [
+                    Ingredient(
+                        id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                        name: "flour"
+                    )
+                ]
+            )
+        ]
         
-        let decoder = JSONDecoder()
-        let model = try decoder.decode(RecipeModel.self, from: oldJSON.data(using: .utf8)!)
+        let instructionSections = [
+            InstructionSection(
+                id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                steps: [
+                    InstructionStep(
+                        id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+                        stepNumber: 1,
+                        text: "Mix well"
+                    )
+                ]
+            )
+        ]
+        
+        let encoder = JSONEncoder()
+        let ingredientSectionsData = try encoder.encode(ingredientSections)
+        let instructionSectionsData = try encoder.encode(instructionSections)
+        let emptyNotesData = try encoder.encode([RecipeNote]())
+        
+        let model = RecipeX(
+            id: UUID(uuidString: "12345678-1234-1234-1234-123456789012")!,
+            title: "Old Recipe",
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData,
+            notesData: emptyNotesData
+        )
         
         #expect(model.title == "Old Recipe")
         #expect(model.additionalImageNames == nil)
-        #expect(model.imageURLs == nil)
         #expect(model.ingredientSections.count == 1)
+        #expect(model.instructionSections.count == 1)
+        #expect(model.notes.isEmpty)
+        
+        // Verify IDs are preserved
+        #expect(model.id?.uuidString == "12345678-1234-1234-1234-123456789012")
+        #expect(model.ingredientSections[0].id.uuidString == "87654321-4321-4321-4321-210987654321")
+        #expect(model.ingredientSections[0].ingredients[0].id.uuidString == "11111111-1111-1111-1111-111111111111")
     }
 }

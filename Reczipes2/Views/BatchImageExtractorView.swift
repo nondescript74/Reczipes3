@@ -1523,7 +1523,7 @@ struct PhotoAssetCell: View {
     NavigationStack {
         BatchImageExtractorView(
             apiKey: "test-api-key",
-            modelContext: ModelContext(try! ModelContainer(for: RecipeX.self))
+            modelContext: ModelContext(try! ModelContainer(for: RecipeX.self, Book.self, VersionHistoryRecord.self))
         )
     }
 }

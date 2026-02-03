@@ -24,6 +24,7 @@ enum SchemaV1: VersionedSchema {
             SavedLink.self,
             Book.self,
             CookingSession.self,
+            VersionHistoryRecord.self,
         ]
     }
     
@@ -68,6 +69,7 @@ enum SchemaV2: VersionedSchema {
             SavedLink.self,
             Book.self,
             CookingSession.self,
+            VersionHistoryRecord.self,
         ]
     }
     
@@ -165,6 +167,7 @@ enum SchemaV3: VersionedSchema {
             SavedLink.self,
             Book.self,
             CookingSession.self,
+            VersionHistoryRecord.self,
         ]
     }
     
@@ -294,9 +297,10 @@ enum SchemaV4: VersionedSchema {
             SavedLink.self,
             Book.self,
             CookingSession.self,
-            SharedRecipe.self,          // NEW: CloudKit sharing models
-            SharedRecipeBook.self,      // NEW: CloudKit sharing models
-            SharingPreferences.self,    // NEW: CloudKit sharing models
+            SharedRecipe.self,
+            SharedRecipeBook.self,      
+            SharingPreferences.self,
+            VersionHistoryRecord.self,
         ]
     }
     

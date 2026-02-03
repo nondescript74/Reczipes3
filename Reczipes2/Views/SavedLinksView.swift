@@ -648,7 +648,10 @@ struct ImportLinksSheet: View {
                     throw LinkImportError.fileNotFound
                 }
                 
-                let result = JSONLinkValidator.validate(fileAt: url)
+                // Read and sanitize before validating (strips trailing commas etc.)
+                let rawData = try Data(contentsOf: url)
+                let sanitizedData = LinkImportService.sanitizeJSON(rawData)
+                let result = JSONLinkValidator.validate(data: sanitizedData)
                 
                 await MainActor.run {
                     validationResult = result

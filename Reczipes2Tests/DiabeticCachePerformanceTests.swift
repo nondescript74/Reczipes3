@@ -36,14 +36,14 @@ struct DiabeticCachePerformanceTests {
         let data = try encoder.encode(ingredients)
         
         // Warm up
-        _ = Recipe.calculateIngredientsHash(from: data)
+        _ = RecipeX.calculateIngredientsHash(from: data)
         
         // Measure performance
         let iterations = 1000
         let startTime = Date()
         
         for _ in 1...iterations {
-            _ = Recipe.calculateIngredientsHash(from: data)
+            _ = RecipeX.calculateIngredientsHash(from: data)
         }
         
         let duration = Date().timeIntervalSince(startTime)
@@ -80,14 +80,14 @@ struct DiabeticCachePerformanceTests {
         logger.info("📊 Data size: \(data.count) bytes")
         
         // Warm up
-        _ = Recipe.calculateIngredientsHash(from: data)
+        _ = RecipeX.calculateIngredientsHash(from: data)
         
         // Measure performance
         let iterations = 100
         let startTime = Date()
         
         for _ in 1...iterations {
-            _ = Recipe.calculateIngredientsHash(from: data)
+            _ = RecipeX.calculateIngredientsHash(from: data)
         }
         
         let duration = Date().timeIntervalSince(startTime)
@@ -117,23 +117,28 @@ struct DiabeticCachePerformanceTests {
         let data = try encoder.encode(ingredients)
         
         // Calculate reference hash
-        let referenceHash = Recipe.calculateIngredientsHash(from: data)
+        guard let referenceHash = RecipeX.calculateIngredientsHash(from: data) else {
+            Issue.record("Failed to calculate reference hash")
+            return
+        }
         logger.info("📊 Reference hash: \(referenceHash)")
         
         // Calculate hash concurrently many times
         let iterations = 100
         let startTime = Date()
         
-        await withTaskGroup(of: String.self) { group in
+        await withTaskGroup(of: String?.self) { group in
             for _ in 1...iterations {
                 group.addTask {
-                    Recipe.calculateIngredientsHash(from: data)
+                    RecipeX.calculateIngredientsHash(from: data)
                 }
             }
             
             var allHashes: [String] = []
             for await hash in group {
-                allHashes.append(hash)
+                if let hash = hash {
+                    allHashes.append(hash)
+                }
             }
             
             let duration = Date().timeIntervalSince(startTime)
@@ -160,11 +165,16 @@ struct DiabeticCachePerformanceTests {
         logger.info("🧪 Testing cache validation performance")
         
         let recipe = createTestRecipe()
+        guard let recipeId = recipe.id else {
+            Issue.record("Recipe must have ID")
+            return
+        }
+        
         let encoder = JSONEncoder()
         
         let mockAnalysis = DiabeticInfo(
             id: UUID(),
-            recipeId: recipe.id,
+            recipeId: recipeId,
             lastUpdated: Date(),
             estimatedGlycemicLoad: nil,
             glycemicImpactFactors: [],
@@ -180,7 +190,7 @@ struct DiabeticCachePerformanceTests {
         let analysisData = try encoder.encode(mockAnalysis)
         
         let cached = CachedDiabeticAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipeId,
             analysisData: analysisData,
             cachedAt: Date(),
             recipeVersion: recipe.currentVersion,
@@ -219,17 +229,21 @@ struct DiabeticCachePerformanceTests {
         logger.info("📝 Creating 1000 cache entries...")
         let cacheCount = 1000
         var caches: [CachedDiabeticAnalysis] = []
-        var recipes: [Recipe] = []
+        var recipes: [RecipeX] = []
         
         let createStartTime = Date()
         
         for i in 1...cacheCount {
             let recipe = createTestRecipe(title: "Recipe \(i)")
+            guard let recipeId = recipe.id else {
+                Issue.record("Recipe must have ID")
+                continue
+            }
             recipes.append(recipe)
             
             let mockAnalysis = DiabeticInfo(
                 id: UUID(),
-                recipeId: recipe.id,
+                recipeId: recipeId,
                 lastUpdated: Date(),
                 estimatedGlycemicLoad: nil,
                 glycemicImpactFactors: [],
@@ -245,7 +259,7 @@ struct DiabeticCachePerformanceTests {
             let analysisData = try encoder.encode(mockAnalysis)
             
             let cached = CachedDiabeticAnalysis(
-                recipeId: recipe.id,
+                recipeId: recipeId,
                 analysisData: analysisData,
                 cachedAt: Date(),
                 recipeVersion: recipe.currentVersion,
@@ -316,9 +330,9 @@ struct DiabeticCachePerformanceTests {
         ]
         let largeData = try encoder.encode(largeIngredients)
         
-        let smallHash = Recipe.calculateIngredientsHash(from: smallData)
-        let mediumHash = Recipe.calculateIngredientsHash(from: mediumData)
-        let largeHash = Recipe.calculateIngredientsHash(from: largeData)
+        let smallHash = RecipeX.calculateIngredientsHash(from: smallData) ?? ""
+        let mediumHash = RecipeX.calculateIngredientsHash(from: mediumData) ?? ""
+        let largeHash = RecipeX.calculateIngredientsHash(from: largeData) ?? ""
         
         logger.info("📊 Small data (\(smallData.count) bytes) -> hash: \(smallHash.count) chars")
         logger.info("📊 Medium data (\(mediumData.count) bytes) -> hash: \(mediumHash.count) chars")
@@ -388,12 +402,17 @@ struct DiabeticCachePerformanceTests {
         logger.info("🧪 Testing cache decode performance")
         
         let recipe = createTestRecipe()
+        guard let recipeId = recipe.id else {
+            Issue.record("Recipe must have ID")
+            return
+        }
+        
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         
         let mockAnalysis = DiabeticInfo(
             id: UUID(),
-            recipeId: recipe.id,
+            recipeId: recipeId,
             lastUpdated: Date(),
             estimatedGlycemicLoad: GlycemicLoad(value: 15.5, explanation: "Moderate"),
             glycemicImpactFactors: [
@@ -420,7 +439,7 @@ struct DiabeticCachePerformanceTests {
         logger.info("📊 Analysis data size: \(analysisData.count) bytes")
         
         let cached = CachedDiabeticAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipeId,
             analysisData: analysisData,
             cachedAt: Date(),
             recipeVersion: recipe.currentVersion,
@@ -484,8 +503,9 @@ struct DiabeticCachePerformanceTests {
         let startTime = Date()
         
         for _ in 1...iterations {
-            let hash = Recipe.calculateIngredientsHash(from: data)
-            hashes.insert(hash)
+            if let hash = RecipeX.calculateIngredientsHash(from: data) {
+                hashes.insert(hash)
+            }
         }
         
         let duration = Date().timeIntervalSince(startTime)
@@ -502,7 +522,7 @@ struct DiabeticCachePerformanceTests {
     // MARK: - Helper Methods
     
     @MainActor
-    private func createTestRecipe(title: String = "Test Recipe") -> Recipe {
+    private func createTestRecipe(title: String = "Test Recipe") -> RecipeX {
         let ingredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "2", unit: "cups", name: "flour")
@@ -511,16 +531,17 @@ struct DiabeticCachePerformanceTests {
         
         let instructions = [
             InstructionSection(steps: [
-                InstructionStep(text: "Mix ingredients")
+                InstructionStep(stepNumber: 1, text: "Mix ingredients")
             ])
         ]
         
-        let recipeModel = RecipeModel(
-            title: title,
-            ingredientSections: ingredients,
-            instructionSections: instructions
-        )
+        let ingredientsData = try? JSONEncoder().encode(ingredients)
+        let instructionsData = try? JSONEncoder().encode(instructions)
         
-        return Recipe(from: recipeModel)
+        return RecipeX(
+            title: title,
+            ingredientSectionsData: ingredientsData,
+            instructionSectionsData: instructionsData
+        )
     }
 }

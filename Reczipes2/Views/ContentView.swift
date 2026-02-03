@@ -606,62 +606,6 @@ struct ContentView: View {
             .navigationTitle("Recipes")
             .toolbar {
 #if os(iOS)
-                #if DEBUG
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Menu {
-                        Button("Test Recovery Success") {
-                            DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
-                            
-                            let testError = NSError(
-                                domain: "NSCocoaErrorDomain",
-                                code: 134504,
-                                userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
-                            )
-                            
-                            DatabaseRecoveryLogger.shared.logRecoverySuccess(
-                                error: testError,
-                                filesDeleted: ["CloudKitModel.sqlite", "CloudKitModel.sqlite-shm"],
-                                cloudKitEnabled: true,
-                                databaseSizeMB: 10.5
-                            )
-                        }
-                        
-                        Button("Test Recovery Failure") {
-                            DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
-                            
-                            let testError = NSError(
-                                domain: "NSCocoaErrorDomain",
-                                code: 134504,
-                                userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
-                            )
-                            
-                            let secondaryError = NSError(
-                                domain: "SwiftData.SwiftDataError",
-                                code: 1,
-                                userInfo: [NSLocalizedDescriptionKey: "Failed to recreate container"]
-                            )
-                            
-                            DatabaseRecoveryLogger.shared.logRecoveryFailure(
-                                error: testError,
-                                filesDeleted: ["CloudKitModel.sqlite"],
-                                cloudKitEnabled: true,
-                                secondaryError: secondaryError
-                            )
-                        }
-                        
-                        Button("View Recovery Stats") {
-                            DatabaseRecoveryLogger.shared.logRecoveryStatistics()
-                        }
-                        
-                        Button("Clear Recovery History") {
-                            DatabaseRecoveryLogger.shared.clearHistory()
-                        }
-                    } label: {
-                        Label("Debug Recovery Logger", systemImage: "ladybug")
-                    }
-                }
-                #endif
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     CloudKitSyncBadge()
                 }
@@ -1087,7 +1031,7 @@ private struct RecipeObserversModifier: ViewModifier {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [RecipeX.self, RecipeImageAssignment.self, UserAllergenProfile.self, Book.self, SavedLink.self], inMemory: true)
+        .modelContainer(for: [RecipeX.self, RecipeImageAssignment.self, UserAllergenProfile.self, Book.self, SavedLink.self, VersionHistoryRecord.self], inMemory: true)
         .environmentObject(AppStateManager.shared)
 }
 // MARK: - Recipe Book Badge View

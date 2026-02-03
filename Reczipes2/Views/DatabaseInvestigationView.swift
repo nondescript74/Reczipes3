@@ -503,6 +503,7 @@ class DatabaseInvestigationService {
             SharingPreferences.self,
             CachedSharedRecipe.self,
             CloudKitRecipePreview.self,
+            VersionHistoryRecord.self,
             migrationPlan: Reczipes2MigrationPlan.self,
             configurations: config
         )

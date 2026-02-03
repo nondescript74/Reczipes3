@@ -21,8 +21,8 @@ struct SharingWorkflowTests {
     
     private func createTestModelContainer() throws -> ModelContainer {
         let schema = Schema([
-            Recipe.self,
-            RecipeBook.self,
+            RecipeX.self,
+            Book.self,
             SharedRecipe.self,
             SharedRecipeBook.self,
             SharingPreferences.self
@@ -31,15 +31,15 @@ struct SharingWorkflowTests {
         return try ModelContainer(for: schema, configurations: [configuration])
     }
     
-    private func createTestRecipe(title: String = "Test Recipe") -> Recipe {
-        let recipe = Recipe(title: title)
+    private func createTestRecipe(title: String = "Test Recipe") -> RecipeX {
+        let recipe = RecipeX(title: title)
         recipe.headerNotes = "Test notes"
         recipe.recipeYield = "4 servings"
         return recipe
     }
     
-    private func createTestBook(name: String = "Test Book") -> RecipeBook {
-        let book = RecipeBook(name: name, bookDescription: "Test description")
+    private func createTestBook(name: String = "Test Book") -> Book {
+        let book = Book(name: name, bookDescription: "Test description")
         return book
     }
     

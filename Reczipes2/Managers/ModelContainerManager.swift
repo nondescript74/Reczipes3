@@ -156,6 +156,7 @@ class ModelContainerManager: ObservableObject {
                 SharingPreferences.self,        // CloudKit sharing models
                 CachedSharedRecipe.self,
                 CloudKitRecipePreview.self,
+                VersionHistoryRecord.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: cloudKitConfiguration
             )
@@ -222,6 +223,7 @@ class ModelContainerManager: ObservableObject {
                             SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
                             CloudKitRecipePreview.self,
+                            VersionHistoryRecord.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: cloudKitConfiguration
                         )
@@ -319,6 +321,7 @@ class ModelContainerManager: ObservableObject {
                             SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
                             CloudKitRecipePreview.self,
+                            VersionHistoryRecord.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: cloudKitConfiguration
                         )
@@ -360,6 +363,7 @@ class ModelContainerManager: ObservableObject {
                 SharingPreferences.self,        // CloudKit sharing models
                 CachedSharedRecipe.self,
                 CloudKitRecipePreview.self,
+                VersionHistoryRecord.self,
                 migrationPlan: Reczipes2MigrationPlan.self,
                 configurations: localConfiguration
             )
@@ -428,6 +432,7 @@ class ModelContainerManager: ObservableObject {
                             SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
                             CloudKitRecipePreview.self,
+                            VersionHistoryRecord.self,
                             migrationPlan: Reczipes2MigrationPlan.self,
                             configurations: localConfiguration
                         )

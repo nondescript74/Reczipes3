@@ -460,7 +460,8 @@ class CloudKitOnboardingService: ObservableObject {
         // Create a dummy record of each type to ensure schema exists
         let recordTypes = [
             "SharedRecipe",
-            "SharedRecipeBook"
+            "SharedRecipeBook",
+            "VersionHistoryRecord"
         ]
         
         for recordType in recordTypes {

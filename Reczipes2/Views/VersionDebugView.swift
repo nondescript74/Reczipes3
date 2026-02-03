@@ -18,13 +18,8 @@ struct VersionDebugView: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String
     }
     
-    private var currentEntry: VersionHistoryEntry? {
-        VersionHistoryManager.shared.getCurrentVersionEntry()
-    }
-    
-    private var allEntries: [VersionHistoryEntry] {
-        VersionHistoryManager.shared.getAllHistory()
-    }
+    @State private var currentEntry: VersionHistoryRecord?
+    @State private var allEntries: [VersionHistoryRecord] = []
     
     var body: some View {
         NavigationView {
@@ -59,11 +54,11 @@ struct VersionDebugView: View {
                     }
                 }
                 
-                Section("VersionHistoryManager Detection") {
+                Section("VersionHistoryService Detection") {
                     HStack {
                         Text("Detected Version")
                         Spacer()
-                        Text(VersionHistoryManager.shared.currentVersion)
+                        Text(VersionHistoryService.shared.currentVersion)
                             .foregroundColor(.blue)
                             .bold()
                     }
@@ -71,7 +66,7 @@ struct VersionDebugView: View {
                     HStack {
                         Text("Detected Build")
                         Spacer()
-                        Text(VersionHistoryManager.shared.currentBuildNumber)
+                        Text(VersionHistoryService.shared.currentBuildNumber)
                             .foregroundColor(.blue)
                             .bold()
                     }
@@ -79,7 +74,7 @@ struct VersionDebugView: View {
                     HStack {
                         Text("Full String")
                         Spacer()
-                        Text(VersionHistoryManager.shared.currentVersionString)
+                        Text(VersionHistoryService.shared.currentVersionString)
                             .foregroundColor(.purple)
                             .bold()
                     }
@@ -137,8 +132,8 @@ struct VersionDebugView: View {
                                     .font(.subheadline)
                                     .bold()
                                 
-                                if entry.version == VersionHistoryManager.shared.currentVersion &&
-                                   entry.buildNumber == VersionHistoryManager.shared.currentBuildNumber {
+                                if entry.version == VersionHistoryService.shared.currentVersion &&
+                                   entry.buildNumber == VersionHistoryService.shared.currentBuildNumber {
                                     Spacer()
                                     Text("CURRENT")
                                         .font(.caption2)
@@ -159,21 +154,24 @@ struct VersionDebugView: View {
                 }
                 
                 Section("What's New (from getWhatsNew())") {
-                    let whatsNew = VersionHistoryManager.shared.getWhatsNew()
-                    
-                    Text("Returns \(whatsNew.count) items")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    ForEach(whatsNew, id: \.self) { change in
-                        Text(change)
+                    if let whatsNew = try? VersionHistoryService.shared.getWhatsNew() {
+                        Text("Returns \(whatsNew.count) items")
                             .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        ForEach(whatsNew, id: \.self) { change in
+                            Text(change)
+                                .font(.caption)
+                        }
+                    } else {
+                        Text("Unable to fetch what's new")
+                            .foregroundColor(.red)
                     }
                 }
                 
                 Section("Actions") {
                     Button {
-                        VersionHistoryManager.shared.resetVersionTracking()
+                        VersionHistoryService.shared.resetVersionTracking()
                     } label: {
                         HStack {
                             Image(systemName: "arrow.counterclockwise")
@@ -186,11 +184,11 @@ struct VersionDebugView: View {
                         print("🐛 VERSION DEBUG INFO")
                         print("Bundle Version: \(bundleVersion ?? "nil")")
                         print("Bundle Build: \(bundleBuild ?? "nil")")
-                        print("Manager Version: \(VersionHistoryManager.shared.currentVersion)")
-                        print("Manager Build: \(VersionHistoryManager.shared.currentBuildNumber)")
-                        print("Manager String: \(VersionHistoryManager.shared.currentVersionString)")
+                        print("Manager Version: \(VersionHistoryService.shared.currentVersion)")
+                        print("Manager Build: \(VersionHistoryService.shared.currentBuildNumber)")
+                        print("Manager String: \(VersionHistoryService.shared.currentVersionString)")
                         print("Current Entry: \(currentEntry?.versionString ?? "nil")")
-                        print("Should Show What's New: \(VersionHistoryManager.shared.shouldShowWhatsNew())")
+                        print("Should Show What's New: \(VersionHistoryService.shared.shouldShowWhatsNew())")
                     } label: {
                         HStack {
                             Image(systemName: "ant.circle")
@@ -201,6 +199,19 @@ struct VersionDebugView: View {
             }
             .navigationTitle("Version Debug")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                await loadData()
+            }
+        }
+    }
+    
+    @MainActor
+    private func loadData() async {
+        do {
+            currentEntry = try VersionHistoryService.shared.getCurrentVersionEntry()
+            allEntries = try VersionHistoryService.shared.getAllHistory()
+        } catch {
+            print("Error loading version history: \(error)")
         }
     }
 }

@@ -16,73 +16,78 @@ struct RecipeExportImportEdgeCaseTests {
     
     // MARK: - Special Characters Tests
     
-    @Test("RecipeModel handles special characters in text")
+    @Test("RecipeX handles special characters in text")
     @MainActor
-    func testSpecialCharactersInRecipeModel() throws {
-        let model = RecipeModel(
+    func testSpecialCharactersInRecipeX() throws {
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(name: "ingredient with ½ fraction"),
+                    Ingredient(name: "ingredient with © symbol")
+                ]
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Step with newlines\nand\ttabs")
+                ]
+            )
+        ]
+        
+        let encoder = JSONEncoder()
+        let ingredientSectionsData = try encoder.encode(ingredientSections)
+        let instructionSectionsData = try encoder.encode(instructionSections)
+        
+        let recipe = RecipeX(
             title: "Recipe with \"quotes\" & <symbols>",
             headerNotes: "Notes with émojis 🍕 and unicode",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(name: "ingredient with ½ fraction"),
-                        Ingredient(name: "ingredient with © symbol")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(text: "Step with newlines\nand\ttabs")
-                    ]
-                )
-            ]
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData
         )
         
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(model)
-        
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(RecipeModel.self, from: data)
-        
-        #expect(decoded.title == model.title)
-        #expect(decoded.headerNotes == model.headerNotes)
-        #expect(decoded.ingredientSections[0].ingredients[0].name.contains("½"))
-        #expect(decoded.instructionSections[0].steps[0].text.contains("\n"))
+        // Verify data is preserved
+        #expect(recipe.title == "Recipe with \"quotes\" & <symbols>")
+        #expect(recipe.headerNotes == "Notes with émojis 🍕 and unicode")
+        #expect(recipe.ingredientSections[0].ingredients[0].name.contains("½"))
+        #expect(recipe.instructionSections[0].steps[0].text.contains("\n"))
     }
     
-    @Test("RecipeModel handles very long text fields")
+    @Test("RecipeX handles very long text fields")
     @MainActor
-    func testLongTextFieldsInRecipeModel() throws {
+    func testLongTextFieldsInRecipeX() throws {
         let longText = String(repeating: "This is a very long text. ", count: 100)
         
-        let model = RecipeModel(
-            title: longText,
-            headerNotes: longText,
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(name: longText)
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(text: longText)
-                    ]
-                )
-            ]
-        )
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(name: longText)
+                ]
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                steps: [
+                    InstructionStep(stepNumber: 1, text: longText)
+                ]
+            )
+        ]
         
         let encoder = JSONEncoder()
-        let data = try encoder.encode(model)
+        let ingredientSectionsData = try encoder.encode(ingredientSections)
+        let instructionSectionsData = try encoder.encode(instructionSections)
         
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(RecipeModel.self, from: data)
+        let recipe = RecipeX(
+            title: longText,
+            headerNotes: longText,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: instructionSectionsData
+        )
         
-        #expect(decoded.title == longText)
-        #expect(decoded.headerNotes == longText)
+        #expect(recipe.title == longText)
+        #expect(recipe.headerNotes == longText)
     }
     
     // MARK: - Corrupted File Tests
@@ -97,7 +102,7 @@ struct RecipeExportImportEdgeCaseTests {
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            _ = try decoder.decode(RecipeBookExportPackage.self, from: data)
+            _ = try decoder.decode(BookExportPackage.self, from: data)
             #expect(Bool(false), "Should have thrown an error")
         } catch {
             // Expected to throw
@@ -120,7 +125,7 @@ struct RecipeExportImportEdgeCaseTests {
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            _ = try decoder.decode(RecipeBookExportPackage.self, from: data)
+            _ = try decoder.decode(BookExportPackage.self, from: data)
             #expect(Bool(false), "Should have thrown an error")
         } catch {
             // Expected - missing book, recipes, and imageManifest
@@ -134,7 +139,6 @@ struct RecipeExportImportEdgeCaseTests {
         let corruptedJSON = """
         {
             "version": "2.0",
-            "exportDate": "2026-01-03T12:00:00Z",
             "book": {
                 "id": "12345678-1234-1234-1234-123456789012",
                 "name": "Test Book",
@@ -145,7 +149,10 @@ struct RecipeExportImportEdgeCaseTests {
             "recipes": [
                 {
                     "id": "invalid-uuid",
-                    "title": "Corrupted Recipe"
+                    "title": "Corrupted Recipe",
+                    "ingredientSections": [],
+                    "instructionSections": [],
+                    "notes": []
                 }
             ],
             "imageManifest": []
@@ -157,7 +164,7 @@ struct RecipeExportImportEdgeCaseTests {
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            _ = try decoder.decode(RecipeBookExportPackage.self, from: data)
+            _ = try decoder.decode(BookExportPackage.self, from: data)
             #expect(Bool(false), "Should have thrown an error for invalid UUID")
         } catch {
             #expect(error is DecodingError)
@@ -170,7 +177,6 @@ struct RecipeExportImportEdgeCaseTests {
         let wrongVersionJSON = """
         {
             "version": 999,
-            "exportDate": "2026-01-03T12:00:00Z",
             "book": {
                 "id": "12345678-1234-1234-1234-123456789012",
                 "name": "Test Book",
@@ -188,7 +194,7 @@ struct RecipeExportImportEdgeCaseTests {
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            _ = try decoder.decode(RecipeBookExportPackage.self, from: data)
+            _ = try decoder.decode(BookExportPackage.self, from: data)
             #expect(Bool(false), "Should have thrown an error for wrong version type")
         } catch {
             #expect(error is DecodingError)
@@ -201,7 +207,6 @@ struct RecipeExportImportEdgeCaseTests {
         let malformedDateJSON = """
         {
             "version": "2.0",
-            "exportDate": "not-a-date",
             "book": {
                 "id": "12345678-1234-1234-1234-123456789012",
                 "name": "Test Book",
@@ -219,14 +224,14 @@ struct RecipeExportImportEdgeCaseTests {
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            _ = try decoder.decode(RecipeBookExportPackage.self, from: data)
+            _ = try decoder.decode(BookExportPackage.self, from: data)
             #expect(Bool(false), "Should have thrown an error for malformed dates")
         } catch {
             #expect(error is DecodingError)
         }
     }
     
-    @Test("Recipe book validates empty data gracefully")
+    @Test("Book validates empty data gracefully")
     @MainActor
     func testEmptyData() throws {
         let emptyData = Data()
@@ -235,7 +240,7 @@ struct RecipeExportImportEdgeCaseTests {
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            _ = try decoder.decode(RecipeBookExportPackage.self, from: emptyData)
+            _ = try decoder.decode(BookExportPackage.self, from: emptyData)
             #expect(Bool(false), "Should have thrown an error for empty data")
         } catch {
             #expect(error is DecodingError)
@@ -244,10 +249,10 @@ struct RecipeExportImportEdgeCaseTests {
     
     // MARK: - Error Message Tests
     
-    @Test("RecipeBookImportError provides localized descriptions")
+    @Test("BookImportError provides localized descriptions")
     @MainActor
     func testImportErrorDescriptions() {
-        let errors: [RecipeBookImportError] = [
+        let errors: [RecipeBookImportService.ImportError] = [
             .invalidFile,
             .decodingFailed(NSError(domain: "test", code: 1)),
             .existingBookConflict("Test Book"),
@@ -266,7 +271,7 @@ struct RecipeExportImportEdgeCaseTests {
     @Test("Invalid file error message is user-friendly")
     @MainActor
     func testInvalidFileErrorMessage() {
-        let error = RecipeBookImportError.invalidFile
+        let error = RecipeBookImportService.ImportError.invalidFile
         #expect(error.errorDescription == "The selected file is not a valid recipe book.")
     }
     
@@ -274,7 +279,7 @@ struct RecipeExportImportEdgeCaseTests {
     @MainActor
     func testExistingBookConflictMessage() {
         let bookName = "My Favorite Recipes"
-        let error = RecipeBookImportError.existingBookConflict(bookName)
+        let error = RecipeBookImportService.ImportError.existingBookConflict(bookName)
         #expect(error.errorDescription?.contains(bookName) == true)
     }
     
@@ -282,7 +287,7 @@ struct RecipeExportImportEdgeCaseTests {
     @MainActor
     func testUnsupportedVersionMessage() {
         let version = "99.0"
-        let error = RecipeBookImportError.unsupportedVersion(version)
+        let error = RecipeBookImportService.ImportError.unsupportedVersion(version)
         #expect(error.errorDescription?.contains(version) == true)
     }
     
@@ -294,21 +299,43 @@ struct RecipeExportImportEdgeCaseTests {
         let recipe1ID = UUID()
         let recipe2ID = UUID()
         
-        let recipe1 = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(ingredients: [Ingredient(name: "flour")])
+        ]
+        let instructionSections = [
+            InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "Mix")])
+        ]
+        
+        
+        let recipe1 = ExportableRecipe(
             id: recipe1ID,
             title: "Recipe 1",
-            ingredientSections: [],
-            instructionSections: []
+            headerNotes: nil,
+            yield: nil,
+            ingredientSections: ingredientSections,
+            instructionSections: instructionSections,
+            notes: [],
+            reference: nil,
+            imageName: nil,
+            additionalImageNames: nil,
+            imageURLs: nil
         )
         
-        let recipe2 = RecipeModel(
+        let recipe2 = ExportableRecipe(
             id: recipe2ID,
             title: "Recipe 2",
-            ingredientSections: [],
-            instructionSections: []
+            headerNotes: nil,
+            yield: nil,
+            ingredientSections: ingredientSections,
+            instructionSections: instructionSections,
+            notes: [],
+            reference: nil,
+            imageName: nil,
+            additionalImageNames: nil,
+            imageURLs: nil
         )
         
-        let exportableBook = ExportableRecipeBook(
+        let exportableBook = ExportableBook(
             id: UUID(),
             name: "Test Book",
             bookDescription: nil,
@@ -319,7 +346,8 @@ struct RecipeExportImportEdgeCaseTests {
             color: nil
         )
         
-        let package = RecipeBookExportPackage(
+        let package = BookExportPackage(
+            version: "2.0",
             book: exportableBook,
             recipes: [recipe1, recipe2],
             imageManifest: []
@@ -338,15 +366,28 @@ struct RecipeExportImportEdgeCaseTests {
         let bookID = UUID()
         let recipeID = UUID()
         
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(ingredients: [Ingredient(name: "flour")])
+        ]
+        let instructionSections = [
+            InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "Mix")])
+        ]
+        
+        let recipe = ExportableRecipe(
             id: recipeID,
             title: "Recipe",
-            ingredientSections: [],
-            instructionSections: [],
-            imageName: "recipe.jpg"
+            headerNotes: nil,
+            yield: nil,
+            ingredientSections: ingredientSections,
+            instructionSections: instructionSections,
+            notes: [],
+            reference: nil,
+            imageName: "recipe.jpg",
+            additionalImageNames: nil,
+            imageURLs: nil
         )
         
-        let exportableBook = ExportableRecipeBook(
+        let exportableBook = ExportableBook(
             id: bookID,
             name: "Book",
             bookDescription: nil,
@@ -362,7 +403,8 @@ struct RecipeExportImportEdgeCaseTests {
             ImageManifestEntry(fileName: "recipe.jpg", type: .recipePrimary, associatedID: recipeID)
         ]
         
-        let package = RecipeBookExportPackage(
+        let package = BookExportPackage(
+            version: "2.0",
             book: exportableBook,
             recipes: [recipe],
             imageManifest: imageManifest
@@ -385,46 +427,52 @@ struct RecipeExportImportEdgeCaseTests {
         let bookID = UUID()
         let recipeID = UUID()
         
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                title: "Ingredients",
+                ingredients: [
+                    Ingredient(
+                        quantity: "2½",
+                        unit: "cups",
+                        name: "flour",
+                        preparation: "sifted",
+                        metricQuantity: "600",
+                        metricUnit: "mL"
+                    )
+                ],
+                transitionNote: "Mix well"
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                title: "Steps",
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Step with\nnewlines\tand\ttabs")
+                ]
+            )
+        ]
+        
+        let notes = [
+            RecipeNote(type: .tip, text: "Tip with © symbol"),
+            RecipeNote(type: .warning, text: "Warning ⚠️")
+        ]
+        
+        let recipe = ExportableRecipe(
             id: recipeID,
             title: "Test Recipe with Émojis 🍕",
             headerNotes: "Notes with \"quotes\" & special chars <>&",
             yield: "Serves 4-6",
-            ingredientSections: [
-                IngredientSection(
-                    title: "Ingredients",
-                    ingredients: [
-                        Ingredient(
-                            quantity: "2½",
-                            unit: "cups",
-                            name: "flour",
-                            preparation: "sifted",
-                            metricQuantity: "600",
-                            metricUnit: "mL"
-                        )
-                    ],
-                    transitionNote: "Mix well"
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    title: "Steps",
-                    steps: [
-                        InstructionStep(stepNumber: 1, text: "Step with\nnewlines\tand\ttabs")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "Tip with © symbol"),
-                RecipeNote(type: .warning, text: "Warning ⚠️")
-            ],
+            ingredientSections: ingredientSections,
+            instructionSections: instructionSections,
+            notes: notes,
             reference: "Source with https://example.com URL",
             imageName: "test_image.jpg",
             additionalImageNames: ["extra1.jpg", "extra2.jpg"],
             imageURLs: ["https://example.com/image1.jpg"]
         )
         
-        let exportableBook = ExportableRecipeBook(
+        let exportableBook = ExportableBook(
             id: bookID,
             name: "Test Book™",
             bookDescription: "Description with émojis 📚",
@@ -440,7 +488,8 @@ struct RecipeExportImportEdgeCaseTests {
             ImageManifestEntry(fileName: "test_image.jpg", type: .recipePrimary, associatedID: recipeID)
         ]
         
-        let original = RecipeBookExportPackage(
+        let original = BookExportPackage(
+            version: "2.0",
             book: exportableBook,
             recipes: [recipe],
             imageManifest: imageManifest
@@ -455,7 +504,7 @@ struct RecipeExportImportEdgeCaseTests {
         // Decode
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(RecipeBookExportPackage.self, from: data)
+        let decoded = try decoder.decode(BookExportPackage.self, from: data)
         
         // Verify all data is preserved
         #expect(decoded.book.id == original.book.id)
@@ -498,15 +547,26 @@ struct RecipeExportImportEdgeCaseTests {
     @Test("Small recipe encodes to reasonable size")
     @MainActor
     func testSmallRecipeSize() throws {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(ingredients: [Ingredient(name: "ingredient")])
+        ]
+        
+        let instructionSections = [
+            InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "step")])
+        ]
+        
+        let recipe = ExportableRecipe(
             id: UUID(),
             title: "Simple Recipe",
-            ingredientSections: [
-                IngredientSection(ingredients: [Ingredient(name: "ingredient")])
-            ],
-            instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "step")])
-            ]
+            headerNotes: nil,
+            yield: nil,
+            ingredientSections: ingredientSections,
+            instructionSections: instructionSections,
+            notes: [],
+            reference: nil,
+            imageName: nil,
+            additionalImageNames: nil,
+            imageURLs: nil
         )
         
         let encoder = JSONEncoder()
@@ -517,54 +577,63 @@ struct RecipeExportImportEdgeCaseTests {
         #expect(data.count < 2048, "Small recipe should encode to less than 2KB")
     }
     
-    @Test("Large recipe book encodes successfully")
+    @Test("Large book encodes successfully")
     @MainActor
-    func testLargeRecipeBook() throws {
-        var recipes: [RecipeModel] = []
+    func testLargeBook() throws {
+        var recipes: [ExportableRecipe] = []
         
         // Create 50 recipes with substantial content
         for i in 1...50 {
-            let recipe = RecipeModel(
+            let ingredientSections = [
+                IngredientSection(
+                    title: "Ingredients Section \(i)",
+                    ingredients: (1...10).map { j in
+                        Ingredient(
+                            quantity: "\(j)",
+                            unit: "cups",
+                            name: "ingredient \(j)",
+                            preparation: "chopped",
+                            metricQuantity: "\(j * 240)",
+                            metricUnit: "mL"
+                        )
+                    }
+                )
+            ]
+            
+            let instructionSections = [
+                InstructionSection(
+                    title: "Instructions",
+                    steps: (1...15).map { k in
+                        InstructionStep(
+                            stepNumber: k,
+                            text: "Step \(k): " + String(repeating: "Detailed instruction text. ", count: 5)
+                        )
+                    }
+                )
+            ]
+            
+            let notes = [
+                RecipeNote(type: .tip, text: "Helpful tip here"),
+                RecipeNote(type: .timing, text: "This takes about 45 minutes")
+            ]
+            
+            let recipe = ExportableRecipe(
                 id: UUID(),
                 title: "Recipe \(i): Comprehensive Recipe with Long Title",
                 headerNotes: String(repeating: "These are detailed header notes. ", count: 10),
                 yield: "Serves 4-6 people",
-                ingredientSections: [
-                    IngredientSection(
-                        title: "Ingredients Section \(i)",
-                        ingredients: (1...10).map { j in
-                            Ingredient(
-                                quantity: "\(j)",
-                                unit: "cups",
-                                name: "ingredient \(j)",
-                                preparation: "chopped",
-                                metricQuantity: "\(j * 240)",
-                                metricUnit: "mL"
-                            )
-                        }
-                    )
-                ],
-                instructionSections: [
-                    InstructionSection(
-                        title: "Instructions",
-                        steps: (1...15).map { k in
-                            InstructionStep(
-                                stepNumber: k,
-                                text: "Step \(String(describing: k)): " + String(repeating: "Detailed instruction text. ", count: 5)
-                            )
-                        }
-                    )
-                ],
-                notes: [
-                    RecipeNote(type: .tip, text: "Helpful tip here"),
-                    RecipeNote(type: .timing, text: "This takes about 45 minutes")
-                ],
-                reference: "Source: Test Cookbook, Page \(i)"
+                ingredientSections: ingredientSections,
+                instructionSections: instructionSections,
+                notes: notes,
+                reference: "Source: Test Cookbook, Page \(i)",
+                imageName: nil,
+                additionalImageNames: nil,
+                imageURLs: nil
             )
             recipes.append(recipe)
         }
         
-        let book = ExportableRecipeBook(
+        let book = ExportableBook(
             id: UUID(),
             name: "Large Recipe Collection",
             bookDescription: "A comprehensive collection of 50 recipes",
@@ -575,7 +644,8 @@ struct RecipeExportImportEdgeCaseTests {
             color: "blue"
         )
         
-        let package = RecipeBookExportPackage(
+        let package = BookExportPackage(
+            version: "2.0",
             book: book,
             recipes: recipes,
             imageManifest: []
@@ -593,12 +663,12 @@ struct RecipeExportImportEdgeCaseTests {
         // Verify it can be decoded
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(RecipeBookExportPackage.self, from: data)
+        let decoded = try decoder.decode(BookExportPackage.self, from: data)
         
         #expect(decoded.recipes.count == 50)
         
         // Log size for informational purposes
-        print("Large recipe book encoded to \(data.count) bytes (\(data.count / 1024)KB)")
+        print("Large book encoded to \(data.count) bytes (\(data.count / 1024)KB)")
     }
     
     // MARK: - File Name Sanitization Tests
@@ -643,7 +713,7 @@ struct RecipeExportImportEdgeCaseTests {
     @Test("Preserves valid file name characters")
     @MainActor
     func testPreserveValidCharacters() {
-        let validName = "My Recipe Book 2026 (Updated)"
+        let validName = "My Book 2026 (Updated)"
         let sanitized = sanitizeFileName(validName)
         #expect(sanitized == validName)
     }
@@ -651,7 +721,7 @@ struct RecipeExportImportEdgeCaseTests {
     @Test("Handles unicode characters correctly")
     @MainActor
     func testUnicodeCharacters() {
-        let unicodeName = "Recipe Book 📚 Émojis & Accénts"
+        let unicodeName = "Book 📚 Émojis & Accénts"
         let sanitized = sanitizeFileName(unicodeName)
         
         // Should preserve unicode but remove only invalid characters
@@ -665,8 +735,9 @@ struct RecipeExportImportEdgeCaseTests {
     @Test("Export package version is semantic version format")
     @MainActor
     func testVersionFormat() {
-        let package = RecipeBookExportPackage(
-            book: ExportableRecipeBook(
+        let package = BookExportPackage(
+            version: "2.0",
+            book: ExportableBook(
                 id: UUID(),
                 name: "Test",
                 bookDescription: nil,
@@ -694,8 +765,9 @@ struct RecipeExportImportEdgeCaseTests {
     @Test("Current version is 2.0")
     @MainActor
     func testCurrentVersion() {
-        let package = RecipeBookExportPackage(
-            book: ExportableRecipeBook(
+        let package = BookExportPackage(
+            version: "2.0",
+            book: ExportableBook(
                 id: UUID(),
                 name: "Test",
                 bookDescription: nil,
@@ -710,39 +782,5 @@ struct RecipeExportImportEdgeCaseTests {
         )
         
         #expect(package.version == "2.0")
-    }
-    
-    @Test("Export date is preserved across encoding")
-    @MainActor
-    func testExportDatePreservation() throws {
-        let originalDate = Date()
-        
-        let package = RecipeBookExportPackage(
-            exportDate: originalDate,
-            book: ExportableRecipeBook(
-                id: UUID(),
-                name: "Test",
-                bookDescription: nil,
-                coverImageName: nil,
-                dateCreated: Date(),
-                dateModified: Date(),
-                recipeIDs: [],
-                color: nil
-            ),
-            recipes: [],
-            imageManifest: []
-        )
-        
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(package)
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(RecipeBookExportPackage.self, from: data)
-        
-        // Dates should match within 1 second (accounting for encoding precision)
-        let timeDifference = abs(decoded.exportDate.timeIntervalSince(originalDate))
-        #expect(timeDifference < 1.0, "Export date should be preserved")
     }
 }

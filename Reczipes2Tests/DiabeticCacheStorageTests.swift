@@ -24,7 +24,9 @@ struct DiabeticCacheStorageTests {
     /// Creates an in-memory model container for testing
     private func createTestContainer() throws -> ModelContainer {
         let schema = Schema([
-            Recipe.self,
+            RecipeX.self,
+            Book.self,
+            VersionHistoryRecord.self,
             CachedDiabeticAnalysis.self
         ])
         
@@ -66,7 +68,7 @@ struct DiabeticCacheStorageTests {
         logger.info("✅ Saved context")
         
         // Retrieve
-        let recipeId = recipe.id  // Capture the value
+        let recipeId = recipe.safeID  // Capture the value
         let descriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == recipeId }
         )
@@ -75,7 +77,7 @@ struct DiabeticCacheStorageTests {
         logger.info("🔍 Fetched \(results.count) results")
         
         #expect(results.count == 1, "Should retrieve one cache entry")
-        #expect(results.first?.recipeId == recipe.id, "Should retrieve correct entry")
+        #expect(results.first?.recipeId == recipe.safeID, "Should retrieve correct entry")
         #expect(results.first?.recipeVersion == recipe.currentVersion, "Version should match")
         
         logger.info("✅ Test passed")
@@ -126,7 +128,7 @@ struct DiabeticCacheStorageTests {
         logger.info("✅ Cache updated")
         
         // Verify update
-        let recipeId = recipe.id  // Capture the value
+        let recipeId = recipe.safeID  // Capture the value
         let descriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == recipeId }
         )
@@ -159,7 +161,7 @@ struct DiabeticCacheStorageTests {
         logger.info("💾 Cache entry saved")
         
         // Verify exists
-        let recipeId = recipe.id  // Capture the value
+        let recipeId = recipe.safeID  // Capture the value
         var descriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == recipeId }
         )
@@ -268,7 +270,7 @@ struct DiabeticCacheStorageTests {
         let context = ModelContext(container)
         
         // Create multiple recipes
-        var targetRecipe: Recipe?
+        var targetRecipe: RecipeX?
         for i in 1...10 {
             let recipe = createTestRecipe(title: "Recipe \(i)")
             context.insert(recipe)
@@ -289,10 +291,10 @@ struct DiabeticCacheStorageTests {
             return
         }
         
-        logger.info("💾 Saved 10 recipes, querying for recipe: \(targetRecipe.title)")
+        logger.info("💾 Saved 10 recipes, querying for recipe: \(targetRecipe.safeTitle)")
         
         // Query specific recipe
-        let targetId = targetRecipe.id  // Capture the value
+        let targetId: UUID = targetRecipe.safeID  // Capture the value with explicit type
         let descriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == targetId }
         )
@@ -300,7 +302,7 @@ struct DiabeticCacheStorageTests {
         
         logger.info("🔍 Found \(results.count) results")
         #expect(results.count == 1, "Should find exactly one entry")
-        #expect(results.first?.recipeId == targetRecipe.id, "Should match recipe ID")
+        #expect(results.first?.recipeId == targetRecipe.safeID, "Should match recipe ID")
         
         logger.info("✅ Test passed")
     }
@@ -424,8 +426,8 @@ struct DiabeticCacheStorageTests {
         logger.info("💾 Saved orphaned cache entry")
         
         // Try to find matching recipe
-        let recipeId = recipe.id  // Capture the value
-        let recipeDescriptor = FetchDescriptor<Recipe>(
+        let recipeId = recipe.safeID  // Capture the value
+        let recipeDescriptor = FetchDescriptor<RecipeX>(
             predicate: #Predicate { $0.id == recipeId }
         )
         let recipeResults = try context.fetch(recipeDescriptor)
@@ -465,7 +467,7 @@ struct DiabeticCacheStorageTests {
         logger.info("💾 Created 3 cache entries for same recipe")
         
         // Query
-        let recipeId = recipe.id  // Capture the value
+        let recipeId = recipe.safeID  // Capture the value
         let descriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == recipeId }
         )
@@ -507,7 +509,7 @@ struct DiabeticCacheStorageTests {
         // Create analysis with lots of data
         let largeAnalysis = DiabeticInfo(
             id: UUID(),
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,
             lastUpdated: Date(),
             estimatedGlycemicLoad: GlycemicLoad(value: 25.5, explanation: String(repeating: "Long explanation. ", count: 100)),
             glycemicImpactFactors: (1...50).map { i in
@@ -559,7 +561,7 @@ struct DiabeticCacheStorageTests {
         logger.info("📊 Analysis data size: \(analysisData.count) bytes")
         
         let cached = CachedDiabeticAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,
             analysisData: analysisData,
             cachedAt: Date(),
             recipeVersion: recipe.currentVersion,
@@ -572,7 +574,7 @@ struct DiabeticCacheStorageTests {
         logger.info("💾 Saved large analysis data")
         
         // Retrieve and decode
-        let recipeId = recipe.id  // Capture the value
+        let recipeId = recipe.safeID  // Capture the value
         let descriptor = FetchDescriptor<CachedDiabeticAnalysis>(
             predicate: #Predicate { $0.recipeId == recipeId }
         )
@@ -591,7 +593,7 @@ struct DiabeticCacheStorageTests {
     
     // MARK: - Helper Methods
     
-    private func createTestRecipe(title: String = "Test Recipe") -> Recipe {
+    private func createTestRecipe(title: String = "Test Recipe") -> RecipeX {
         let ingredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "2", unit: "cups", name: "flour")
@@ -600,23 +602,27 @@ struct DiabeticCacheStorageTests {
         
         let instructions = [
             InstructionSection(steps: [
-                InstructionStep(text: "Mix ingredients")
+                InstructionStep(stepNumber: 1, text: "Mix ingredients")
             ])
         ]
         
-        let recipeModel = RecipeModel(
-            title: title,
-            ingredientSections: ingredients,
-            instructionSections: instructions
-        )
+        // Encode sections to Data
+        let encoder = JSONEncoder()
+        let ingredientsData = try? encoder.encode(ingredients)
+        let instructionsData = try? encoder.encode(instructions)
         
-        return Recipe(from: recipeModel)
+        return RecipeX(
+            id: UUID(),  // Explicitly provide a UUID
+            title: title,
+            ingredientSectionsData: ingredientsData,
+            instructionSectionsData: instructionsData
+        )
     }
     
-    private func createMockAnalysis(for recipe: Recipe, carbCount: Double = 50) -> DiabeticInfo {
+    private func createMockAnalysis(for recipe: RecipeX, carbCount: Double = 50) -> DiabeticInfo {
         DiabeticInfo(
             id: UUID(),
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,  // Use safeID to get non-optional UUID
             lastUpdated: Date(),
             estimatedGlycemicLoad: GlycemicLoad(value: 15.5, explanation: "Moderate"),
             glycemicImpactFactors: [

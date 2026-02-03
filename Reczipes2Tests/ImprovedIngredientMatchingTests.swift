@@ -17,7 +17,7 @@ struct ImprovedIngredientMatchingTests {
     // MARK: - Test Data Setup
     
     /// Create a test recipe with potentially confusing ingredients
-    func createTestRecipe(ingredients: [String]) -> RecipeModel {
+    func createTestRecipe(ingredients: [String]) -> RecipeX {
         let ingredientModels = ingredients.map { name in
             Ingredient(
                 quantity: "1",
@@ -35,14 +35,17 @@ struct ImprovedIngredientMatchingTests {
             transitionNote: nil
         )
         
-        return RecipeModel(
+        // Encode ingredient sections to Data
+        let ingredientSectionsData = try? JSONEncoder().encode([section])
+        
+        return RecipeX(
             title: "Test Recipe",
             headerNotes: nil,
-            yield: "4 servings",
-            ingredientSections: [section],
-            instructionSections: [],
-            notes: [],
-            reference: nil
+            recipeYield: "4 servings",
+            reference: nil,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: nil,
+            notesData: nil
         )
     }
     
@@ -449,14 +452,18 @@ struct ClaudePromptTests {
         ]
         
         let section = IngredientSection(title: nil, ingredients: ingredients, transitionNote: nil)
-        let recipe = RecipeModel(
+        
+        // Encode ingredient sections to Data
+        let ingredientSectionsData = try? JSONEncoder().encode([section])
+        
+        let recipe = RecipeX(
             title: "Test Recipe",
             headerNotes: nil,
-            yield: "4",
-            ingredientSections: [section],
-            instructionSections: [],
-            notes: [],
-            reference: nil
+            recipeYield: "4",
+            reference: nil,
+            ingredientSectionsData: ingredientSectionsData,
+            instructionSectionsData: nil,
+            notesData: nil
         )
         
         let profile = UserAllergenProfile()
@@ -487,14 +494,14 @@ struct ClaudePromptTests {
     @Test("Prompt includes false positive prevention examples")
     func promptIncludesFalsePositivePrevention() throws {
         // Given: A basic recipe and profile
-        let recipe = RecipeModel(
+        let recipe = RecipeX(
             title: "Test",
             headerNotes: nil,
-            yield: "1",
-            ingredientSections: [],
-            instructionSections: [],
-            notes: [],
-            reference: nil
+            recipeYield: "1",
+            reference: nil,
+            ingredientSectionsData: nil,
+            instructionSectionsData: nil,
+            notesData: nil
         )
         
         let profile = UserAllergenProfile()
@@ -531,14 +538,14 @@ struct ClaudePromptTests {
     @Test("Prompt requests confidence scores")
     func promptRequestsConfidenceScores() throws {
         // Given: A basic recipe and profile
-        let recipe = RecipeModel(
+        let recipe = RecipeX(
             title: "Test",
             headerNotes: nil,
-            yield: "1",
-            ingredientSections: [],
-            instructionSections: [],
-            notes: [],
-            reference: nil
+            recipeYield: "1",
+            reference: nil,
+            ingredientSectionsData: nil,
+            instructionSectionsData: nil,
+            notesData: nil
         )
         
         let profile = UserAllergenProfile()

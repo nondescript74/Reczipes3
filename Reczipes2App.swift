@@ -120,6 +120,11 @@ struct Reczipes2App: App {
                             
                             // Check for App Clip data
                             checkForAppClipData()
+                            
+                            // Initialize version history system
+                            Task { @MainActor in
+                                await initializeVersionHistory()
+                            }
                         }
                         .task {
                             // Run CloudKit diagnostics on first launch
@@ -433,6 +438,27 @@ struct Reczipes2App: App {
                 }
             }
         }
+    }
+    
+    // MARK: - Version History Initialization
+    
+    @MainActor
+    private func initializeVersionHistory() async {
+        let modelContext = sharedModelContainer.mainContext
+        
+        // Initialize the service
+        VersionHistoryService.shared.initialize(modelContext: modelContext)
+        
+        // Import historical data (one-time migration)
+        // This checks for duplicates, so it's safe to call every time
+        do {
+            try await VersionHistoryMigration.importHistoricalData(into: modelContext)
+        } catch {
+            logError("Failed to import version history: \(error)", category: "version-history")
+        }
+        
+        // Add/update current version entry
+        await addCurrentVersionToHistory(modelContext: modelContext)
     }
     
     // MARK: - Scene Phase Handling

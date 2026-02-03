@@ -106,7 +106,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Can select single recipe")
         func canSelectSingleRecipe() {
-            var selectedRecipes: [Recipe] = []
+            var selectedRecipes: [RecipeX] = []
             let recipe = createTestRecipe(title: "Recipe 1")
             
             // Simulate selection
@@ -118,7 +118,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Can select multiple recipes")
         func canSelectMultipleRecipes() {
-            var selectedRecipes: [Recipe] = []
+            var selectedRecipes: [RecipeX] = []
             
             let recipe1 = createTestRecipe(title: "Recipe 1")
             let recipe2 = createTestRecipe(title: "Recipe 2")
@@ -133,7 +133,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Can deselect recipe")
         func canDeselectRecipe() {
-            var selectedRecipes: [Recipe] = []
+            var selectedRecipes: [RecipeX] = []
             
             let recipe1 = createTestRecipe(title: "Recipe 1")
             let recipe2 = createTestRecipe(title: "Recipe 2")
@@ -154,7 +154,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Toggle selection works correctly")
         func toggleSelectionWorks() {
-            var selectedRecipes: [Recipe] = []
+            var selectedRecipes: [RecipeX] = []
             let recipe = createTestRecipe(title: "Test Recipe")
             
             // Simulate toggle - add if not present
@@ -174,7 +174,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Share button is disabled when nothing selected")
         func shareButtonDisabledWhenNothingSelected() {
-            let selectedRecipes: [Recipe] = []
+            let selectedRecipes: [RecipeX] = []
             
             let isShareButtonEnabled = !selectedRecipes.isEmpty
             
@@ -183,7 +183,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Share button is enabled when items selected")
         func shareButtonEnabledWhenItemsSelected() {
-            var selectedRecipes: [Recipe] = []
+            var selectedRecipes: [RecipeX] = []
             selectedRecipes.append(createTestRecipe(title: "Test Recipe"))
             
             let isShareButtonEnabled = !selectedRecipes.isEmpty
@@ -191,8 +191,8 @@ struct SharingUIBehaviorTests {
             #expect(isShareButtonEnabled == true)
         }
         
-        private func createTestRecipe(title: String = "Test Recipe") -> Recipe {
-            let recipe = Recipe(title: title)
+        private func createTestRecipe(title: String = "Test Recipe") -> RecipeX {
+            let recipe = RecipeX(title: title)
             return recipe
         }
     }
@@ -203,7 +203,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Can select single book")
         func canSelectSingleBook() {
-            var selectedBooks: [RecipeBook] = []
+            var selectedBooks: [Book] = []
             let book = createTestBook(name: "Book 1")
             
             selectedBooks.append(book)
@@ -214,7 +214,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Can select multiple books")
         func canSelectMultipleBooks() {
-            var selectedBooks: [RecipeBook] = []
+            var selectedBooks: [Book] = []
             
             selectedBooks.append(createTestBook(name: "Book 1"))
             selectedBooks.append(createTestBook(name: "Book 2"))
@@ -225,7 +225,7 @@ struct SharingUIBehaviorTests {
         
         @Test("Can deselect book")
         func canDeselectBook() {
-            var selectedBooks: [RecipeBook] = []
+            var selectedBooks: [Book] = []
             
             let book1 = createTestBook(name: "Book 1")
             let book2 = createTestBook(name: "Book 2")
@@ -241,8 +241,8 @@ struct SharingUIBehaviorTests {
             #expect(selectedBooks.first?.name == "Book 2")
         }
         
-        private func createTestBook(name: String) -> RecipeBook {
-            let book = RecipeBook(name: name)
+        private func createTestBook(name: String) -> Book {
+            let book = Book(name: name)
             return book
         }
     }

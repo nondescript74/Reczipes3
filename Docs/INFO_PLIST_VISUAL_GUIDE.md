@@ -12,66 +12,125 @@
 4. Click the "Info" tab at the top
 ```
 
-#### Step 2: Add Exported Type Identifier
+#### Step 2: Add Exported Type Identifiers (3 types)
 
+You need three exported type declarations. Click the "+" button in
+"Exported Type Identifiers" for each one:
+
+---
+
+**Type 1 — Recipe Book Package**
 ```
-5. Scroll down to find "Exported Type Identifiers" section
-6. Click the small "+" button to add a new type
-7. You'll see a new row appear - click on it to expand
-
-Fill in these fields:
 ┌─────────────────────────────────────────────────────────────┐
-│ Identifier: com.headydiscy.reczipes.recipebook             │
 │ Description: Recipe Book Package                            │
-│ Conforms To: [Click + to add multiple]                     │
-│   - public.zip-archive                                      │
-│   - public.data                                             │
-│ Extensions: [Click + to add]                               │
-│   - recipebook                                              │
-│ MIME Types: [Click + to add]                               │
-│   - application/x-recipebook                                │
+│ Identifier:  com.headydiscy.reczipes.recipebook            │
+│ Conforms To: public.zip-archive, public.data               │
+│ Extensions:  recipebook                                     │
+│ MIME Types:  application/x-recipebook                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**Type 2 — Recipes Backup**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Description: Recipes Backup                                 │
+│ Identifier:  com.headydiscy.reczipes.backup                │
+│ Conforms To: public.zip-archive, public.data               │
+│ Extensions:  backup                                         │
+│ MIME Types:  application/x-backup                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Type 3 — Recipe Books Backup**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Description: Recipe Books Backup                            │
+│ Identifier:  com.headydiscy.reczipes.bookbackup            │
+│ Conforms To: public.zip-archive, public.data               │
+│ Extensions:  bookbackup                                     │
+│ MIME Types:  application/x-bookbackup                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 **Visual representation:**
 ```
-Exported Type Identifiers
-  ▼ Item 0
-    Identifier              com.headydiscy.reczipes.recipebook
+Exported Type Identifiers (3)
+  ▼ Recipe Book Package
     Description             Recipe Book Package
-    ▼ Conforms To
-      Item 0                public.zip-archive
-      Item 1                public.data
-    ▼ Extensions
-      Item 0                recipebook
-    ▼ MIME Types
-      Item 0                application/x-recipebook
+    Identifier              com.headydiscy.reczipes.recipebook
+    Conforms To             public.zip-archive, public.data
+    Extensions              recipebook
+    MIME Types              application/x-recipebook
+
+  ▼ Recipes Backup
+    Description             Recipes Backup
+    Identifier              com.headydiscy.reczipes.backup
+    Conforms To             public.zip-archive, public.data
+    Extensions              backup
+    MIME Types              application/x-backup
+
+  ▼ Recipe Books Backup
+    Description             Recipe Books Backup
+    Identifier              com.headydiscy.reczipes.bookbackup
+    Conforms To             public.zip-archive, public.data
+    Extensions              bookbackup
+    MIME Types              application/x-bookbackup
 ```
 
-#### Step 3: Add Document Type
+#### Step 3: Add Document Types (3 types)
 
 ```
-8. Scroll down to find "Document Types" section
-9. Click the small "+" button to add a new document type
-10. You'll see a new row appear - click on it to expand
+Scroll down to find "Document Types" section.
+Click the "+" button for each of the three document types:
 
-Fill in these fields:
+Document Type 1 — Recipe Book
 ┌─────────────────────────────────────────────────────────────┐
-│ Name: Recipe Book                                           │
-│ Types: [Click + to add]                                     │
-│   - com.headydiscy.reczipes.recipebook                      │
-│ Role: Editor                                                │
+│ Name:         Recipe Book                                   │
+│ Types:        com.headydiscy.reczipes.recipebook            │
+│ Role:         Editor                                        │
+│ Handler rank: Owner                                         │
+└─────────────────────────────────────────────────────────────┘
+
+Document Type 2 — Recipes Backup
+┌─────────────────────────────────────────────────────────────┐
+│ Name:         Recipes Backup                                │
+│ Types:        com.headydiscy.reczipes.backup                │
+│ Role:         Editor                                        │
+│ Handler rank: Owner                                         │
+└─────────────────────────────────────────────────────────────┘
+
+Document Type 3 — Recipe Books Backup
+┌─────────────────────────────────────────────────────────────┐
+│ Name:         Recipe Books Backup                           │
+│ Types:        com.headydiscy.reczipes.bookbackup            │
+│ Role:         Editor                                        │
 │ Handler rank: Owner                                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Visual representation:**
 ```
-Document Types
-  ▼ Item 0
+Document Types (3)
+  ▼ Recipe Book
     Name                    Recipe Book
     ▼ Types
       Item 0                com.headydiscy.reczipes.recipebook
+    Role                    Editor
+    Handler rank            Owner
+
+  ▼ Recipes Backup
+    Name                    Recipes Backup
+    ▼ Types
+      Item 0                com.headydiscy.reczipes.backup
+    Role                    Editor
+    Handler rank            Owner
+
+  ▼ Recipe Books Backup
+    Name                    Recipe Books Backup
+    ▼ Types
+      Item 0                com.headydiscy.reczipes.bookbackup
     Role                    Editor
     Handler rank            Owner
 ```
@@ -131,23 +190,115 @@ Document Types
     <key>CFBundleVersion</key>
     <string>1</string>
     
-    <!-- NEW: Exported Type Declarations -->
+    <!-- Exported Type Declarations (3 types) -->
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
             <key>UTTypeIdentifier</key>
             <string>com.headydiscy.reczipes.recipebook</string>
-            ...
+            <key>UTTypeDescription</key>
+            <string>Recipe Book Package</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.zip-archive</string>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>recipebook</string>
+                </array>
+                <key>public.mime-type</key>
+                <array>
+                    <string>application/x-recipebook</string>
+                </array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.headydiscy.reczipes.backup</string>
+            <key>UTTypeDescription</key>
+            <string>Recipes Backup</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.zip-archive</string>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>backup</string>
+                </array>
+                <key>public.mime-type</key>
+                <array>
+                    <string>application/x-backup</string>
+                </array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.headydiscy.reczipes.bookbackup</string>
+            <key>UTTypeDescription</key>
+            <string>Recipe Books Backup</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.zip-archive</string>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>bookbackup</string>
+                </array>
+                <key>public.mime-type</key>
+                <array>
+                    <string>application/x-bookbackup</string>
+                </array>
+            </dict>
         </dict>
     </array>
     
-    <!-- NEW: Document Types -->
+    <!-- Document Types (3 types) -->
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>
             <key>CFBundleTypeName</key>
             <string>Recipe Book</string>
-            ...
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.headydiscy.reczipes.recipebook</string>
+            </array>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Recipes Backup</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.headydiscy.reczipes.backup</string>
+            </array>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Recipe Books Backup</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.headydiscy.reczipes.bookbackup</string>
+            </array>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
         </dict>
     </array>
     
@@ -175,18 +326,42 @@ If you prefer command line:
 # Navigate to your project directory
 cd /path/to/Reczipes2
 
-# Add exported type declaration
+# --- Type 1: Recipe Book Package ---
 /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeIdentifier string com.headydiscy.reczipes.recipebook" Info.plist
 /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeDescription string 'Recipe Book Package'" Info.plist
 /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo array" Info.plist
 /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:0 string public.zip-archive" Info.plist
 /usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:1 string public.data" Info.plist
 
-# Add document type
+# --- Type 2: Recipes Backup ---
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:1:UTTypeIdentifier string com.headydiscy.reczipes.backup" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:1:UTTypeDescription string 'Recipes Backup'" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:1:UTTypeConformsTo array" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:1:UTTypeConformsTo:0 string public.zip-archive" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:1:UTTypeConformsTo:1 string public.data" Info.plist
+
+# --- Type 3: Recipe Books Backup ---
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:2:UTTypeIdentifier string com.headydiscy.reczipes.bookbackup" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:2:UTTypeDescription string 'Recipe Books Backup'" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:2:UTTypeConformsTo array" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:2:UTTypeConformsTo:0 string public.zip-archive" Info.plist
+/usr/libexec/PlistBuddy -c "Add :UTExportedTypeDeclarations:2:UTTypeConformsTo:1 string public.data" Info.plist
+
+# --- Document Types (3) ---
 /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeName string 'Recipe Book'" Info.plist
 /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes array" Info.plist
 /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:LSItemContentTypes:0 string com.headydiscy.reczipes.recipebook" Info.plist
 /usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:0:CFBundleTypeRole string Editor" Info.plist
+
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:1:CFBundleTypeName string 'Recipes Backup'" Info.plist
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:1:LSItemContentTypes array" Info.plist
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:1:LSItemContentTypes:0 string com.headydiscy.reczipes.backup" Info.plist
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:1:CFBundleTypeRole string Editor" Info.plist
+
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:2:CFBundleTypeName string 'Recipe Books Backup'" Info.plist
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:2:LSItemContentTypes array" Info.plist
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:2:LSItemContentTypes:0 string com.headydiscy.reczipes.bookbackup" Info.plist
+/usr/libexec/PlistBuddy -c "Add :CFBundleDocumentTypes:2:CFBundleTypeRole string Editor" Info.plist
 ```
 
 ---
@@ -224,16 +399,29 @@ The system caches UTI info, so just rebuilding won't work!
 After adding entries, verify in Xcode:
 
 ```
-Info Tab → Exported Type Identifiers
-  ✓ Shows: com.headydiscy.reczipes.recipebook
-  ✓ Description: Recipe Book Package
-  ✓ Conforms To: public.zip-archive, public.data
-  ✓ Extensions: recipebook
+Info Tab → Exported Type Identifiers (3)
+  ✓ Recipe Book Package
+      Identifier:  com.headydiscy.reczipes.recipebook
+      Conforms To: public.zip-archive, public.data
+      Extensions:  recipebook
+      MIME Types:  application/x-recipebook
 
-Info Tab → Document Types
-  ✓ Name: Recipe Book
-  ✓ Types: com.headydiscy.reczipes.recipebook
-  ✓ Role: Editor
+  ✓ Recipes Backup
+      Identifier:  com.headydiscy.reczipes.backup
+      Conforms To: public.zip-archive, public.data
+      Extensions:  backup
+      MIME Types:  application/x-backup
+
+  ✓ Recipe Books Backup
+      Identifier:  com.headydiscy.reczipes.bookbackup
+      Conforms To: public.zip-archive, public.data
+      Extensions:  bookbackup
+      MIME Types:  application/x-bookbackup
+
+Info Tab → Document Types (3)
+  ✓ Recipe Book         → com.headydiscy.reczipes.recipebook     Role: Editor
+  ✓ Recipes Backup      → com.headydiscy.reczipes.backup         Role: Editor
+  ✓ Recipe Books Backup → com.headydiscy.reczipes.bookbackup     Role: Editor
 ```
 
 ---
@@ -295,25 +483,23 @@ Xcode Project Navigator
 │       │   │
 │       │   ├─ ... (other settings)
 │       │   │
-│       │   ├─ 📤 Exported Type Identifiers
-│       │   │   └─ [+] ← ADD HERE
-│       │   │       ├─ Identifier
-│       │   │       ├─ Description
-│       │   │       ├─ Conforms To
-│       │   │       ├─ Extensions
-│       │   │       └─ MIME Types
+│       │   ├─ 📤 Exported Type Identifiers (3)
+│       │   │   ├─ Recipe Book Package
+│       │   │   │   └─ com.headydiscy.reczipes.recipebook   (.recipebook)
+│       │   │   ├─ Recipes Backup
+│       │   │   │   └─ com.headydiscy.reczipes.backup       (.backup)
+│       │   │   └─ Recipe Books Backup
+│       │   │       └─ com.headydiscy.reczipes.bookbackup   (.bookbackup)
 │       │   │
-│       │   └─ 📄 Document Types
-│       │       └─ [+] ← ADD HERE
-│       │           ├─ Name
-│       │           ├─ Types
-│       │           ├─ Role
-│       │           └─ Handler rank
+│       │   └─ 📄 Document Types (3)
+│       │       ├─ Recipe Book         → com.headydiscy.reczipes.recipebook
+│       │       ├─ Recipes Backup      → com.headydiscy.reczipes.backup
+│       │       └─ Recipe Books Backup → com.headydiscy.reczipes.bookbackup
 │       │
 │       ├─ Build Settings
 │       └─ Build Phases
 │
-└─ 📄 Info.plist (Alternative: Edit as source)
+└─ (No standalone Info.plist — Xcode generates it from the Info tab)
 ```
 
 ---

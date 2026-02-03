@@ -471,7 +471,7 @@ struct BookRecipePageView: View {
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Book.self, RecipeX.self, configurations: config)
+    let container = try! ModelContainer(for: Book.self, RecipeX.self, VersionHistoryRecord.self, configurations: config)
     
     // Create a sample book
     let book = Book(

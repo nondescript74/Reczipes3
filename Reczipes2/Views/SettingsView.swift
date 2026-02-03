@@ -390,28 +390,88 @@ struct SettingsView: View {
                             } label: {
                                 Label("Database Diagnostics", systemImage: "stethoscope")
                             }
-                        }
-                        
-                        NavigationLink(destination: VersionDebugView()) {
-                            HStack {
-                                Label("Version Debug Info", systemImage: "ant.circle")
-                                    .foregroundColor(.orange)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            
+                            NavigationLink(destination: VersionDebugView()) {
+                                HStack {
+                                    Label("Version Debug Info", systemImage: "ant.circle")
+                                        .foregroundColor(.orange)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
-                        }
-                        
-                        Button {
-                            VersionHistoryManager.shared.resetVersionTracking()
-                        } label: {
-                            HStack {
-                                Label("Reset Version Tracking", systemImage: "arrow.counterclockwise")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            
+                            // Database Recovery Logger Test Menu
+                            Menu {
+                                Button("Test Recovery Success") {
+                                    DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                                    
+                                    let testError = NSError(
+                                        domain: "NSCocoaErrorDomain",
+                                        code: 134504,
+                                        userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
+                                    )
+                                    
+                                    DatabaseRecoveryLogger.shared.logRecoverySuccess(
+                                        error: testError,
+                                        filesDeleted: ["CloudKitModel.sqlite", "CloudKitModel.sqlite-shm"],
+                                        cloudKitEnabled: true,
+                                        databaseSizeMB: 10.5
+                                    )
+                                }
+                                
+                                Button("Test Recovery Failure") {
+                                    DatabaseRecoveryLogger.shared.beginRecoveryAttempt()
+                                    
+                                    let testError = NSError(
+                                        domain: "NSCocoaErrorDomain",
+                                        code: 134504,
+                                        userInfo: [NSLocalizedDescriptionKey: "Test schema error"]
+                                    )
+                                    
+                                    let secondaryError = NSError(
+                                        domain: "SwiftData.SwiftDataError",
+                                        code: 1,
+                                        userInfo: [NSLocalizedDescriptionKey: "Failed to recreate container"]
+                                    )
+                                    
+                                    DatabaseRecoveryLogger.shared.logRecoveryFailure(
+                                        error: testError,
+                                        filesDeleted: ["CloudKitModel.sqlite"],
+                                        cloudKitEnabled: true,
+                                        secondaryError: secondaryError
+                                    )
+                                }
+                                
+                                Button("View Recovery Stats") {
+                                    DatabaseRecoveryLogger.shared.logRecoveryStatistics()
+                                }
+                                
+                                Button("Clear Recovery History") {
+                                    DatabaseRecoveryLogger.shared.clearHistory()
+                                }
+                            } label: {
+                                HStack {
+                                    Label("Recovery Logger Tests", systemImage: "ladybug")
+                                        .foregroundColor(.red)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            Button {
+                                VersionHistoryService.shared.resetVersionTracking()
+                            } label: {
+                                HStack {
+                                    Label("Reset Version Tracking", systemImage: "arrow.counterclockwise")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
 #endif

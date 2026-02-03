@@ -17,6 +17,9 @@ struct BatchRecipeExtractorView: View {
     @Query(sort: \SavedLink.dateAdded, order: .reverse) private var allLinks: [SavedLink]
     
     @State private var showingCompletionAlert = false
+    @State private var showingImportSheet = false
+    @State private var importResultMessage: String?
+    @State private var showingImportResult = false
     
     init(apiKey: String, modelContext: ModelContext) {
         _viewModel = StateObject(wrappedValue: BatchRecipeExtractorViewModel(apiKey: apiKey, modelContext: modelContext))
@@ -35,6 +38,21 @@ struct BatchRecipeExtractorView: View {
                     mainContentView
                 }
             }
+            .sheet(isPresented: $showingImportSheet) {
+                ImportLinksSheet(
+                    onImportComplete: { count in
+                        importResultMessage = "Successfully imported \(count) new link(s)"
+                        showingImportResult = true
+                    }
+                )
+            }
+            .alert("Import Complete", isPresented: $showingImportResult) {
+                Button("OK") { }
+            } message: {
+                if let message = importResultMessage {
+                    Text(message)
+                }
+            }
             .navigationTitle("Batch Extract")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -44,6 +62,14 @@ struct BatchRecipeExtractorView: View {
                             viewModel.stop()
                         }
                         dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingImportSheet = true
+                    } label: {
+                        Label("Import Links", systemImage: "square.and.arrow.down")
                     }
                 }
             }
@@ -88,20 +114,26 @@ struct BatchRecipeExtractorView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Save recipe links first to use batch extraction")
+            Text("Import recipe links from your JSON file, then extract them all at once.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             
+            // Import button
             Button {
-                dismiss()
+                showingImportSheet = true
             } label: {
-                Label("Close", systemImage: "xmark.circle")
+                Label("Import Links from JSON", systemImage: "square.and.arrow.down")
                     .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
             }
-            .buttonStyle(.bordered)
-            .tint(.blue)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 40)
         }
         .padding()
     }
@@ -457,7 +489,7 @@ struct BatchRecipeExtractorView: View {
     NavigationStack {
         BatchRecipeExtractorView(
             apiKey: "test-api-key",
-            modelContext: ModelContext(try! ModelContainer(for: SavedLink.self, RecipeX.self))
+            modelContext: ModelContext(try! ModelContainer(for: SavedLink.self, RecipeX.self, VersionHistoryRecord.self))
         )
     }
 }

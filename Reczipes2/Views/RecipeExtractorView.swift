@@ -29,6 +29,9 @@ struct RecipeExtractorView: View {
     @State private var showPendingExtractionAlert = false
     @State private var showBatchExtraction = false
     @State private var showBatchImageExtraction = false
+    @State private var showImportLinks = false
+    @State private var importResultMessage: String?
+    @State private var showingImportResult = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
@@ -412,12 +415,52 @@ struct RecipeExtractorView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                
+                // Row 5: Import Links (full width) — feeds the Batch Extract URLs flow
+                Button {
+                    showImportLinks = true
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 40))
+                        Text("Import Recipe Links")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("Import links from JSON to batch extract later")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.clear, lineWidth: 2)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(radius: 2)
+        .sheet(isPresented: $showImportLinks) {
+            ImportLinksSheet(
+                onImportComplete: { count in
+                    importResultMessage = "Successfully imported \(count) new link(s)"
+                    showingImportResult = true
+                }
+            )
+        }
+        .alert("Import Complete", isPresented: $showingImportResult) {
+            Button("OK") { }
+        } message: {
+            if let message = importResultMessage {
+                Text(message)
+            }
+        }
     }
     
     private var urlInputSection: some View {

@@ -6,22 +6,27 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct LaunchScreenView: View {
+    @Environment(\.modelContext) private var modelContext
+    
     @State private var wipeProgress: CGFloat = 0
     @State private var imageOpacity: Double = 0
     @State private var textOpacity: Double = 0
     @State private var accentScale: CGFloat = 0.8
     @State private var isComplete = false
+    @State private var latestFeatures: [String] = []
+    
     let onComplete: () -> Void
     
     // App version information
     private var appVersion: String {
-        VersionHistoryManager.shared.currentVersion
+        VersionHistoryService.shared.currentVersion
     }
     
     private var buildNumber: String {
-        VersionHistoryManager.shared.currentBuildNumber
+        VersionHistoryService.shared.currentBuildNumber
     }
     
     private var appName: String {
@@ -30,11 +35,6 @@ struct LaunchScreenView: View {
     
     private var logFileSize: String {
         DiagnosticLogger.shared.getFormattedLogFileSize()
-    }
-    
-    // Latest features - dynamically loaded from version history
-    private var latestFeatures: [String] {
-        VersionHistoryManager.shared.getWhatsNew()
     }
     
     var body: some View {
@@ -228,6 +228,12 @@ struct LaunchScreenView: View {
             .ignoresSafeArea()
         }
         .onAppear {
+            // Initialize version history service
+            VersionHistoryService.shared.initialize(modelContext: modelContext)
+            
+            // Load latest features from SwiftData
+            loadLatestFeatures()
+            
             // Smooth animations sequence
             
             // Start background image fade
@@ -256,9 +262,28 @@ struct LaunchScreenView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                 isComplete = true
                 // Mark this version as shown
-                VersionHistoryManager.shared.markWhatsNewAsShown()
+                VersionHistoryService.shared.markWhatsNewAsShown()
                 onComplete()
             }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Load the latest version's features from SwiftData
+    private func loadLatestFeatures() {
+        do {
+            // Try to get the latest version entry from SwiftData
+            if let latestEntry = try VersionHistoryService.shared.getCurrentVersionEntry() {
+                latestFeatures = latestEntry.changes
+            } else {
+                // Fallback if no entry found
+                latestFeatures = ["Welcome to Reczipes!", "📱 Your Digital Recipe Collection"]
+            }
+        } catch {
+            // Fallback on error
+            print("⚠️ Error loading version history: \(error.localizedDescription)")
+            latestFeatures = ["Welcome to Reczipes!", "📱 Your Digital Recipe Collection"]
         }
     }
 }

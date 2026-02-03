@@ -34,8 +34,8 @@ struct DiabeticCacheTests {
         
         let encoder = JSONEncoder()
         let data1 = try encoder.encode(ingredients1)
-        let hash1 = Recipe.calculateIngredientsHash(from: data1)
-        logger.info("✅ Hash 1: \(hash1)")
+        let hash1 = RecipeX.calculateIngredientsHash(from: data1)
+        logger.info("✅ Hash 1: \(hash1 ?? "nil")")
         
         // Create identical ingredients (different order)
         logger.info("📝 Creating second ingredient set (different order)")
@@ -50,13 +50,13 @@ struct DiabeticCacheTests {
         ]
         
         let data2 = try encoder.encode(ingredients2)
-        let hash2 = Recipe.calculateIngredientsHash(from: data2)
-        logger.info("✅ Hash 2: \(hash2)")
+        let hash2 = RecipeX.calculateIngredientsHash(from: data2)
+        logger.info("✅ Hash 2: \(hash2 ?? "nil")")
         
         // Hashes should be identical (sorted internally)
         logger.info("🔍 Comparing hashes...")
         #expect(hash1 == hash2, "Hashes should match regardless of ingredient order")
-        #expect(!hash1.isEmpty, "Hash should not be empty")
+        #expect(hash1?.isEmpty == false, "Hash should not be empty")
         
         logger.info("✅ Test completed successfully")
     }
@@ -75,7 +75,7 @@ struct DiabeticCacheTests {
             )
         ]
         let data1 = try encoder.encode(ingredients1)
-        let hash1 = Recipe.calculateIngredientsHash(from: data1)
+        let hash1 = RecipeX.calculateIngredientsHash(from: data1)
         
         // Modified ingredients (different quantity)
         let ingredients2 = await [
@@ -87,7 +87,7 @@ struct DiabeticCacheTests {
             )
         ]
         let data2 = try encoder.encode(ingredients2)
-        let hash2 = Recipe.calculateIngredientsHash(from: data2)
+        let hash2 = RecipeX.calculateIngredientsHash(from: data2)
         
         #expect(hash1 != hash2, "Hashes should differ when quantities change")
         
@@ -101,7 +101,7 @@ struct DiabeticCacheTests {
             )
         ]
         let data3 = try encoder.encode(ingredients3)
-        let hash3 = Recipe.calculateIngredientsHash(from: data3)
+        let hash3 = RecipeX.calculateIngredientsHash(from: data3)
         
         #expect(hash1 != hash3, "Hashes should differ when ingredient names change")
     }
@@ -113,25 +113,26 @@ struct DiabeticCacheTests {
         
         // Create a recipe
         logger.info("📝 Creating recipe")
-        let recipeModel = RecipeModel(
+        let ingredients = [
+            IngredientSection(
+                title: "Main",
+                ingredients: [
+                    Ingredient(quantity: "2", unit: "cups", name: "flour")
+                ]
+            )
+        ]
+        let instructions = [
+            InstructionSection(steps: [
+                InstructionStep(stepNumber: 1, text: "Mix ingredients")
+            ])
+        ]
+        
+        let recipe = RecipeX(
             title: "Test Recipe",
-            ingredientSections: [
-                IngredientSection(
-                    title: "Main",
-                    ingredients: [
-                        Ingredient(quantity: "2", unit: "cups", name: "flour")
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(steps: [
-                    InstructionStep(text: "Mix ingredients")
-                ])
-            ]
+            ingredientSectionsData: try encoder.encode(ingredients),
+            instructionSectionsData: try encoder.encode(instructions)
         )
         
-        logger.info("🔨 Creating Recipe from RecipeModel")
-        let recipe = Recipe(from: recipeModel)
         let initialVersion = recipe.currentVersion
         let initialHash = recipe.ingredientsHash
         
@@ -179,26 +180,27 @@ struct DiabeticCacheTests {
         
         // Create recipe and cache
         logger.info("📝 Creating recipe")
-        let recipeModel = RecipeModel(
-            title: "Test Recipe",
-            ingredientSections: [
-                IngredientSection(ingredients: [
-                    Ingredient(quantity: "2", unit: "cups", name: "flour")
-                ])
-            ],
-            instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "Mix")])
-            ]
-        )
+        let ingredients = [
+            IngredientSection(ingredients: [
+                Ingredient(quantity: "2", unit: "cups", name: "flour")
+            ])
+        ]
+        let instructions = [
+            InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "Mix")])
+        ]
         
-        let recipe = Recipe(from: recipeModel)
+        let recipe = RecipeX(
+            title: "Test Recipe",
+            ingredientSectionsData: try encoder.encode(ingredients),
+            instructionSectionsData: try encoder.encode(instructions)
+        )
         logger.info("✅ Recipe created - Version: \(recipe.currentVersion), Hash: \(recipe.ingredientsHash ?? "nil")")
         
         // Create a mock cache entry
         logger.info("📝 Creating mock diabetic analysis")
         let mockAnalysis = DiabeticInfo(
             id: UUID(),
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,
             lastUpdated: Date(),
             estimatedGlycemicLoad: nil,
             glycemicImpactFactors: [],
@@ -218,7 +220,7 @@ struct DiabeticCacheTests {
         // Create cache
         logger.info("📝 Creating cached analysis")
         let cached = CachedDiabeticAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,
             analysisData: analysisData,
             cachedAt: Date(),
             recipeVersion: recipe.currentVersion,
@@ -263,24 +265,25 @@ struct DiabeticCacheTests {
         let encoder = JSONEncoder()
         
         // Create recipe
-        let recipeModel = RecipeModel(
-            title: "Test Recipe",
-            ingredientSections: [
-                IngredientSection(ingredients: [
-                    Ingredient(quantity: "2", unit: "cups", name: "flour")
-                ])
-            ],
-            instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "Mix")])
-            ]
-        )
+        let ingredients = [
+            IngredientSection(ingredients: [
+                Ingredient(quantity: "2", unit: "cups", name: "flour")
+            ])
+        ]
+        let instructions = [
+            InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "Mix")])
+        ]
         
-        let recipe = Recipe(from: recipeModel)
+        let recipe = RecipeX(
+            title: "Test Recipe",
+            ingredientSectionsData: try encoder.encode(ingredients),
+            instructionSectionsData: try encoder.encode(instructions)
+        )
         
         // Create cache with current hash
         let mockAnalysis = DiabeticInfo(
             id: UUID(),
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,
             lastUpdated: Date(),
             estimatedGlycemicLoad: nil,
             glycemicImpactFactors: [],
@@ -298,7 +301,7 @@ struct DiabeticCacheTests {
         
         // ✅ Use computed properties for cache initialization
         let cached = CachedDiabeticAnalysis(
-            recipeId: recipe.id,
+            recipeId: recipe.safeID,
             analysisData: analysisData,
             cachedAt: Date(),
             recipeVersion: recipe.currentVersion,

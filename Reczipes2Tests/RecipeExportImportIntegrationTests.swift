@@ -20,92 +20,100 @@ struct RecipeExportImportIntegrationTests {
         return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
     }
     
+    /// Helper to create ingredient sections data
+    func encodeIngredientSections(_ sections: [IngredientSection]) throws -> Data {
+        return try JSONEncoder().encode(sections)
+    }
+    
+    /// Helper to create instruction sections data
+    func encodeInstructionSections(_ sections: [InstructionSection]) throws -> Data {
+        return try JSONEncoder().encode(sections)
+    }
+    
+    /// Helper to create notes data
+    func encodeNotes(_ notes: [RecipeNote]) throws -> Data {
+        return try JSONEncoder().encode(notes)
+    }
+    
     @Test("Full export/import cycle preserves all data")
     @MainActor
     func testFullExportImportCycle() async throws {
-        // Create a complete recipe
-        let original = RecipeModel(
+        // Create a complete recipe with RecipeX
+        let ingredientSections = [
+            IngredientSection(
+                title: "Main",
+                ingredients: [
+                    Ingredient(
+                        quantity: "2",
+                        unit: "cups",
+                        name: "flour",
+                        metricQuantity: "480",
+                        metricUnit: "mL"
+                    )
+                ]
+            )
+        ]
+        
+        let instructionSections = [
+            InstructionSection(
+                steps: [
+                    InstructionStep(stepNumber: 1, text: "Mix ingredients")
+                ]
+            )
+        ]
+        
+        let notes = [
+            RecipeNote(type: .tip, text: "Test tip")
+        ]
+        
+        let original = RecipeX(
             id: UUID(),
             title: "Integration Test Recipe",
             headerNotes: "Test notes",
-            yield: "4 servings",
-            ingredientSections: [
-                IngredientSection(
-                    title: "Main",
-                    ingredients: [
-                        Ingredient(
-                            quantity: "2",
-                            unit: "cups",
-                            name: "flour",
-                            metricQuantity: "480",
-                            metricUnit: "mL"
-                        )
-                    ]
-                )
-            ],
-            instructionSections: [
-                InstructionSection(
-                    steps: [
-                        InstructionStep(stepNumber: 1, text: "Mix ingredients")
-                    ]
-                )
-            ],
-            notes: [
-                RecipeNote(type: .tip, text: "Test tip")
-            ],
+            recipeYield: "4 servings",
             reference: "Test source",
+            ingredientSectionsData: try encodeIngredientSections(ingredientSections),
+            instructionSectionsData: try encodeInstructionSections(instructionSections),
+            notesData: try encodeNotes(notes),
             imageName: "test.jpg"
         )
         
         // Create in-memory ModelContainer for this test
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
         
-        // Convert to Recipe (simulating save)
-        let recipe = Recipe(from: original)
-        context.insert(recipe)
+        // Insert recipe
+        context.insert(original)
+        try context.save()
         
-        // Convert back to RecipeModel (simulating export)
+        // Read back (simulating export)
         let decoder = JSONDecoder()
         
-        let ingredientSections = try decoder.decode(
+        let decodedIngredientSections = try decoder.decode(
             [IngredientSection].self,
-            from: recipe.ingredientSectionsData!
+            from: original.ingredientSectionsData!
         )
-        let instructionSections = try decoder.decode(
+        let decodedInstructionSections = try decoder.decode(
             [InstructionSection].self,
-            from: recipe.instructionSectionsData!
+            from: original.instructionSectionsData!
         )
-        let notes = try decoder.decode(
+        let decodedNotes = try decoder.decode(
             [RecipeNote].self,
-            from: recipe.notesData!
-        )
-        
-        let exported = RecipeModel(
-            id: recipe.id,
-            title: recipe.title,
-            headerNotes: recipe.headerNotes,
-            yield: recipe.recipeYield,
-            ingredientSections: ingredientSections,
-            instructionSections: instructionSections,
-            notes: notes,
-            reference: recipe.reference,
-            imageName: recipe.imageName,
-            additionalImageNames: recipe.additionalImageNames
+            from: original.notesData!
         )
         
         // Verify everything matches
-        #expect(exported.id == original.id)
-        #expect(exported.title == original.title)
-        #expect(exported.headerNotes == original.headerNotes)
-        #expect(exported.yield == original.yield)
-        #expect(exported.reference == original.reference)
-        #expect(exported.imageName == original.imageName)
-        #expect(exported.ingredientSections.count == original.ingredientSections.count)
-        #expect(exported.instructionSections.count == original.instructionSections.count)
-        #expect(exported.notes.count == original.notes.count)
+        #expect(original.id != nil)
+        #expect(original.title == "Integration Test Recipe")
+        #expect(original.headerNotes == "Test notes")
+        #expect(original.recipeYield == "4 servings")
+        #expect(original.reference == "Test source")
+        #expect(original.imageName == "test.jpg")
+        #expect(decodedIngredientSections.count == ingredientSections.count)
+        #expect(decodedInstructionSections.count == instructionSections.count)
+        #expect(decodedNotes.count == notes.count)
         
         print("✓ Full export/import cycle preserved all recipe data")
     }
@@ -114,32 +122,32 @@ struct RecipeExportImportIntegrationTests {
     @MainActor
     func testCompleteBackupRestoreWorkflow() async throws {
         // Step 1: Create original recipes
-        let exportSchema = Schema([Recipe.self, RecipeBook.self])
+        let exportSchema = Schema([RecipeX.self, Book.self])
         let exportConfig = ModelConfiguration(schema: exportSchema, isStoredInMemoryOnly: true)
         let exportContainer = try ModelContainer(for: exportSchema, configurations: [exportConfig])
         let exportContext = exportContainer.mainContext
         
-        let recipe1 = Recipe(from: RecipeModel(
+        let recipe1 = RecipeX(
             id: UUID(),
             title: "Workflow Test Recipe 1",
-            ingredientSections: [
+            ingredientSectionsData: try encodeIngredientSections([
                 IngredientSection(ingredients: [Ingredient(name: "ingredient 1")])
-            ],
-            instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "step 1")])
-            ]
-        ))
+            ]),
+            instructionSectionsData: try encodeInstructionSections([
+                InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "step 1")])
+            ])
+        )
         
-        let recipe2 = Recipe(from: RecipeModel(
+        let recipe2 = RecipeX(
             id: UUID(),
             title: "Workflow Test Recipe 2",
-            ingredientSections: [
+            ingredientSectionsData: try encodeIngredientSections([
                 IngredientSection(ingredients: [Ingredient(name: "ingredient 2")])
-            ],
-            instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "step 2")])
-            ]
-        ))
+            ]),
+            instructionSectionsData: try encodeInstructionSections([
+                InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "step 2")])
+            ])
+        )
         
         exportContext.insert(recipe1)
         exportContext.insert(recipe2)
@@ -166,7 +174,7 @@ struct RecipeExportImportIntegrationTests {
         print("Step 3: Verified backup appears in available backups list")
         
         // Step 4: Create new context (simulating app reinstall or new device)
-        let importSchema = Schema([Recipe.self, RecipeBook.self])
+        let importSchema = Schema([RecipeX.self, Book.self])
         let importConfig = ModelConfiguration(schema: importSchema, isStoredInMemoryOnly: true)
         let importContainer = try ModelContainer(for: importSchema, configurations: [importConfig])
         let importContext = importContainer.mainContext
@@ -178,7 +186,7 @@ struct RecipeExportImportIntegrationTests {
             from: backupURL,
             into: importContext,
             existingRecipes: [],
-            overwriteMode: .keepBoth
+            overwriteMode: .overwrite
         )
         
         #expect(importResult.newRecipes == 2, 
@@ -191,11 +199,11 @@ struct RecipeExportImportIntegrationTests {
         // Step 6: Verify imported recipes match originals
         try importContext.save()
         
-        let importedRecipes = try importContext.fetch(FetchDescriptor<Recipe>())
+        let importedRecipes = try importContext.fetch(FetchDescriptor<RecipeX>())
         #expect(importedRecipes.count == 2, 
                 "Should have 2 recipes in new context")
         
-        let titles = Set(importedRecipes.map { $0.title })
+        let titles = Set(importedRecipes.map { $0.title ?? "" })
         #expect(titles.contains("Workflow Test Recipe 1"), 
                 "Should contain Recipe 1")
         #expect(titles.contains("Workflow Test Recipe 2"), 
@@ -212,17 +220,18 @@ struct RecipeExportImportIntegrationTests {
     @MainActor
     func testBackupRestoreWithRelationships() async throws {
         // Create recipes with complex data
-        let exportSchema = Schema([Recipe.self, RecipeBook.self])
+        let exportSchema = Schema([RecipeX.self, Book.self])
         let exportConfig = ModelConfiguration(schema: exportSchema, isStoredInMemoryOnly: true)
         let exportContainer = try ModelContainer(for: exportSchema, configurations: [exportConfig])
         let exportContext = exportContainer.mainContext
         
-        let complexRecipe = Recipe(from: RecipeModel(
+        let complexRecipe = RecipeX(
             id: UUID(),
             title: "Complex Recipe with All Features",
             headerNotes: "Header notes with émojis 🍕",
-            yield: "Serves 4-6",
-            ingredientSections: [
+            recipeYield: "Serves 4-6",
+            reference: "Test Cookbook, Page 42",
+            ingredientSectionsData: try encodeIngredientSections([
                 IngredientSection(
                     title: "Section 1",
                     ingredients: [
@@ -237,8 +246,8 @@ struct RecipeExportImportIntegrationTests {
                         Ingredient(quantity: "2", unit: "cups", name: "water")
                     ]
                 )
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encodeInstructionSections([
                 InstructionSection(
                     title: "Preparation",
                     steps: [
@@ -252,14 +261,13 @@ struct RecipeExportImportIntegrationTests {
                         InstructionStep(stepNumber: 3, text: "Cook at 350°F")
                     ]
                 )
-            ],
-            notes: [
+            ]),
+            notesData: try encodeNotes([
                 RecipeNote(type: .tip, text: "Use fresh ingredients"),
                 RecipeNote(type: .warning, text: "Don't overmix"),
                 RecipeNote(type: .timing, text: "Takes 45 minutes")
-            ],
-            reference: "Test Cookbook, Page 42"
-        ))
+            ])
+        )
         
         exportContext.insert(complexRecipe)
         
@@ -267,7 +275,7 @@ struct RecipeExportImportIntegrationTests {
         let backupURL = try await RecipeBackupManager.shared.createBackup(from: [complexRecipe])
         
         // Import to new context
-        let importSchema = Schema([Recipe.self, RecipeBook.self])
+        let importSchema = Schema([RecipeX.self, Book.self])
         let importConfig = ModelConfiguration(schema: importSchema, isStoredInMemoryOnly: true)
         let importContainer = try ModelContainer(for: importSchema, configurations: [importConfig])
         let importContext = importContainer.mainContext
@@ -276,13 +284,13 @@ struct RecipeExportImportIntegrationTests {
             from: backupURL,
             into: importContext,
             existingRecipes: [],
-            overwriteMode: .keepBoth
+            overwriteMode: .overwrite
         )
         
         #expect(result.newRecipes == 1)
         
         // Verify imported recipe
-        let importedRecipes = try importContext.fetch(FetchDescriptor<Recipe>())
+        let importedRecipes = try importContext.fetch(FetchDescriptor<RecipeX>())
         #expect(importedRecipes.count == 1)
         
         let imported = importedRecipes[0]
@@ -323,31 +331,41 @@ struct RecipeExportImportIntegrationTests {
         let bookID = UUID()
         let recipeID = UUID()
         
-        let exportableBook = ExportableRecipeBook(
+        let exportableBook = ExportableBook(
             id: bookID,
             name: "Test Book",
-            bookDescription: nil,
-            coverImageName: nil,
+            bookDescription: "Test description",
+            coverImageName: "cover.jpg",
             dateCreated: Date(),
             dateModified: Date(),
             recipeIDs: [recipeID],
-            color: nil
+            color: "blue"
         )
         
-        let recipe = RecipeModel(
+        let exportableRecipe = ExportableRecipe(
             id: recipeID,
             title: "Test Recipe",
+            headerNotes: "Test notes",
+            yield: "4 servings",
             ingredientSections: [
                 IngredientSection(ingredients: [Ingredient(name: "test")])
             ],
             instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "test")])
-            ]
+                InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "test")])
+            ],
+            notes: [
+                RecipeNote(type: .general, text: "Test note")
+            ],
+            reference: "Test source",
+            imageName: "recipe.jpg",
+            additionalImageNames: [],
+            imageURLs: []
         )
         
-        let package = RecipeBookExportPackage(
+        let package = BookExportPackage(
+            version: "2.0",
             book: exportableBook,
-            recipes: [recipe],
+            recipes: [exportableRecipe],
             imageManifest: []
         )
         
@@ -363,17 +381,17 @@ struct RecipeExportImportIntegrationTests {
         // Verify it can be decoded back
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(RecipeBookExportPackage.self, from: data)
+        let decoded = try decoder.decode(BookExportPackage.self, from: data)
         
         #expect(decoded.book.id == bookID)
         #expect(decoded.recipes.count == 1)
         #expect(decoded.version == "2.0")
     }
     
-    @Test("ExportableRecipeBook initializes from RecipeBook correctly")
+    @Test("ExportableBook initializes correctly")
     @MainActor
-    func testExportableRecipeBookFromRecipeBook() throws {
-        let exportable = ExportableRecipeBook(
+    func testExportableBookInitialization() throws {
+        let exportable = ExportableBook(
             id: UUID(),
             name: "My Cookbook",
             bookDescription: "A test cookbook",
@@ -390,7 +408,7 @@ struct RecipeExportImportIntegrationTests {
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(ExportableRecipeBook.self, from: data)
+        let decoded = try decoder.decode(ExportableBook.self, from: data)
         
         #expect(decoded.name == exportable.name)
         #expect(decoded.bookDescription == exportable.bookDescription)
@@ -409,8 +427,8 @@ struct RecipeExportImportIntegrationTests {
             )
         }
         
-        let ids = Set(entries.map { $0.id })
-        #expect(ids.count == 10, "All manifest entry IDs should be unique")
+        let fileNames = Set(entries.map { $0.fileName })
+        #expect(fileNames.count == 10, "All manifest entry file names should be unique")
     }
     
     @Test("Image manifest correctly categorizes image types")

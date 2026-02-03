@@ -191,7 +191,7 @@ private struct BookRecipeRowView: View {
 #Preview {
     do {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, RecipeX.self, configurations: config)
+        let container = try ModelContainer(for: Book.self, RecipeX.self, VersionHistoryRecord.self, configurations: config)
         
         // Create sample data
         let book = Book(name: "My Cookbook")

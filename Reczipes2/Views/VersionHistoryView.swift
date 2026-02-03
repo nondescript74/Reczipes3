@@ -2,178 +2,114 @@
 //  VersionHistoryView.swift
 //  Reczipes2
 //
-//  Created by Zahirudeen Premji on 12/30/24.
+//  Created on 02/01/26.
 //
 
 import SwiftUI
+import SwiftData
+
+// MARK: - Version History View
 
 struct VersionHistoryView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \VersionHistoryRecord.releaseDate, order: .reverse)
+    private var historyRecords: [VersionHistoryRecord]
     
-    private let allHistory = VersionHistoryManager.shared.getAllHistory()
+    @State private var expandedVersions: Set<String> = []
+    @State private var showShareSheet = false
+    @State private var shareText = ""
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Current version header
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "app.badge")
-                                .font(.title2)
-                                .foregroundColor(.accentColor)
-                            
-                            Text("Current Version")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                        }
-                        
-                        Text(VersionHistoryManager.shared.currentVersionString)
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal)
-                    .padding(.top)
-                    
-                    Divider()
-                    
-                    // Version history list
-                    ForEach(allHistory) { entry in
-                        VersionHistoryCard(entry: entry)
-                    }
-                }
-                .padding(.bottom)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Version History")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    ShareLink(
-                        item: VersionHistoryManager.shared.getFormattedChangelog(),
-                        preview: SharePreview(
-                            "Reczipes Version History",
-                            image: Image(systemName: "doc.text")
-                        )
-                    ) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
+        List {
+            if historyRecords.isEmpty {
+                ContentUnavailableView(
+                    "No Version History",
+                    systemImage: "clock.arrow.circlepath",
+                    description: Text("Version history will appear here once entries are added.")
+                )
+            } else {
+                ForEach(historyRecords) { record in
+                    versionSection(for: record)
                 }
             }
         }
+        .navigationTitle("Version History")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    generateShareText()
+                    showShareSheet = true
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .disabled(historyRecords.isEmpty)
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: [shareText])
+        }
     }
-}
-
-// MARK: - Version History Card
-
-struct VersionHistoryCard: View {
-    let entry: VersionHistoryEntry
-    @State private var isExpanded = false
     
-    private var isCurrentVersion: Bool {
-        entry.versionString == VersionHistoryManager.shared.currentVersionString
-    }
+    // MARK: - Version Section
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text("Version \(entry.version)")
+    private func versionSection(for record: VersionHistoryRecord) -> some View {
+        let isExpanded = expandedVersions.contains(record.versionString)
+        
+        return Section {
+            // Version Header
+            Button {
+                withAnimation {
+                    if isExpanded {
+                        expandedVersions.remove(record.versionString)
+                    } else {
+                        expandedVersions.insert(record.versionString)
+                    }
+                }
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Version \(record.versionString)")
                             .font(.headline)
-                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
                         
-                        Text("(\(entry.buildNumber))")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        if isCurrentVersion {
-                            Text("CURRENT")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.accentColor)
-                                )
-                                .foregroundColor(.white)
-                        }
+                        Text(formatDate(record.releaseDate))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     
-                    Text(formatDate(entry.releaseDate))
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(.secondary)
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    withAnimation(.spring(response: 0.3)) {
-                        isExpanded.toggle()
-                    }
-                }) {
-                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle")
-                        .font(.title3)
-                        .foregroundColor(.accentColor)
                 }
             }
+            .buttonStyle(.plain)
             
-            // Changes list
+            // Changes List (when expanded)
             if isExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(entry.changes, id: \.self) { change in
-                        HStack(alignment: .top, spacing: 8) {
-                            Text(change)
-                                .font(.subheadline)
-                                .foregroundColor(.primary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                .padding(.top, 4)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            } else {
-                // Show first 3 changes as preview
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(entry.changes.prefix(3)), id: \.self) { change in
+                ForEach(record.changes, id: \.self) { change in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("•")
+                            .foregroundStyle(.secondary)
+                        
                         Text(change)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
+                            .foregroundStyle(.primary)
                     }
-                    
-                    if entry.changes.count > 3 {
-                        Text("+ \(entry.changes.count - 3) more changes...")
-                            .font(.caption)
-                            .foregroundColor(.accentColor)
-                            .padding(.top, 2)
-                    }
+                    .padding(.vertical, 2)
                 }
-                .transition(.opacity)
             }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-        )
-        .padding(.horizontal)
-        .onAppear {
-            // Auto-expand current version
-            if isCurrentVersion {
-                isExpanded = true
+        } header: {
+            if record.versionString == VersionHistoryService.shared.currentVersionString {
+                Label("Current Version", systemImage: "star.fill")
+                    .foregroundStyle(.orange)
             }
         }
     }
+    
+    // MARK: - Helper Methods
     
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -181,10 +117,31 @@ struct VersionHistoryCard: View {
         formatter.timeStyle = .none
         return formatter.string(from: date)
     }
+    
+    private func generateShareText() {
+        var text = "Reczipes Version History\n\n"
+        
+        for record in historyRecords {
+            text += "Version \(record.versionString)\n"
+            text += "Released: \(formatDate(record.releaseDate))\n\n"
+            
+            for change in record.changes {
+                text += "• \(change)\n"
+            }
+            
+            text += "\n---\n\n"
+        }
+        
+        shareText = text
+    }
 }
+
 
 // MARK: - Preview
 
 #Preview {
-    VersionHistoryView()
+    NavigationStack {
+        VersionHistoryView()
+    }
+    .modelContainer(for: [VersionHistoryRecord.self], inMemory: true)
 }

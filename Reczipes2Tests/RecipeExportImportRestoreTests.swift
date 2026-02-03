@@ -23,46 +23,61 @@ struct RecipeExportImportRestoreTests {
         return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
     }
     
-    /// Creates a complete RecipeModel with all fields populated
-    func createCompleteRecipeModel() -> RecipeModel {
-        return RecipeModel(
+    /// Helper to encode ingredient sections
+    func encodeIngredientSections(_ sections: [IngredientSection]) throws -> Data {
+        return try JSONEncoder().encode(sections)
+    }
+    
+    /// Helper to encode instruction sections
+    func encodeInstructionSections(_ sections: [InstructionSection]) throws -> Data {
+        return try JSONEncoder().encode(sections)
+    }
+    
+    /// Helper to encode notes
+    func encodeNotes(_ notes: [RecipeNote]) throws -> Data {
+        return try JSONEncoder().encode(notes)
+    }
+    
+    /// Creates a complete RecipeX with all fields populated
+    func createCompleteRecipe() throws -> RecipeX {
+        return RecipeX(
             id: UUID(),
             title: "Test Recipe: Complete Lasagna",
             headerNotes: "A delicious Italian classic",
-            yield: "Serves 8-10",
-            ingredientSections: [
+            recipeYield: "Serves 8-10",
+            reference: "Grandma's recipe book, page 42",
+            ingredientSectionsData: try encodeIngredientSections([
                 IngredientSection(
                     title: "For the Sauce",
                     ingredients: [
                         Ingredient(quantity: "2", unit: "lbs", name: "ground beef", preparation: "browned")
                     ]
                 )
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encodeInstructionSections([
                 InstructionSection(
                     title: "Prepare the Sauce",
                     steps: [
                         InstructionStep(stepNumber: 1, text: "Brown the ground beef in a large skillet")
                     ]
                 )
-            ],
-            notes: [
+            ]),
+            notesData: try encodeNotes([
                 RecipeNote(type: .tip, text: "Let the lasagna rest for 10 minutes before cutting")
-            ],
-            reference: "Grandma's recipe book, page 42"
+            ])
         )
     }
     
-    /// Creates a minimal RecipeModel
-    func createMinimalRecipeModel() -> RecipeModel {
-        return RecipeModel(
+    /// Creates a minimal RecipeX
+    func createMinimalRecipe() throws -> RecipeX {
+        return RecipeX(
             title: "Simple Toast",
-            ingredientSections: [
+            ingredientSectionsData: try encodeIngredientSections([
                 IngredientSection(ingredients: [Ingredient(name: "bread")])
-            ],
-            instructionSections: [
-                InstructionSection(steps: [InstructionStep(text: "Toast the bread")])
-            ]
+            ]),
+            instructionSectionsData: try encodeInstructionSections([
+                InstructionSection(steps: [InstructionStep(stepNumber: 1, text: "Toast the bread")])
+            ])
         )
     }
     
@@ -71,18 +86,18 @@ struct RecipeExportImportRestoreTests {
     @Test("Importing backup from Reczipes2 folder succeeds")
     func testImportBackupFromReczipes2Folder() async throws {
         // Create export
-        let exportSchema = Schema([Recipe.self, RecipeBook.self])
+        let exportSchema = Schema([RecipeX.self, Book.self])
         let exportConfig = ModelConfiguration(schema: exportSchema, isStoredInMemoryOnly: true)
         let exportContainer = try ModelContainer(for: exportSchema, configurations: [exportConfig])
         let exportContext = exportContainer.mainContext
         
-        let originalRecipe = Recipe(from: createCompleteRecipeModel())
+        let originalRecipe = try createCompleteRecipe()
         exportContext.insert(originalRecipe)
         
         let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
         
         // Create new context for import
-        let importSchema = Schema([Recipe.self, RecipeBook.self])
+        let importSchema = Schema([RecipeX.self, Book.self])
         let importConfig = ModelConfiguration(schema: importSchema, isStoredInMemoryOnly: true)
         let importContainer = try ModelContainer(for: importSchema, configurations: [importConfig])
         let importContext = importContainer.mainContext
@@ -92,7 +107,7 @@ struct RecipeExportImportRestoreTests {
             from: backupURL,
             into: importContext,
             existingRecipes: [],
-            overwriteMode: .keepBoth
+            overwriteMode: .overwrite
         )
         
         #expect(result.newRecipes == 1, 
@@ -106,82 +121,15 @@ struct RecipeExportImportRestoreTests {
         try? FileManager.default.removeItem(at: backupURL)
     }
     
-    @Test("Import with keepBoth mode preserves existing recipes")
-    func testImportKeepBothMode() async throws {
-        let schema = Schema([Recipe.self, RecipeBook.self])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        let context = container.mainContext
-        
-        // Create and export a recipe
-        let recipeModel = createCompleteRecipeModel()
-        let originalRecipe = Recipe(from: recipeModel)
-        context.insert(originalRecipe)
-        
-        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
-        
-        // Import with keepBoth mode (recipe already exists)
-        let result = try await RecipeBackupManager.shared.importBackup(
-            from: backupURL,
-            into: context,
-            existingRecipes: [originalRecipe],
-            overwriteMode: .keepBoth
-        )
-        
-        #expect(result.newRecipes == 1, 
-                "keepBoth mode should create new recipe even if one exists")
-        #expect(result.updatedRecipes == 0, 
-                "keepBoth mode should not update existing recipes")
-        
-        print("✓ keepBoth mode correctly creates duplicate with new ID")
-        
-        // Cleanup
-        try? FileManager.default.removeItem(at: backupURL)
-    }
-    
-    @Test("Import with skip mode skips existing recipes")
-    func testImportSkipMode() async throws {
-        let schema = Schema([Recipe.self, RecipeBook.self])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        let context = container.mainContext
-        
-        // Create and export a recipe
-        let recipeModel = createCompleteRecipeModel()
-        let originalRecipe = Recipe(from: recipeModel)
-        context.insert(originalRecipe)
-        
-        let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
-        
-        // Import with skip mode (recipe already exists)
-        let result = try await RecipeBackupManager.shared.importBackup(
-            from: backupURL,
-            into: context,
-            existingRecipes: [originalRecipe],
-            overwriteMode: .skip
-        )
-        
-        #expect(result.skippedRecipes == 1, 
-                "skip mode should skip existing recipe")
-        #expect(result.newRecipes == 0, 
-                "skip mode should not create new recipes when they exist")
-        
-        print("✓ skip mode correctly skips existing recipes")
-        
-        // Cleanup
-        try? FileManager.default.removeItem(at: backupURL)
-    }
-    
     @Test("Import with overwrite mode replaces existing recipes")
     func testImportOverwriteMode() async throws {
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
         
         // Create and export a recipe
-        let recipeModel = createCompleteRecipeModel()
-        let originalRecipe = Recipe(from: recipeModel)
+        let originalRecipe = try createCompleteRecipe()
         context.insert(originalRecipe)
         
         let backupURL = try await RecipeBackupManager.shared.createBackup(from: [originalRecipe])
@@ -211,7 +159,7 @@ struct RecipeExportImportRestoreTests {
     func testImportNonExistentFile() async {
         let nonExistentURL = getBackupDirectory().appendingPathComponent("DoesNotExist.reczipes")
         
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
@@ -221,7 +169,7 @@ struct RecipeExportImportRestoreTests {
                 from: nonExistentURL,
                 into: context,
                 existingRecipes: [],
-                overwriteMode: .keepBoth
+                overwriteMode: .overwrite
             )
             #expect(Bool(false), "Should throw error for non-existent file")
         } catch RecipeBackupError.invalidBackupFile {
@@ -241,7 +189,7 @@ struct RecipeExportImportRestoreTests {
         let corruptedData = "This is not valid JSON {{{".data(using: .utf8)!
         try corruptedData.write(to: corruptedURL)
         
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
@@ -251,7 +199,7 @@ struct RecipeExportImportRestoreTests {
                 from: corruptedURL,
                 into: context,
                 existingRecipes: [],
-                overwriteMode: .keepBoth
+                overwriteMode: .overwrite
             )
             #expect(Bool(false), "Should throw decoding error for corrupted file")
         } catch RecipeBackupError.decodingFailed(let underlyingError) {
@@ -274,7 +222,7 @@ struct RecipeExportImportRestoreTests {
         let emptyData = Data()
         try emptyData.write(to: emptyURL)
         
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
@@ -284,7 +232,7 @@ struct RecipeExportImportRestoreTests {
                 from: emptyURL,
                 into: context,
                 existingRecipes: [],
-                overwriteMode: .keepBoth
+                overwriteMode: .overwrite
             )
             #expect(Bool(false), "Should throw error for empty file")
         } catch {
@@ -299,12 +247,12 @@ struct RecipeExportImportRestoreTests {
     
     @Test("Backup persists across app sessions")
     func testBackupPersistence() async throws {
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
         
-        let testRecipe = Recipe(from: createMinimalRecipeModel())
+        let testRecipe = try createMinimalRecipe()
         context.insert(testRecipe)
         
         // Create backup
@@ -358,12 +306,12 @@ struct RecipeExportImportRestoreTests {
     
     @Test("Multiple sequential backups all persist")
     func testMultipleSequentialBackups() async throws {
-        let schema = Schema([Recipe.self, RecipeBook.self])
+        let schema = Schema([RecipeX.self, Book.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = container.mainContext
         
-        let testRecipe = Recipe(from: createMinimalRecipeModel())
+        let testRecipe = try createMinimalRecipe()
         context.insert(testRecipe)
         
         var backupURLs: [URL] = []

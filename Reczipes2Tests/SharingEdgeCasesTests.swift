@@ -156,7 +156,7 @@ struct SharingEdgeCasesTests {
         
         @Test("Share all recipes with no recipes")
         func shareAllRecipesWithNoRecipes() {
-            let allRecipes: [Recipe] = []
+            let allRecipes: [RecipeX] = []
             
             // Should exit early if empty
             guard !allRecipes.isEmpty else {
@@ -170,7 +170,7 @@ struct SharingEdgeCasesTests {
         
         @Test("Share all books with no books")
         func shareAllBooksWithNoBooks() {
-            let allBooks: [RecipeBook] = []
+            let allBooks: [Book] = []
             
             guard !allBooks.isEmpty else {
                 #expect(true)
@@ -229,7 +229,7 @@ struct SharingEdgeCasesTests {
         
         @Test("Recipe without title can still be shared")
         func recipeWithoutTitleCanStillBeShared() {
-            _ = Recipe(title: "")
+            _ = RecipeX(title: "")
             
             // Should still allow sharing (CloudKit will accept it)
             let canShare = true
@@ -238,7 +238,7 @@ struct SharingEdgeCasesTests {
         
         @Test("Recipe without ingredients can be shared")
         func recipeWithoutIngredientsCanBeShared() {
-            let recipe = Recipe(title: "Empty Recipe")
+            let recipe = RecipeX(title: "Empty Recipe")
             // No ingredient sections added
             
             #expect(recipe.ingredientSectionsData == nil)
@@ -250,10 +250,10 @@ struct SharingEdgeCasesTests {
         
         @Test("Book without recipes can be shared")
         func bookWithoutRecipesCanBeShared() {
-            let book = RecipeBook(name: "Empty Book")
+            let book = Book(name: "Empty Book")
             // No recipes added
             
-            #expect(book.recipeIDs.isEmpty)
+            #expect(book.recipeIDs?.isEmpty ?? true)
             
             // Should still be shareable
             let canShare = true
@@ -311,8 +311,8 @@ struct SharingEdgeCasesTests {
         
         private func createTestModelContainer() throws -> ModelContainer {
             let schema = Schema([
-                Recipe.self,
-                RecipeBook.self,
+                RecipeX.self,
+                Book.self,
                 SharedRecipe.self,
                 SharedRecipeBook.self
             ])
@@ -372,13 +372,13 @@ struct SharingEdgeCasesTests {
         
         @Test("Local recipe and shared recipe IDs match")
         func localAndSharedRecipeIDsMatch() {
-            let recipe = Recipe(title: "Test Recipe")
-            let recipeID = recipe.id
+            let recipe = RecipeX(title: "Test Recipe")
+            let recipeID = recipe.id ?? UUID()
             
             let sharedRecipe = SharedRecipe(
                 recipeID: recipeID,
                 sharedByUserID: "user_1",
-                recipeTitle: recipe.title
+                recipeTitle: recipe.title ?? ""
             )
             
             #expect(sharedRecipe.recipeID == recipeID)
@@ -386,13 +386,13 @@ struct SharingEdgeCasesTests {
         
         @Test("Local book and shared book IDs match")
         func localAndSharedBookIDsMatch() {
-            let book = RecipeBook(name: "Test Book")
-            let bookID = book.id
+            let book = Book(name: "Test Book")
+            let bookID = book.id ?? UUID()
             
             let sharedBook = SharedRecipeBook(
                 bookID: bookID,
                 sharedByUserID: "user_1",
-                bookName: book.name
+                bookName: book.name ?? ""
             )
             
             #expect(sharedBook.bookID == bookID)
@@ -400,12 +400,12 @@ struct SharingEdgeCasesTests {
         
         @Test("Shared recipe caches correct title")
         func sharedRecipeCachesCorrectTitle() {
-            let recipe = Recipe(title: "Amazing Recipe")
+            let recipe = RecipeX(title: "Amazing Recipe")
             
             let sharedRecipe = SharedRecipe(
-                recipeID: recipe.id,
+                recipeID: recipe.id ?? UUID(),
                 sharedByUserID: "user_1",
-                recipeTitle: recipe.title
+                recipeTitle: recipe.title ?? ""
             )
             
             #expect(sharedRecipe.recipeTitle == "Amazing Recipe")
@@ -413,12 +413,12 @@ struct SharingEdgeCasesTests {
         
         @Test("Shared book caches correct name")
         func sharedBookCachesCorrectName() {
-            let book = RecipeBook(name: "Amazing Book")
+            let book = Book(name: "Amazing Book")
             
             let sharedBook = SharedRecipeBook(
-                bookID: book.id,
+                bookID: book.id ?? UUID(),
                 sharedByUserID: "user_1",
-                bookName: book.name
+                bookName: book.name ?? ""
             )
             
             #expect(sharedBook.bookName == "Amazing Book")
@@ -436,13 +436,13 @@ struct SharingEdgeCasesTests {
             let container = try createTestModelContainer()
             let context = container.mainContext
             
-            let recipe = Recipe(title: "To Delete")
+            let recipe = RecipeX(title: "To Delete")
             context.insert(recipe)
             
             let sharedRecipe = SharedRecipe(
-                recipeID: recipe.id,
+                recipeID: recipe.id ?? UUID(),
                 sharedByUserID: "user_1",
-                recipeTitle: recipe.title
+                recipeTitle: recipe.title ?? ""
             )
             sharedRecipe.isActive = true
             context.insert(sharedRecipe)
@@ -468,13 +468,13 @@ struct SharingEdgeCasesTests {
             let container = try createTestModelContainer()
             let context = container.mainContext
             
-            let book = RecipeBook(name: "To Delete")
+            let book = Book(name: "To Delete")
             context.insert(book)
             
             let sharedBook = SharedRecipeBook(
-                bookID: book.id,
+                bookID: book.id ?? UUID(),
                 sharedByUserID: "user_1",
-                bookName: book.name
+                bookName: book.name ?? ""
             )
             sharedBook.isActive = true
             context.insert(sharedBook)
@@ -492,8 +492,8 @@ struct SharingEdgeCasesTests {
         
         private func createTestModelContainer() throws -> ModelContainer {
             let schema = Schema([
-                Recipe.self,
-                RecipeBook.self,
+                RecipeX.self,
+                Book.self,
                 SharedRecipe.self,
                 SharedRecipeBook.self
             ])

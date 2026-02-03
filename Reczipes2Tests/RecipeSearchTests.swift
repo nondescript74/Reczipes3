@@ -15,99 +15,107 @@ struct RecipeSearchTests {
     
     let searchService = RecipeSearchService()
     
-    // Sample recipes for testing
-    let sampleRecipes: [RecipeModel] = [
-        RecipeModel(
+    // Helper to create sample recipes
+    func createSampleRecipes() throws -> [RecipeX] {
+        let encoder = JSONEncoder()
+        
+        let recipe1 = RecipeX(
             title: "Classic Tomato Soup",
             headerNotes: "A warm and comforting soup perfect for cold days",
-            yield: "4 servings",
-            ingredientSections: [
+            recipeYield: "4 servings",
+            reference: "Julia Child",
+            ingredientSectionsData: try encoder.encode([
                 IngredientSection(ingredients: [
                     Ingredient(quantity: "2", unit: "lbs", name: "tomatoes", preparation: "diced"),
                     Ingredient(quantity: "1", unit: "cup", name: "cream"),
                     Ingredient(quantity: "1", unit: "tsp", name: "basil")
                 ])
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encoder.encode([
                 InstructionSection(steps: [
                     InstructionStep(stepNumber: 1, text: "Sauté onions for 5 minutes"),
                     InstructionStep(stepNumber: 2, text: "Add tomatoes and simmer for 30 minutes"),
                     InstructionStep(stepNumber: 3, text: "Blend and add cream")
                 ])
-            ],
-            notes: [
+            ]),
+            notesData: try encoder.encode([
                 RecipeNote(type: .tip, text: "This soup freezes well")
-            ],
-            reference: "Julia Child"
-        ),
-        RecipeModel(
+            ])
+        )
+        
+        let recipe2 = RecipeX(
             title: "Caesar Salad",
             headerNotes: "Classic Caesar with homemade dressing",
-            yield: "2 servings",
-            ingredientSections: [
+            recipeYield: "2 servings",
+            reference: "Gordon Ramsay",
+            ingredientSectionsData: try encoder.encode([
                 IngredientSection(ingredients: [
                     Ingredient(quantity: "1", unit: "head", name: "romaine lettuce"),
                     Ingredient(quantity: "1/4", unit: "cup", name: "parmesan cheese"),
                     Ingredient(quantity: "1", unit: "cup", name: "croutons")
                 ])
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encoder.encode([
                 InstructionSection(steps: [
                     InstructionStep(stepNumber: 1, text: "Wash and chop lettuce"),
                     InstructionStep(stepNumber: 2, text: "Toss with dressing, takes about 10 minutes")
                 ])
-            ],
-            reference: "Gordon Ramsay"
-        ),
-        RecipeModel(
+            ])
+        )
+        
+        let recipe3 = RecipeX(
             title: "Chocolate Chip Cookies",
             headerNotes: "Chewy and delicious cookies",
-            yield: "24 cookies",
-            ingredientSections: [
+            recipeYield: "24 cookies",
+            reference: "Betty Crocker",
+            ingredientSectionsData: try encoder.encode([
                 IngredientSection(ingredients: [
                     Ingredient(quantity: "2", unit: "cups", name: "flour"),
                     Ingredient(quantity: "1", unit: "cup", name: "chocolate chips"),
                     Ingredient(quantity: "1/2", unit: "cup", name: "butter")
                 ])
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encoder.encode([
                 InstructionSection(steps: [
                     InstructionStep(stepNumber: 1, text: "Mix dry ingredients"),
                     InstructionStep(stepNumber: 2, text: "Cream butter and sugar"),
                     InstructionStep(stepNumber: 3, text: "Bake for 12 minutes at 350°F")
                 ])
-            ],
-            notes: [
+            ]),
+            notesData: try encoder.encode([
                 RecipeNote(type: .tip, text: "Total time including prep is about 25 minutes")
-            ],
-            reference: "Betty Crocker"
-        ),
-        RecipeModel(
+            ])
+        )
+        
+        let recipe4 = RecipeX(
             title: "Spaghetti Carbonara",
             headerNotes: "Authentic Italian pasta",
-            yield: "4 servings",
-            ingredientSections: [
+            recipeYield: "4 servings",
+            ingredientSectionsData: try encoder.encode([
                 IngredientSection(ingredients: [
                     Ingredient(quantity: "1", unit: "lb", name: "spaghetti"),
                     Ingredient(quantity: "4", name: "eggs"),
                     Ingredient(quantity: "1", unit: "cup", name: "parmesan cheese"),
                     Ingredient(quantity: "8", unit: "oz", name: "pancetta")
                 ])
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encoder.encode([
                 InstructionSection(steps: [
                     InstructionStep(stepNumber: 1, text: "Cook pasta according to package directions"),
                     InstructionStep(stepNumber: 2, text: "Cook pancetta until crispy, about 20 minutes"),
                     InstructionStep(stepNumber: 3, text: "Toss hot pasta with eggs and cheese")
                 ])
-            ]
+            ])
         )
-    ]
+        
+        return [recipe1, recipe2, recipe3, recipe4]
+    }
     
     // MARK: - Text Search Tests
     
     @Test("Search by recipe title")
-    func searchByTitle() {
+    func searchByTitle() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria = RecipeSearchService.SearchCriteria(searchText: "tomato")
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -116,7 +124,8 @@ struct RecipeSearchTests {
     }
     
     @Test("Search by ingredient name")
-    func searchByIngredient() {
+    func searchByIngredient() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria = RecipeSearchService.SearchCriteria(searchText: "chocolate")
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -125,7 +134,8 @@ struct RecipeSearchTests {
     }
     
     @Test("Search by author/reference")
-    func searchByAuthor() {
+    func searchByAuthor() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria = RecipeSearchService.SearchCriteria(author: "Julia")
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -134,7 +144,8 @@ struct RecipeSearchTests {
     }
     
     @Test("Search by header notes")
-    func searchByHeaderNotes() {
+    func searchByHeaderNotes() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria = RecipeSearchService.SearchCriteria(searchText: "authentic")
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -143,7 +154,8 @@ struct RecipeSearchTests {
     }
     
     @Test("Case-insensitive search")
-    func caseInsensitiveSearch() {
+    func caseInsensitiveSearch() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria1 = RecipeSearchService.SearchCriteria(searchText: "TOMATO")
         let results1 = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria1)
         
@@ -156,41 +168,46 @@ struct RecipeSearchTests {
     // MARK: - Dish Type Tests
     
     @Test("Detect soup dish type")
-    func detectSoupType() {
-        let soupRecipe = sampleRecipes.first { $0.title.contains("Soup") }!
+    func detectSoupType() throws {
+        let sampleRecipes = try createSampleRecipes()
+        let soupRecipe = sampleRecipes.first { $0.title?.contains("Soup") ?? false }!
         let dishTypes = searchService.detectAllDishTypes(for: soupRecipe)
         
-        #expect(dishTypes.contains(.soup), "Should detect soup dish type")
+        #expect(dishTypes.contains(RecipeSearchService.DishType.soup), "Should detect soup dish type")
     }
     
     @Test("Detect salad dish type")
-    func detectSaladType() {
-        let saladRecipe = sampleRecipes.first { $0.title.contains("Salad") }!
+    func detectSaladType() throws {
+        let sampleRecipes = try createSampleRecipes()
+        let saladRecipe = sampleRecipes.first { $0.title?.contains("Salad") ?? false }!
         let dishTypes = searchService.detectAllDishTypes(for: saladRecipe)
         
-        #expect(dishTypes.contains(.salad), "Should detect salad dish type")
+        #expect(dishTypes.contains(RecipeSearchService.DishType.salad), "Should detect salad dish type")
     }
     
     @Test("Detect dessert dish type")
-    func detectDessertType() {
-        let cookieRecipe = sampleRecipes.first { $0.title.contains("Cookie") }!
+    func detectDessertType() throws {
+        let sampleRecipes = try createSampleRecipes()
+        let cookieRecipe = sampleRecipes.first { $0.title?.contains("Cookie") ?? false }!
         let dishTypes = searchService.detectAllDishTypes(for: cookieRecipe)
         
-        #expect(dishTypes.contains(.dessert), "Should detect dessert dish type (cookies)")
+        #expect(dishTypes.contains(RecipeSearchService.DishType.dessert), "Should detect dessert dish type (cookies)")
     }
     
     @Test("Detect pasta dish type")
-    func detectPastaType() {
-        let pastaRecipe = sampleRecipes.first { $0.title.contains("Spaghetti") }!
+    func detectPastaType() throws {
+        let sampleRecipes = try createSampleRecipes()
+        let pastaRecipe = sampleRecipes.first { $0.title?.contains("Spaghetti") ?? false }!
         let dishTypes = searchService.detectAllDishTypes(for: pastaRecipe)
         
-        #expect(dishTypes.contains(.pasta), "Should detect pasta dish type")
+        #expect(dishTypes.contains(RecipeSearchService.DishType.pasta), "Should detect pasta dish type")
     }
     
     @Test("Filter by dish type")
-    func filterByDishType() {
+    func filterByDishType() throws {
+        let sampleRecipes = try createSampleRecipes()
         var criteria = RecipeSearchService.SearchCriteria()
-        criteria.dishTypes = [.soup]
+        criteria.dishTypes = [RecipeSearchService.DishType.soup]
         
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -199,9 +216,10 @@ struct RecipeSearchTests {
     }
     
     @Test("Filter by multiple dish types")
-    func filterByMultipleDishTypes() {
+    func filterByMultipleDishTypes() throws {
+        let sampleRecipes = try createSampleRecipes()
         var criteria = RecipeSearchService.SearchCriteria()
-        criteria.dishTypes = [.soup, .salad]
+        criteria.dishTypes = [RecipeSearchService.DishType.soup, RecipeSearchService.DishType.salad]
         
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -211,8 +229,9 @@ struct RecipeSearchTests {
     // MARK: - Cooking Time Tests
     
     @Test("Extract cooking time from instructions")
-    func extractCookingTime() {
-        let soupRecipe = sampleRecipes.first { $0.title.contains("Soup") }!
+    func extractCookingTime() throws {
+        let sampleRecipes = try createSampleRecipes()
+        let soupRecipe = sampleRecipes.first { $0.title?.contains("Soup") ?? false }!
         let cookingTime = searchService.getCookingTimeString(for: soupRecipe)
         
         // The recipe has multiple time mentions: "5 minutes" and "30 minutes"
@@ -233,8 +252,9 @@ struct RecipeSearchTests {
     }
     
     @Test("Extract cooking time from notes")
-    func extractCookingTimeFromNotes() {
-        let cookieRecipe = sampleRecipes.first { $0.title.contains("Cookie") }!
+    func extractCookingTimeFromNotes() throws {
+        let sampleRecipes = try createSampleRecipes()
+        let cookieRecipe = sampleRecipes.first { $0.title?.contains("Cookie") ?? false }!
         let cookingTime = searchService.getCookingTimeString(for: cookieRecipe)
         
         // The recipe has "25 minutes" in notes and "12 minutes" in instructions
@@ -255,7 +275,8 @@ struct RecipeSearchTests {
     }
     
     @Test("Filter by cooking time")
-    func filterByCookingTime() {
+    func filterByCookingTime() throws {
+        let sampleRecipes = try createSampleRecipes()
         var criteria = RecipeSearchService.SearchCriteria()
         criteria.maxCookingTime = 15 // Only recipes 15 minutes or less
         
@@ -268,10 +289,11 @@ struct RecipeSearchTests {
     // MARK: - Combined Search Tests
     
     @Test("Combined text and dish type search")
-    func combinedTextAndDishType() {
+    func combinedTextAndDishType() throws {
+        let sampleRecipes = try createSampleRecipes()
         var criteria = RecipeSearchService.SearchCriteria()
         criteria.searchText = "cheese"
-        criteria.dishTypes = [.salad]
+        criteria.dishTypes = [RecipeSearchService.DishType.salad]
         
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -280,10 +302,11 @@ struct RecipeSearchTests {
     }
     
     @Test("Combined author and dish type search")
-    func combinedAuthorAndDishType() {
+    func combinedAuthorAndDishType() throws {
+        let sampleRecipes = try createSampleRecipes()
         var criteria = RecipeSearchService.SearchCriteria()
         criteria.author = "Julia"
-        criteria.dishTypes = [.soup]
+        criteria.dishTypes = [RecipeSearchService.DishType.soup]
         
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -292,7 +315,8 @@ struct RecipeSearchTests {
     }
     
     @Test("No results for mismatched criteria")
-    func noResultsForMismatch() {
+    func noResultsForMismatch() throws {
+        let sampleRecipes = try createSampleRecipes()
         var criteria = RecipeSearchService.SearchCriteria()
         criteria.searchText = "chicken"
         
@@ -302,7 +326,8 @@ struct RecipeSearchTests {
     }
     
     @Test("Empty criteria returns all recipes")
-    func emptyCriteriaReturnsAll() {
+    func emptyCriteriaReturnsAll() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria = RecipeSearchService.SearchCriteria()
         let results = searchService.searchRecipes(recipes: sampleRecipes, criteria: criteria)
         
@@ -312,7 +337,8 @@ struct RecipeSearchTests {
     // MARK: - Scoring Tests
     
     @Test("Search results with scoring")
-    func searchResultsWithScoring() {
+    func searchResultsWithScoring() throws {
+        let sampleRecipes = try createSampleRecipes()
         let criteria = RecipeSearchService.SearchCriteria(searchText: "tomato")
         let results = searchService.search(recipes: sampleRecipes, criteria: criteria)
         
@@ -321,34 +347,36 @@ struct RecipeSearchTests {
     }
     
     @Test("Higher scores for title matches")
-    func higherScoresForTitleMatches() {
+    func higherScoresForTitleMatches() throws {
+        let encoder = JSONEncoder()
+        
         // Create two recipes - one with search term in title, one in ingredients only
-        let recipe1 = RecipeModel(
+        let recipe1 = RecipeX(
             title: "Tomato Salad",
-            ingredientSections: [
+            ingredientSectionsData: try encoder.encode([
                 IngredientSection(ingredients: [
                     Ingredient(name: "lettuce")
                 ])
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encoder.encode([
                 InstructionSection(steps: [
-                    InstructionStep(text: "Mix ingredients")
+                    InstructionStep(stepNumber: 1, text: "Mix ingredients")
                 ])
-            ]
+            ])
         )
         
-        let recipe2 = RecipeModel(
+        let recipe2 = RecipeX(
             title: "Garden Salad",
-            ingredientSections: [
+            ingredientSectionsData: try encoder.encode([
                 IngredientSection(ingredients: [
                     Ingredient(name: "tomatoes")
                 ])
-            ],
-            instructionSections: [
+            ]),
+            instructionSectionsData: try encoder.encode([
                 InstructionSection(steps: [
-                    InstructionStep(text: "Mix ingredients")
+                    InstructionStep(stepNumber: 1, text: "Mix ingredients")
                 ])
-            ]
+            ])
         )
         
         let criteria = RecipeSearchService.SearchCriteria(searchText: "tomato")

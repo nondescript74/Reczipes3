@@ -9,7 +9,8 @@ import UniformTypeIdentifiers
 
 extension UTType {
     /// Custom UTType for recipe book export files
-    static let recipeBook = UTType(exportedAs: "com.headydiscy.reczipes.recipebook")
+    static let recipeBook = UTType(exportedAs: "com.headydiscy.reczipes.recipebook",
+                                       conformingTo: .data)
 }
 
 /// Package manifest for exported recipe books

@@ -102,19 +102,21 @@ struct FODMAPSubstitutionTests {
     @Test("Recipe with no high FODMAP ingredients")
     @MainActor
     func testLowFODMAPRecipe() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(quantity: "1", unit: "cup", name: "rice"),
+                    Ingredient(quantity: "2", unit: "cups", name: "bok choy"),
+                    Ingredient(quantity: "100", unit: "g", name: "chicken"),
+                    Ingredient(quantity: "1", unit: "tbsp", name: "soy sauce")
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Low FODMAP Stir Fry",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "1", unit: "cup", name: "rice"),
-                        Ingredient(quantity: "2", unit: "cups", name: "bok choy"),
-                        Ingredient(quantity: "100", unit: "g", name: "chicken"),
-                        Ingredient(quantity: "1", unit: "tbsp", name: "soy sauce")
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let db = FODMAPSubstitutionDatabase.shared
@@ -128,19 +130,21 @@ struct FODMAPSubstitutionTests {
     @Test("Recipe with high FODMAP ingredients")
     @MainActor
     func testHighFODMAPRecipe() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(quantity: "1", unit: "medium", name: "onion"),
+                    Ingredient(quantity: "3", unit: "cloves", name: "garlic"),
+                    Ingredient(quantity: "1", unit: "cup", name: "mushrooms"),
+                    Ingredient(quantity: "1", unit: "cup", name: "milk")
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Pasta with Mushroom Sauce",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "1", unit: "medium", name: "onion"),
-                        Ingredient(quantity: "3", unit: "cloves", name: "garlic"),
-                        Ingredient(quantity: "1", unit: "cup", name: "mushrooms"),
-                        Ingredient(quantity: "1", unit: "cup", name: "milk")
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let db = FODMAPSubstitutionDatabase.shared
@@ -154,25 +158,27 @@ struct FODMAPSubstitutionTests {
     @Test("Recipe analysis includes all detected ingredients")
     @MainActor
     func testAnalysisCompleteness() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                title: "Main",
+                ingredients: [
+                    Ingredient(quantity: "1", unit: "medium", name: "onion"),
+                    Ingredient(quantity: "1", unit: "cup", name: "rice")
+                ]
+            ),
+            IngredientSection(
+                title: "Sauce",
+                ingredients: [
+                    Ingredient(quantity: "2", unit: "cloves", name: "garlic"),
+                    Ingredient(quantity: "1", unit: "cup", name: "tomatoes")
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Test Recipe",
-            ingredientSections: [
-                IngredientSection(
-                    title: "Main",
-                    ingredients: [
-                        Ingredient(quantity: "1", unit: "medium", name: "onion"),
-                        Ingredient(quantity: "1", unit: "cup", name: "rice")
-                    ]
-                ),
-                IngredientSection(
-                    title: "Sauce",
-                    ingredients: [
-                        Ingredient(quantity: "2", unit: "cloves", name: "garlic"),
-                        Ingredient(quantity: "1", unit: "cup", name: "tomatoes")
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let db = FODMAPSubstitutionDatabase.shared
@@ -252,19 +258,21 @@ struct FODMAPSubstitutionTests {
     @Test("Real world recipe: Onion soup")
     @MainActor
     func testOnionSoup() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(quantity: "4", unit: "large", name: "onions, sliced"),
+                    Ingredient(quantity: "4", unit: "cloves", name: "garlic, minced"),
+                    Ingredient(quantity: "6", unit: "cups", name: "beef broth"),
+                    Ingredient(quantity: "1", unit: "cup", name: "gruyere cheese, shredded")
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "French Onion Soup",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "4", unit: "large", name: "onions, sliced"),
-                        Ingredient(quantity: "4", unit: "cloves", name: "garlic, minced"),
-                        Ingredient(quantity: "6", unit: "cups", name: "beef broth"),
-                        Ingredient(quantity: "1", unit: "cup", name: "gruyere cheese, shredded")
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
@@ -281,20 +289,22 @@ struct FODMAPSubstitutionTests {
     @Test("Real world recipe: Mushroom risotto")
     @MainActor
     func testMushroomRisotto() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(quantity: "2", unit: "cups", name: "arborio rice"),
+                    Ingredient(quantity: "2", unit: "cups", name: "mushrooms, sliced"),
+                    Ingredient(quantity: "1", unit: "medium", name: "onion, diced"),
+                    Ingredient(quantity: "1", unit: "cup", name: "white wine"),
+                    Ingredient(quantity: "½", unit: "cup", name: "parmesan cheese")
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Mushroom Risotto",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "2", unit: "cups", name: "arborio rice"),
-                        Ingredient(quantity: "2", unit: "cups", name: "mushrooms, sliced"),
-                        Ingredient(quantity: "1", unit: "medium", name: "onion, diced"),
-                        Ingredient(quantity: "1", unit: "cup", name: "white wine"),
-                        Ingredient(quantity: "½", unit: "cup", name: "parmesan cheese")
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
@@ -312,19 +322,21 @@ struct FODMAPSubstitutionTests {
     @Test("Real world recipe: Smoothie with honey and apple")
     @MainActor
     func testFruitSmoothie() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(quantity: "1", unit: "large", name: "apple, cored"),
+                    Ingredient(quantity: "1", unit: "cup", name: "milk"),
+                    Ingredient(quantity: "2", unit: "tbsp", name: "honey"),
+                    Ingredient(quantity: "½", unit: "cup", name: "yogurt")
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Apple Smoothie",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(quantity: "1", unit: "large", name: "apple, cored"),
-                        Ingredient(quantity: "1", unit: "cup", name: "milk"),
-                        Ingredient(quantity: "2", unit: "tbsp", name: "honey"),
-                        Ingredient(quantity: "½", unit: "cup", name: "yogurt")
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
@@ -347,10 +359,10 @@ struct FODMAPSubstitutionTests {
     @Test("Empty recipe")
     @MainActor
     func testEmptyRecipe() {
-        let recipe = RecipeModel(
+        let recipe = RecipeX(
             title: "Empty",
-            ingredientSections: [],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode([IngredientSection]()),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
@@ -363,13 +375,15 @@ struct FODMAPSubstitutionTests {
     @Test("Recipe with only section titles, no ingredients")
     @MainActor
     func testRecipeWithEmptySections() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(title: "Section 1", ingredients: []),
+            IngredientSection(title: "Section 2", ingredients: [])
+        ]
+        
+        let recipe = RecipeX(
             title: "Test",
-            ingredientSections: [
-                IngredientSection(title: "Section 1", ingredients: []),
-                IngredientSection(title: "Section 2", ingredients: [])
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
@@ -381,21 +395,23 @@ struct FODMAPSubstitutionTests {
     @Test("Ingredient with preparation note")
     @MainActor
     func testIngredientWithPreparation() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(
+                        quantity: "1",
+                        unit: "medium",
+                        name: "onion",
+                        preparation: "finely diced"
+                    )
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Test",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(
-                            quantity: "1",
-                            unit: "medium",
-                            name: "onion",
-                            preparation: "finely diced"
-                        )
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)
@@ -429,20 +445,22 @@ struct FODMAPSubstitutionTests {
     @Test("Recipe analysis is fast")
     @MainActor
     func testAnalysisPerformance() async {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: (0..<50).map { i in
+                    Ingredient(
+                        quantity: "1",
+                        unit: "cup",
+                        name: i % 2 == 0 ? "rice" : "onion"
+                    )
+                }
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Large Recipe",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: (0..<50).map { i in
-                        Ingredient(
-                            quantity: "1",
-                            unit: "cup",
-                            name: i % 2 == 0 ? "rice" : "onion"
-                        )
-                    }
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let db = FODMAPSubstitutionDatabase.shared
@@ -477,19 +495,21 @@ struct FODMAPIntegrationTests {
     @Test("Category breakdown includes all categories")
     @MainActor
     func testCategoryBreakdown() {
-        let recipe = RecipeModel(
+        let ingredientSections = [
+            IngredientSection(
+                ingredients: [
+                    Ingredient(name: "onion"),      // Oligosaccharides
+                    Ingredient(name: "milk"),       // Disaccharides
+                    Ingredient(name: "honey"),      // Monosaccharides
+                    Ingredient(name: "mushroom")    // Polyols
+                ]
+            )
+        ]
+        
+        let recipe = RecipeX(
             title: "Multi-FODMAP Recipe",
-            ingredientSections: [
-                IngredientSection(
-                    ingredients: [
-                        Ingredient(name: "onion"),      // Oligosaccharides
-                        Ingredient(name: "milk"),       // Disaccharides
-                        Ingredient(name: "honey"),      // Monosaccharides
-                        Ingredient(name: "mushroom")    // Polyols
-                    ]
-                )
-            ],
-            instructionSections: []
+            ingredientSectionsData: try? JSONEncoder().encode(ingredientSections),
+            instructionSectionsData: try? JSONEncoder().encode([InstructionSection]())
         )
         
         let analysis = FODMAPSubstitutionDatabase.shared.analyzeRecipe(recipe)

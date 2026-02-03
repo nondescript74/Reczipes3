@@ -119,12 +119,14 @@ struct DiabeticCacheIntegrationTests {
     class CacheManager {
         private var cache: [UUID: CachedDiabeticAnalysis] = [:]
         
-        func getCachedAnalysis(for recipe: Recipe) -> CachedDiabeticAnalysis? {
-            return cache[recipe.id]
+        func getCachedAnalysis(for recipe: RecipeX) -> CachedDiabeticAnalysis? {
+            guard let recipeId = recipe.id else { return nil }
+            return cache[recipeId]
         }
         
-        func setCachedAnalysis(_ cached: CachedDiabeticAnalysis, for recipe: Recipe) {
-            cache[recipe.id] = cached
+        func setCachedAnalysis(_ cached: CachedDiabeticAnalysis, for recipe: RecipeX) {
+            guard let recipeId = recipe.id else { return }
+            cache[recipeId] = cached
         }
         
         func clearCache() {
@@ -148,14 +150,18 @@ struct DiabeticCacheIntegrationTests {
         
         // Create recipe
         let recipe = createTestRecipe(title: "Test Recipe 1")
-        logger.info("📝 Created recipe: \(recipe.title)")
+        guard let recipeId = recipe.id, let recipeTitle = recipe.title else {
+            Issue.record("Recipe must have ID and title")
+            return
+        }
+        logger.info("📝 Created recipe: \(recipeTitle)")
         
         // Verify no cache exists
         #expect(cacheManager.getCachedAnalysis(for: recipe) == nil, "Should have no cache initially")
         
         // Perform analysis (pass IDs, not the Recipe object)
         logger.info("🔄 Performing analysis...")
-        let analysis = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
+        let analysis = try await service.analyzeDiabeticInfo(recipeId: recipeId, recipeTitle: recipeTitle)
         logger.info("✅ Analysis completed")
         
         // Create cache entry
@@ -166,7 +172,7 @@ struct DiabeticCacheIntegrationTests {
         // Verify cache was created
         let retrievedCache = cacheManager.getCachedAnalysis(for: recipe)
         #expect(retrievedCache != nil, "Cache should be created")
-        #expect(retrievedCache?.recipeId == recipe.id, "Cache should match recipe ID")
+        #expect(retrievedCache?.recipeId == recipeId, "Cache should match recipe ID")
         #expect(await service.getCallCount() == 1, "Service should be called once")
         
         logger.info("✅ Test passed: Cache created successfully")
@@ -181,10 +187,14 @@ struct DiabeticCacheIntegrationTests {
         let cacheManager = CacheManager()
         
         let recipe = createTestRecipe(title: "Test Recipe 2")
+        guard let recipeId = recipe.id, let recipeTitle = recipe.title else {
+            Issue.record("Recipe must have ID and title")
+            return
+        }
         
         // First analysis (pass IDs, not Recipe object)
         logger.info("🔄 First analysis...")
-        let analysis1 = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
+        let analysis1 = try await service.analyzeDiabeticInfo(recipeId: recipeId, recipeTitle: recipeTitle)
         let cached = try CachedDiabeticAnalysis.create(from: analysis1, recipe: recipe)
         cacheManager.setCachedAnalysis(cached, for: recipe)
         logger.info("💾 First analysis cached")
@@ -213,10 +223,14 @@ struct DiabeticCacheIntegrationTests {
         let cacheManager = CacheManager()
         
         let recipe = createTestRecipe(title: "Test Recipe 3")
+        guard let recipeId = recipe.id, let recipeTitle = recipe.title else {
+            Issue.record("Recipe must have ID and title")
+            return
+        }
         
         // First analysis (pass IDs, not Recipe object)
         logger.info("🔄 First analysis...")
-        let analysis1 = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
+        let analysis1 = try await service.analyzeDiabeticInfo(recipeId: recipeId, recipeTitle: recipeTitle)
         let cached = try CachedDiabeticAnalysis.create(from: analysis1, recipe: recipe)
         cacheManager.setCachedAnalysis(cached, for: recipe)
         let initialCallCount = await service.getCallCount()
@@ -242,7 +256,7 @@ struct DiabeticCacheIntegrationTests {
             if !isValid {
                 // Perform new analysis (pass IDs, not Recipe object)
                 logger.info("🔄 Cache invalid, performing new analysis...")
-                let analysis2 = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
+                let analysis2 = try await service.analyzeDiabeticInfo(recipeId: recipeId, recipeTitle: recipeTitle)
                 let newCached = try CachedDiabeticAnalysis.create(from: analysis2, recipe: recipe)
                 cacheManager.setCachedAnalysis(newCached, for: recipe)
                 logger.info("💾 New analysis cached")
@@ -269,12 +283,21 @@ struct DiabeticCacheIntegrationTests {
         let recipe2 = createTestRecipe(title: "Recipe 2")
         let recipe3 = createTestRecipe(title: "Recipe 3")
         
+        guard let recipe1Id = recipe1.id, let recipe1Title = recipe1.title,
+              let recipe2Id = recipe2.id, let recipe2Title = recipe2.title,
+              let recipe3Id = recipe3.id, let recipe3Title = recipe3.title else {
+            Issue.record("All recipes must have IDs and titles")
+            return
+        }
+        
         logger.info("📝 Created 3 recipes")
         
         // Analyze all recipes (pass IDs, not Recipe objects)
         logger.info("🔄 Analyzing all recipes...")
-        for recipe in [recipe1, recipe2, recipe3] {
-            let analysis = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
+        for (recipeId, recipeTitle, recipe) in [(recipe1Id, recipe1Title, recipe1), 
+                                                   (recipe2Id, recipe2Title, recipe2), 
+                                                   (recipe3Id, recipe3Title, recipe3)] {
+            let analysis = try await service.analyzeDiabeticInfo(recipeId: recipeId, recipeTitle: recipeTitle)
             let cached = try CachedDiabeticAnalysis.create(from: analysis, recipe: recipe)
             cacheManager.setCachedAnalysis(cached, for: recipe)
         }
@@ -283,9 +306,9 @@ struct DiabeticCacheIntegrationTests {
         
         // Verify each has independent cache
         #expect(cacheManager.cacheCount() == 3, "Should have 3 cache entries")
-        #expect(cacheManager.getCachedAnalysis(for: recipe1)?.recipeId == recipe1.id)
-        #expect(cacheManager.getCachedAnalysis(for: recipe2)?.recipeId == recipe2.id)
-        #expect(cacheManager.getCachedAnalysis(for: recipe3)?.recipeId == recipe3.id)
+        #expect(cacheManager.getCachedAnalysis(for: recipe1)?.recipeId == recipe1Id)
+        #expect(cacheManager.getCachedAnalysis(for: recipe2)?.recipeId == recipe2Id)
+        #expect(cacheManager.getCachedAnalysis(for: recipe3)?.recipeId == recipe3Id)
         
         // Modify one recipe
         logger.info("🔧 Modifying recipe 2...")
@@ -318,11 +341,15 @@ struct DiabeticCacheIntegrationTests {
         await service.setFailureMode(true)
         
         let recipe = createTestRecipe(title: "Test Recipe Failure")
+        guard let recipeId = recipe.id, let recipeTitle = recipe.title else {
+            Issue.record("Recipe must have ID and title")
+            return
+        }
         
         logger.info("🔄 Attempting analysis with failure mode enabled...")
         
         do {
-            _ = try await service.analyzeDiabeticInfo(recipeId: recipe.id, recipeTitle: recipe.title)
+            _ = try await service.analyzeDiabeticInfo(recipeId: recipeId, recipeTitle: recipeTitle)
             Issue.record("Analysis should have failed but succeeded")
         } catch {
             logger.info("✅ Analysis failed as expected: \(error)")
@@ -351,7 +378,11 @@ struct DiabeticCacheIntegrationTests {
             let title: String
         }
         
-        let recipeDataList = recipes.map { RecipeData(id: $0.id, title: $0.title) }
+        // Safely extract id and title from each recipe
+        let recipeDataList = recipes.compactMap { recipe -> RecipeData? in
+            guard let id = recipe.id, let title = recipe.title else { return nil }
+            return RecipeData(id: id, title: title)
+        }
         
         // Analyze all concurrently using the sendable data
         logger.info("🔄 Starting concurrent analyses...")
@@ -389,7 +420,7 @@ struct DiabeticCacheIntegrationTests {
     // MARK: - Helper Methods
     
     @MainActor
-    private func createTestRecipe(title: String) -> Recipe {
+    private func createTestRecipe(title: String) -> RecipeX {
         let ingredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "2", unit: "cups", name: "flour"),
@@ -399,16 +430,17 @@ struct DiabeticCacheIntegrationTests {
         
         let instructions = [
             InstructionSection(steps: [
-                InstructionStep(text: "Mix ingredients")
+                InstructionStep(stepNumber: 1, text: "Mix ingredients")
             ])
         ]
         
-        let recipeModel = RecipeModel(
-            title: title,
-            ingredientSections: ingredients,
-            instructionSections: instructions
-        )
+        let ingredientsData = try? JSONEncoder().encode(ingredients)
+        let instructionsData = try? JSONEncoder().encode(instructions)
         
-        return Recipe(from: recipeModel)
+        return RecipeX(
+            title: title,
+            ingredientSectionsData: ingredientsData,
+            instructionSectionsData: instructionsData
+        )
     }
 }

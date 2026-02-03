@@ -26,14 +26,14 @@ struct DiabeticCacheEdgeCaseTests {
         let encoder = JSONEncoder()
         let data = try encoder.encode(emptyIngredients)
         
-        let hash = Recipe.calculateIngredientsHash(from: data)
+        let hash = RecipeX.calculateIngredientsHash(from: data)
         
-        logger.info("📊 Empty ingredients hash: '\(hash)'")
-        #expect(!hash.isEmpty, "Hash should not be empty even for empty ingredients")
+        logger.info("📊 Empty ingredients hash: '\(hash ?? "nil")'")
+        #expect(hash != nil && !hash!.isEmpty, "Hash should not be empty even for empty ingredients")
         
         // Second empty list should have same hash
         let data2 = try encoder.encode(emptyIngredients)
-        let hash2 = Recipe.calculateIngredientsHash(from: data2)
+        let hash2 = RecipeX.calculateIngredientsHash(from: data2)
         
         #expect(hash == hash2, "Empty ingredient lists should have consistent hashes")
         
@@ -44,10 +44,10 @@ struct DiabeticCacheEdgeCaseTests {
     nonisolated func nilIngredientData() async throws {
         logger.info("🧪 Testing nil ingredient data")
         
-        let hash = Recipe.calculateIngredientsHash(from: nil)
+        let hash = RecipeX.calculateIngredientsHash(from: nil)
         
-        logger.info("📊 Nil data hash: '\(hash)'")
-        #expect(hash.isEmpty, "Hash of nil data should be empty")
+        logger.info("📊 Nil data hash: '\(hash ?? "nil")'")
+        #expect(hash == nil, "Hash of nil data should be nil")
         
         logger.info("✅ Test passed")
     }
@@ -64,10 +64,10 @@ struct DiabeticCacheEdgeCaseTests {
         
         let encoder = JSONEncoder()
         let data = try encoder.encode(ingredients)
-        let hash = Recipe.calculateIngredientsHash(from: data)
+        let hash = RecipeX.calculateIngredientsHash(from: data)
         
-        #expect(!hash.isEmpty, "Single ingredient should produce valid hash")
-        #expect(hash.count == 64, "Should be 64-character SHA-256 hash")
+        #expect(hash != nil && !hash!.isEmpty, "Single ingredient should produce valid hash")
+        #expect(hash?.count == 64, "Should be 64-character SHA-256 hash")
         
         logger.info("✅ Test passed")
     }
@@ -97,13 +97,13 @@ struct DiabeticCacheEdgeCaseTests {
         let dataSize = data.count
         logger.info("📊 Data size: \(dataSize) bytes")
         
-        let hash = Recipe.calculateIngredientsHash(from: data)
+        let hash = RecipeX.calculateIngredientsHash(from: data)
         
         let duration = Date().timeIntervalSince(startTime)
         logger.info("⏱️ Hash calculation took \(String(format: "%.3f", duration)) seconds")
         
-        #expect(!hash.isEmpty, "Should produce hash for large list")
-        #expect(hash.count == 64, "Should be valid SHA-256 hash")
+        #expect(hash != nil && !hash!.isEmpty, "Should produce hash for large list")
+        #expect(hash?.count == 64, "Should be valid SHA-256 hash")
         #expect(duration < 1.0, "Should complete in under 1 second")
         
         logger.info("✅ Test passed")
@@ -126,7 +126,7 @@ struct DiabeticCacheEdgeCaseTests {
         }
         
         let manyData = try encoder.encode(manySections)
-        let manyHash = Recipe.calculateIngredientsHash(from: manyData)
+        let manyHash = RecipeX.calculateIngredientsHash(from: manyData)
         
         // Create same ingredients in one large section
         let allIngredients: [Ingredient] = (1...100).map { i in
@@ -141,10 +141,10 @@ struct DiabeticCacheEdgeCaseTests {
         ]
         
         let oneData = try encoder.encode(oneSection)
-        let oneHash = Recipe.calculateIngredientsHash(from: oneData)
+        let oneHash = RecipeX.calculateIngredientsHash(from: oneData)
         
-        logger.info("📊 Many sections hash: \(manyHash)")
-        logger.info("📊 One section hash: \(oneHash)")
+        logger.info("📊 Many sections hash: \(manyHash ?? "nil")")
+        logger.info("📊 One section hash: \(oneHash ?? "nil")")
         
         // Hashes should be the same (section structure shouldn't matter)
         #expect(manyHash == oneHash, "Section structure should not affect hash")
@@ -175,15 +175,15 @@ struct DiabeticCacheEdgeCaseTests {
         ]
         
         let data = try encoder.encode(specialIngredients)
-        let hash = Recipe.calculateIngredientsHash(from: data)
+        let hash = RecipeX.calculateIngredientsHash(from: data)
         
-        logger.info("📊 Hash with special chars: \(hash)")
-        #expect(!hash.isEmpty, "Should handle special characters")
-        #expect(hash.count == 64, "Should produce valid hash")
+        logger.info("📊 Hash with special chars: \(hash ?? "nil")")
+        #expect(hash != nil && !hash!.isEmpty, "Should handle special characters")
+        #expect(hash?.count == 64, "Should produce valid hash")
         
         // Should be consistent
         let data2 = try encoder.encode(specialIngredients)
-        let hash2 = Recipe.calculateIngredientsHash(from: data2)
+        let hash2 = RecipeX.calculateIngredientsHash(from: data2)
         
         #expect(hash == hash2, "Should be consistent with special characters")
         
@@ -208,11 +208,11 @@ struct DiabeticCacheEdgeCaseTests {
             ])
         ]
         
-        let hash1 = Recipe.calculateIngredientsHash(from: try encoder.encode(ingredients1))
-        let hash2 = Recipe.calculateIngredientsHash(from: try encoder.encode(ingredients2))
+        let hash1 = RecipeX.calculateIngredientsHash(from: try encoder.encode(ingredients1))
+        let hash2 = RecipeX.calculateIngredientsHash(from: try encoder.encode(ingredients2))
         
-        logger.info("📊 Without whitespace: \(hash1)")
-        logger.info("📊 With whitespace: \(hash2)")
+        logger.info("📊 Without whitespace: \(hash1 ?? "nil")")
+        logger.info("📊 With whitespace: \(hash2 ?? "nil")")
         
         // Note: These will be different because we don't trim whitespace in the hash
         // This is intentional - whitespace changes are considered real changes
@@ -239,11 +239,11 @@ struct DiabeticCacheEdgeCaseTests {
             ])
         ]
         
-        let hash1 = Recipe.calculateIngredientsHash(from: try encoder.encode(ingredients1))
-        let hash2 = Recipe.calculateIngredientsHash(from: try encoder.encode(ingredients2))
+        let hash1 = RecipeX.calculateIngredientsHash(from: try encoder.encode(ingredients1))
+        let hash2 = RecipeX.calculateIngredientsHash(from: try encoder.encode(ingredients2))
         
-        logger.info("📊 Capitalized: \(hash1)")
-        logger.info("📊 Lowercase: \(hash2)")
+        logger.info("📊 Capitalized: \(hash1 ?? "nil")")
+        logger.info("📊 Lowercase: \(hash2 ?? "nil")")
         
         #expect(hash1 != hash2, "Hash should be case-sensitive")
         
@@ -308,11 +308,11 @@ struct DiabeticCacheEdgeCaseTests {
         ]
         
         let data = try encoder.encode(ingredients)
-        let hash = Recipe.calculateIngredientsHash(from: data)
+        let hash = RecipeX.calculateIngredientsHash(from: data)
         
-        logger.info("📊 Hash with missing fields: \(hash)")
-        #expect(!hash.isEmpty, "Should handle missing optional fields")
-        #expect(hash.count == 64, "Should produce valid hash")
+        logger.info("📊 Hash with missing fields: \(hash ?? "nil")")
+        #expect(hash != nil && !hash!.isEmpty, "Should handle missing optional fields")
+        #expect(hash?.count == 64, "Should produce valid hash")
         
         logger.info("✅ Test passed")
     }
@@ -335,11 +335,11 @@ struct DiabeticCacheEdgeCaseTests {
             ])
         ]
         
-        let hash1 = Recipe.calculateIngredientsHash(from: try encoder.encode(ingredients1))
-        let hash2 = Recipe.calculateIngredientsHash(from: try encoder.encode(ingredients2))
+        let hash1 = RecipeX.calculateIngredientsHash(from: try encoder.encode(ingredients1))
+        let hash2 = RecipeX.calculateIngredientsHash(from: try encoder.encode(ingredients2))
         
-        logger.info("📊 Nil fields: \(hash1)")
-        logger.info("📊 Empty strings: \(hash2)")
+        logger.info("📊 Nil fields: \(hash1 ?? "nil")")
+        logger.info("📊 Empty strings: \(hash2 ?? "nil")")
         
         // In practice, JSON encoding treats nil and empty string the same for optional fields
         // Both are serialized identically, so hashes match
@@ -440,7 +440,7 @@ struct DiabeticCacheEdgeCaseTests {
     // MARK: - Helper Methods
     
     @MainActor
-    private func createTestRecipe() -> Recipe {
+    private func createTestRecipe() -> RecipeX {
         let ingredients = [
             IngredientSection(ingredients: [
                 Ingredient(quantity: "2", unit: "cups", name: "flour")
@@ -449,16 +449,20 @@ struct DiabeticCacheEdgeCaseTests {
         
         let instructions = [
             InstructionSection(steps: [
-                InstructionStep(text: "Mix")
+                InstructionStep(stepNumber: 1, text: "Mix")
             ])
         ]
         
-        let recipeModel = RecipeModel(
+        let encoder = JSONEncoder()
+        let ingredientsData = try? encoder.encode(ingredients)
+        let instructionsData = try? encoder.encode(instructions)
+        
+        let recipe = RecipeX(
             title: "Test Recipe",
-            ingredientSections: ingredients,
-            instructionSections: instructions
+            ingredientSectionsData: ingredientsData,
+            instructionSectionsData: instructionsData
         )
         
-        return Recipe(from: recipeModel)
+        return recipe
     }
 }

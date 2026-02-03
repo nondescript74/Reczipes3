@@ -11,6 +11,25 @@ import SwiftData
 /// Service for importing recipe links from JSON files
 class LinkImportService {
     
+    // MARK: - JSON Sanitization
+    
+    /// Strips trailing commas before `]` or `}` from a JSON string.
+    /// Swift's JSONDecoder does not tolerate trailing commas, but they are
+    /// common in hand-edited JSON files.  This regex-based pass runs before
+    /// any decode attempt so the rest of the pipeline never sees them.
+    static func sanitizeJSON(_ data: Data) -> Data {
+        guard var json = String(data: data, encoding: .utf8) else { return data }
+        
+        // Remove trailing commas before ] or }
+        // Matches: optional whitespace, a comma, optional whitespace/newlines, then ] or }
+        if let regex = try? NSRegularExpression(pattern: ",\\s*([\\]\\}])") {
+            let range = NSRange(json.startIndex..., in: json)
+            json = regex.stringByReplacingMatches(in: json, range: range, withTemplate: "$1")
+        }
+        
+        return json.data(using: .utf8) ?? data
+    }
+    
     /// Import links from a JSON file in the app bundle
     /// - Parameters:
     ///   - filename: Name of the JSON file (including extension)
@@ -52,10 +71,14 @@ class LinkImportService {
     ) async throws -> Int {
         logInfo("Importing links from: \(url.path)", category: "import")
         
-        // Validate the file if requested
+        // Read and sanitize the raw file data first (strips trailing commas etc.)
+        let rawData = try Data(contentsOf: url)
+        let sanitizedData = sanitizeJSON(rawData)
+        
+        // Validate the sanitized data if requested
         if validate {
             logInfo("Validating JSON file...", category: "import")
-            let validationResult = JSONLinkValidator.validate(fileAt: url)
+            let validationResult = JSONLinkValidator.validate(data: sanitizedData)
             
             if !validationResult.isValid {
                 logError("Validation failed: \(validationResult.errors.joined(separator: ", "))", category: "import")
@@ -65,19 +88,23 @@ class LinkImportService {
             logInfo("Validation passed: \(validationResult.linkCount) links, \(validationResult.warnings.count) warnings, \(validationResult.duplicateURLs.count) duplicates in file", category: "import")
         }
         
-        // Read the file (with optional cleaning)
+        // Use sanitized data (with optional duplicate-removal cleaning)
         let data: Data
         if autoClean {
             logInfo("Auto-cleaning data before import...", category: "import")
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("cleaned_links_\(UUID().uuidString).json")
-            try JSONLinkValidator.clean(inputURL: url, outputURL: tempURL, removeDuplicates: true)
-            data = try Data(contentsOf: tempURL)
+            // Write sanitized data to a temp file so the cleaner can read it
+            let tempInput = FileManager.default.temporaryDirectory.appendingPathComponent("sanitized_links_\(UUID().uuidString).json")
+            let tempOutput = FileManager.default.temporaryDirectory.appendingPathComponent("cleaned_links_\(UUID().uuidString).json")
+            try sanitizedData.write(to: tempInput)
+            try JSONLinkValidator.clean(inputURL: tempInput, outputURL: tempOutput, removeDuplicates: true)
+            data = try Data(contentsOf: tempOutput)
             
-            // Clean up temp file
-            try? FileManager.default.removeItem(at: tempURL)
+            // Clean up temp files
+            try? FileManager.default.removeItem(at: tempInput)
+            try? FileManager.default.removeItem(at: tempOutput)
             logInfo("Used cleaned data for import", category: "import")
         } else {
-            data = try Data(contentsOf: url)
+            data = sanitizedData
         }
         
         logDebug("Read \(data.count) bytes from file", category: "import")

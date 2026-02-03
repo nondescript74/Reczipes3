@@ -713,12 +713,12 @@ struct UserContentBackupView: View {
 extension UTType {
     /// RecipeX backup format - uses .reczipes extension
     static var reczipesBackup: UTType {
-        UTType(exportedAs: "com.reczipes.backup")
+        UTType(exportedAs: "com.headydiscy.reczipes.backup")
     }
     
     /// Book backup format - uses .bookbackup extension
     static var bookBackup: UTType {
-        UTType(exportedAs: "com.reczipes.bookbackup")
+        UTType(exportedAs: "com.headydiscy.reczipes.bookbackup")
     }
 }
 

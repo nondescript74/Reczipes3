@@ -1,3 +1,11 @@
+# Tips Integration
+
+> **⚠️ Superseded** — see [LINK_AND_URL_EXTRACTION.md](LINK_AND_URL_EXTRACTION.md), section *Tips / Notes Carry-Over*, for the current description.  
+> This file is kept for change-history reference only.
+
+---
+
+
 # Tips Integration for Recipe Links
 
 ## Overview

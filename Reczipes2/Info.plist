@@ -2,10 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>recipe-extraction</string>
-	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -22,61 +18,100 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Reczipes Backup</string>
+			<string>Recipes Backup</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.reczipes.backup</string>
+				<string>com.headydiscy.reczipes.backup</string>
 			</array>
 		</dict>
-	</array>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>processing</string>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Recipe Books Backup</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.headydiscy.reczipes.bookbackup</string>
+			</array>
+		</dict>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.json</string>
+				<string>public.zip-archive</string>
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Reczipes Recipe Backup</string>
+			<string>Recipe Book Package</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>com.reczipes.backup</string>
+			<string>com.headydiscy.reczipes.recipebook</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>reczipes</string>
+					<string>recipebook</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-recipebook</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.json</string>
+				<string>public.zip-archive</string>
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Reczipes Book Backup</string>
+			<string>Recipes Backup</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>com.reczipes.bookbackup</string>
+			<string>com.headydiscy.reczipes.backup</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>backup</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-backup</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Recipe Books Backup</string>
+			<key>UTTypeIcons</key>
+			<dict/>
+			<key>UTTypeIdentifier</key>
+			<string>com.headydiscy.reczipes.bookbackup</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
 					<string>bookbackup</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-bookbackup</string>
 				</array>
 			</dict>
 		</dict>

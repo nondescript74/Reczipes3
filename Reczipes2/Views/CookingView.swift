@@ -135,5 +135,5 @@ struct CookingView: View {
 
 #Preview {
     CookingView()
-        .modelContainer(for: [RecipeX.self, CookingSession.self], inMemory: true)
+        .modelContainer(for: [RecipeX.self, Book.self, CookingSession.self, VersionHistoryRecord.self], inMemory: true)
 }

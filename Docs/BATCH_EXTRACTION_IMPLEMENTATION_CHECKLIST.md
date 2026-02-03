@@ -1,3 +1,12 @@
+# Batch Extraction Implementation Checklist
+
+> **⚠️ Superseded** — see [LINK_AND_URL_EXTRACTION.md](LINK_AND_URL_EXTRACTION.md) for the current guide.  
+> This file is kept for change-history reference only.  
+> Note: the empty-state "Close" button has been replaced with an "Import Links from JSON" button, and an "Import Links" toolbar button has been added. See the new guide for details.
+
+---
+
+
 # Batch Recipe Extraction - Implementation Checklist
 
 ## ✅ Completed Tasks
