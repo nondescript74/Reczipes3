@@ -108,7 +108,7 @@ struct ReadOnlyRecipeDetailView: View {
                 instructionsView
                 
                 // Notes
-                if !recipe.notes.isEmpty {
+                if !(recipe.notes.isEmpty) {
                     Divider()
                     notesView
                 }
@@ -693,7 +693,7 @@ struct ImportSharedRecipeView: View {
         headerNotes: recipe.headerNotes,
         imageName: nil,
         imageData: nil,
-        sharedByUserID: recipe.sharedByUserID,
+        sharedByUserID: recipe.sharedByUserID ?? "no user id",
         sharedByUserName: recipe.sharedByUserName,
         recipeYield: recipe.yield,
         bookID: UUID(),

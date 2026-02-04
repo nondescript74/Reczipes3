@@ -33,6 +33,10 @@ final class CachedSharedRecipe {
     // Distinguish from imported recipes
     var isTemporaryCache: Bool = true
     
+    /// Raw image data for the recipe thumbnail, downloaded from the shared CloudKit record.
+    var imageData: Data? = nil
+    
+    @MainActor
     init(from cloudRecipe: CloudKitRecipe) {
         self.id = cloudRecipe.id
         self.title = cloudRecipe.title
@@ -44,7 +48,7 @@ final class CachedSharedRecipe {
         self.reference = cloudRecipe.reference
         self.imageName = cloudRecipe.imageName
         self.additionalImageNames = cloudRecipe.additionalImageNames
-        self.sharedByUserID = cloudRecipe.sharedByUserID
+        self.sharedByUserID = cloudRecipe.sharedByUserID ?? ""
         self.sharedByUserName = cloudRecipe.sharedByUserName
         self.sharedDate = cloudRecipe.sharedDate
         self.cachedDate = Date()

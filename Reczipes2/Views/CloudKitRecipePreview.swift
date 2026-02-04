@@ -65,7 +65,7 @@ final class CloudKitRecipePreview {
             title: cloudRecipe.title,
             headerNotes: cloudRecipe.headerNotes,
             imageName: cloudRecipe.imageName,
-            sharedByUserID: cloudRecipe.sharedByUserID,
+            sharedByUserID: cloudRecipe.sharedByUserID ?? "no user id",
             sharedByUserName: cloudRecipe.sharedByUserName,
             recipeYield: cloudRecipe.yield,
             bookID: bookID,

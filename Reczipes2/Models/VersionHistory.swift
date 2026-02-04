@@ -39,32 +39,14 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
     
     // ⚠️ UPDATE THIS ARRAY WITH YOUR NEW CHANGES ⚠️
     let currentVersionChanges: [String] = [
-        // --- Feb 3, 2026 — Link & URL Extraction fixes ---
-        "🐛 Fixed: links_from_notes.json import was silently failing — trailing comma in JSON caused total decode failure, zero links ever imported",
-        "🔧 Added: LinkImportService.sanitizeJSON() strips trailing commas before ] and } so hand-edited JSON files import reliably",
-        "🐛 Fixed: ImportLinksSheet validation step now sanitises before validating, so Validate and Import agree on the same data",
-        "✨ Added: \"Import Recipe Links\" card on the Extract tab — users can import the JSON file without leaving the extraction flow",
-        "✨ Added: \"Import Links from JSON\" button in BatchRecipeExtractorView empty state — replaces the dead-end \"Close\" button",
-        "✨ Added: \"Import Links\" toolbar button in BatchRecipeExtractorView — import more links at any time, even mid-extraction",
-        "🔧 Fixed: BatchRecipeExtractorViewModel.saveRecipe() migrated to use recipe.setImage() — removed stale RecipeImageAssignment creation and manual imageData assignment",
-        "🔧 Fixed: BatchRecipeExtractorViewModel.saveRecipe() now sets extractionSource, needsCloudSync, timestamps, and version consistently with all other extraction paths",
-        "📚 Added: LINK_AND_URL_EXTRACTION.md — single consolidated guide covering architecture, data flow, import pipeline, extraction, image handling, tips, troubleshooting, and known data issues",
-        "📚 Retired: LINK_EXTRACTION_RECIPEX_FIX.md, QUICK_SETUP_SAVED_LINKS.md, TIPS_INTEGRATION.md, BATCH_EXTRACTION_IMPLEMENTATION_CHECKLIST.md — each now redirects to the new guide",
-
-        // --- Previous version entries ---
-        "🗑️ Removed: All legacy Recipe and RecipeBook models — RecipeX and Book are now the sole data models",
-        "⚡️ Simplified: Entire app runs on a single unified data layer with zero model conversions",
-        "💾 Enhanced: RecipeX and Book store images directly in SwiftData with automatic CloudKit sync",
-        "🔄 Eliminated: RecipeModel intermediary — all views, analyzers, and sharing consume RecipeX natively",
-        "📚 Removed: Legacy RecipeBook schema, migration helpers, and dual-model selector code",
-        "☁️ Streamlined: CloudKit duplicate monitor and sync cleanup now operate exclusively on RecipeX",
-        "✨ Added: Dynamic version history system backed by SwiftData (VersionHistoryRecord)",
-        "📊 Added: Version History view in Settings with expandable per-build changelogs",
-        "🔄 Added: Automatic 'What's New' detection — launch screen updates on every version change",
-        "🎨 Added: Share changelog feature to export full version history as formatted text",
-        "⚡️ Enhanced: Version history persists across updates and syncs via CloudKit alongside app data",
-        "🐛 Fixed: CloudKit sync token expiry no longer causes silent duplicate recipes",
-        "🔧 Rebuilt: Entire test suite migrated to RecipeX/Book — ~500 errors resolved across all test targets",
+        // --- Feb 4, 2026 — Shared-recipe thumbnail fixes ---
+        "🐛 Fixed: Shared recipe thumbnails missing in community books — createThumbnail() only read from Documents by imageName and silently returned nil for any recipe whose image lived exclusively in SwiftData imageData",
+        "🐛 Fixed: mainImage CKAsset missing on individually shared recipes — uploadImage(named:) had the same Documents-only path; recipes set via setImage() (which stores inline, never writes to disk) were uploaded with no image at all",
+        "🔧 Fixed: createThumbnail() now falls back to recipe.imageData when the imageName file is not found on disk, so thumbnails are generated correctly regardless of how the image was originally stored",
+        "🔧 Fixed: uploadImage() now falls back to recipe.imageData when the file is missing from Documents, writing a temporary asset for the CKRecord upload so the full-size image travels with the shared recipe",
+        "🐛 Fixed: shareRecipeBook() thumbnail gate only entered the base64 path when imageName was non-nil — recipes with imageData but no imageName were silently skipped; gate now also checks imageData",
+        // --- Feb 4, 2026 — UTI registration for backup file types ---
+        "🔧 Fixed: Added UTExportedTypeDeclarations and CFBundleDocumentTypes to Info.plist for .reczipes and .bookbackup file types — UTType(exportedAs:) requires the identifiers to be declared and exported by the app bundle",
     ]
     
     // Only add if there are changes

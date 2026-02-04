@@ -20,7 +20,6 @@ enum CloudKitRecordType {
 
 // MARK: - Codable Representations for CloudKit
 
-/// CloudKit-friendly representation of a recipe for sharing
 struct CloudKitRecipe: Codable, Identifiable {
     let id: UUID
     let title: String
@@ -32,12 +31,42 @@ struct CloudKitRecipe: Codable, Identifiable {
     let reference: String?
     let imageName: String?
     let additionalImageNames: [String]?
-    
-    // Sharing metadata
-    let sharedByUserID: String
+    let sharedByUserID: String?
     let sharedByUserName: String?
     let sharedDate: Date
+
+    // ── NEW: downloaded from the mainImage CKAsset, not part of the JSON payload ──
+    /// Raw image data downloaded from CloudKit. Not Codable — set after decode.
+    var imageData: Data? = nil
+
+    /// Keys to encode/decode — excludes imageData so it doesn't break the JSON round-trip.
+    enum CodingKeys: String, CodingKey {
+        case id, title, headerNotes, yield
+        case ingredientSections, instructionSections
+        case notes, reference, imageName, additionalImageNames
+        case sharedByUserID, sharedByUserName, sharedDate
+        // imageData intentionally omitted
+    }
 }
+
+///// CloudKit-friendly representation of a recipe for sharing
+//struct CloudKitRecipe: Codable, Identifiable {
+//    let id: UUID
+//    let title: String
+//    let headerNotes: String?
+//    let yield: String?
+//    let ingredientSections: [IngredientSection]
+//    let instructionSections: [InstructionSection]
+//    let notes: [RecipeNote]
+//    let reference: String?
+//    let imageName: String?
+//    let additionalImageNames: [String]?
+//    
+//    // Sharing metadata
+//    let sharedByUserID: String
+//    let sharedByUserName: String?
+//    let sharedDate: Date
+//}
 
 /// CloudKit-friendly representation of a recipe book for sharing
 struct CloudKitRecipeBook: Codable, Identifiable {

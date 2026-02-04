@@ -238,7 +238,7 @@ class CloudKitSharingService: ObservableObject {
             let tracking = SharedRecipe(
                 recipeID: recipe.id,
                 cloudRecordID: cloudRecordID,
-                sharedByUserID: recipe.sharedByUserID,
+                sharedByUserID: recipe.sharedByUserID ?? "no user id",
                 sharedByUserName: recipe.sharedByUserName,
                 sharedDate: Date(),
                 recipeTitle: recipe.title,
@@ -471,7 +471,6 @@ class CloudKitSharingService: ObservableObject {
         // Create CloudKit record
         let record = CKRecord(recordType: CloudKitRecordType.sharedRecipe)
         
-        // Convert recipe to CloudKit-friendly format
         let cloudRecipe = CloudKitRecipe(
             id: recipe.safeID,
             title: recipe.safeTitle,
@@ -498,9 +497,11 @@ class CloudKitSharingService: ObservableObject {
         record["sharedByName"] = (currentUserName ?? "Anonymous") as CKRecordValue
         record["sharedDate"] = Date() as CKRecordValue
         
-        // Upload images if they exist
+        // Upload images if they exist (prefer file on disk; fall back to inline imageData)
         if let imageName = recipe.imageName {
-            try await uploadImage(named: imageName, to: record, fieldName: "mainImage")
+            try await uploadImage(named: imageName, imageData: recipe.imageData, to: record, fieldName: "mainImage")
+        } else if recipe.imageData != nil {
+            try await uploadImage(named: nil, imageData: recipe.imageData, to: record, fieldName: "mainImage")
         }
         
         // Save to public database
@@ -591,11 +592,10 @@ class CloudKitSharingService: ObservableObject {
             }
             
             // Create thumbnail (small, base64-encoded)
+            // Fall back to inline imageData when the file is missing from Documents
             var thumbnailBase64: String?
-            if let imageName = recipe.imageName {
-                if let thumbnailData = createThumbnail(for: imageName, maxSize: 200) {
-                    thumbnailBase64 = thumbnailData.base64EncodedString()
-                }
+            if let thumbnailData = createThumbnail(for: recipe.imageName, imageData: recipe.imageData, maxSize: 200) {
+                thumbnailBase64 = thumbnailData.base64EncodedString()
             }
             
             // Create preview data with embedded thumbnail
@@ -652,21 +652,12 @@ class CloudKitSharingService: ObservableObject {
         
         logInfo("📚 Uploading cover image...", category: "sharing")
         
-        // Upload cover image if exists
-        if let coverImageName = book.coverImageName {
-            do {
-                try await uploadImage(named: coverImageName, to: record, fieldName: "coverImage")
-                logInfo("  ✅ Uploaded cover image: \(coverImageName)", category: "sharing")
-            } catch {
-                logWarning("  ⚠️ Failed to upload cover image: \(error)", category: "sharing")
-            }
-        } else if let coverImageData = book.coverImageData {
-            // Handle inline cover image data
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_cover_\(String(describing: book.id)).jpg")
-            try? coverImageData.write(to: tempURL)
-            let asset = CKAsset(fileURL: tempURL)
-            record["coverImage"] = asset
-            logInfo("  ✅ Uploaded cover image from data", category: "sharing")
+        // Upload cover image if exists (file on disk or inline coverImageData)
+        do {
+            try await uploadImage(named: book.coverImageName, imageData: book.coverImageData, to: record, fieldName: "coverImage")
+            logInfo("  ✅ Uploaded cover image", category: "sharing")
+        } catch {
+            logWarning("  ⚠️ Failed to upload cover image: \(error)", category: "sharing")
         }
         
         // Save to public database
@@ -814,7 +805,15 @@ class CloudKitSharingService: ObservableObject {
                     if let recipeData = record["recipeData"] as? String,
                        let jsonData = recipeData.data(using: .utf8) {
                         let decoder = JSONDecoder()
-                        if let recipe = try? decoder.decode(CloudKitRecipe.self, from: jsonData) {
+                        if var recipe = try? decoder.decode(CloudKitRecipe.self, from: jsonData) {
+                            // Download the mainImage CKAsset so the thumbnail
+                            // is available on the viewer's device.
+                            if let imageAsset = record["mainImage"] as? CKAsset,
+                               let assetURL = imageAsset.fileURL,
+                               let data = try? Data(contentsOf: assetURL) {
+                                recipe.imageData = data
+                                logInfo("  📷 Downloaded mainImage for '\(recipe.title)' (\(data.count) bytes)", category: "sharing")
+                            }
                             allRecipes.append(recipe)
                             successCount += 1
                         } else {
@@ -1001,17 +1000,34 @@ class CloudKitSharingService: ObservableObject {
     
     // MARK: - Image Handling
     
-    private func uploadImage(named imageName: String, to record: CKRecord, fieldName: String) async throws {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let imageURL = documentsPath.appendingPathComponent(imageName)
-        
-        guard FileManager.default.fileExists(atPath: imageURL.path) else {
-            logWarning("Image file not found: \(imageName)", category: "sharing")
+    /// Upload an image as a CKAsset.
+    /// Prefers the file on disk at `imageName`; falls back to writing `imageData` to a
+    /// temporary file so a valid CKAsset can be created.  Does nothing if neither source
+    /// produces usable data.
+    private func uploadImage(named imageName: String?, imageData: Data?, to record: CKRecord, fieldName: String) async throws {
+        // --- Try the on-disk file first ---
+        if let imageName = imageName {
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let imageURL = documentsPath.appendingPathComponent(imageName)
+
+            if FileManager.default.fileExists(atPath: imageURL.path) {
+                record[fieldName] = CKAsset(fileURL: imageURL)
+                return
+            }
+            logWarning("Image file not found on disk: \(imageName) — attempting imageData fallback", category: "sharing")
+        }
+
+        // --- Fall back to inline imageData ---
+        guard let data = imageData, !data.isEmpty else {
+            logWarning("No image available for field '\(fieldName)' (imageName: \(imageName ?? "nil"), imageData: nil)", category: "sharing")
             return
         }
-        
-        let asset = CKAsset(fileURL: imageURL)
-        record[fieldName] = asset
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ckasset_\(fieldName)_\(UUID().uuidString).jpg")
+        try data.write(to: tempURL)
+        record[fieldName] = CKAsset(fileURL: tempURL)
+        logInfo("  📷 Uploaded '\(fieldName)' from inline imageData (\(data.count) bytes)", category: "sharing")
     }
     
     func downloadImage(from record: CKRecord, fieldName: String) async throws -> UIImage? {
@@ -1056,7 +1072,7 @@ class CloudKitSharingService: ObservableObject {
             logInfo("🔍 DIAGNOSTIC: Total unique sharers: \(groupedByUser.count)", category: "sharing")
             for (userID, userRecipes) in groupedByUser.prefix(5) {
                 let userName = userRecipes.first?.sharedByUserName ?? "Unknown"
-                logInfo("🔍   User '\(userName)' (\(userID)): \(userRecipes.count) recipes", category: "sharing")
+                logInfo("🔍   User '\(userName)' (\(String(describing: userID))): \(userRecipes.count) recipes", category: "sharing")
             }
             
             // Detect duplicates by recipe ID
@@ -1634,14 +1650,22 @@ class CloudKitSharingService: ObservableObject {
                 existingCached.additionalImageNames = cloudRecipe.additionalImageNames
                 existingCached.sharedByUserName = cloudRecipe.sharedByUserName
                 existingCached.cachedDate = Date()
+                // Carry through the downloaded image asset so thumbnails appear
+                if let imageData = cloudRecipe.imageData {
+                    existingCached.imageData = imageData
+                }
                 updatedCount += 1
-                logInfo("📖   Updated cached recipe: '\(cloudRecipe.title)'", category: "sharing")
+                logInfo("📖   Updated cached recipe: '\(cloudRecipe.title)'\(cloudRecipe.imageData != nil ? " (with image)" : "")", category: "sharing")
             } else {
                 // Create new cached recipe
                 let newCached = CachedSharedRecipe(from: cloudRecipe)
+                // Carry through the downloaded image asset so thumbnails appear
+                if let imageData = cloudRecipe.imageData {
+                    newCached.imageData = imageData
+                }
                 modelContext.insert(newCached)
                 addedCount += 1
-                logInfo("📖   Cached new recipe: '\(cloudRecipe.title)' by \(cloudRecipe.sharedByUserName ?? "Unknown")", category: "sharing")
+                logInfo("📖   Cached new recipe: '\(cloudRecipe.title)' by \(cloudRecipe.sharedByUserName ?? "Unknown")\(cloudRecipe.imageData != nil ? " (with image)" : "")", category: "sharing")
             }
         }
         
@@ -2058,29 +2082,42 @@ class CloudKitSharingService: ObservableObject {
         try data.write(to: fileURL)
     }
     
-    /// Helper: Create a small thumbnail from an image
-    /// Returns JPEG data resized to maxSize (width/height), compressed to keep file size small
-    private func createThumbnail(for imageName: String, maxSize: CGFloat = 200) -> Data? {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let imageURL = documentsPath.appendingPathComponent(imageName)
-        
-        guard FileManager.default.fileExists(atPath: imageURL.path),
-              let imageData = try? Data(contentsOf: imageURL),
-              let image = UIImage(data: imageData) else {
-            return nil
+    /// Helper: Create a small thumbnail from an image.
+    /// Prefers the file on disk at `imageName`; falls back to `imageData` when the file
+    /// is missing (e.g. recipes stored exclusively via SwiftData after setImage()).
+    /// Returns JPEG data resized to maxSize (width/height), compressed to keep file size small.
+    private func createThumbnail(for imageName: String?, imageData: Data?, maxSize: CGFloat = 200) -> Data? {
+        var image: UIImage?
+
+        // --- Try the on-disk file first ---
+        if let imageName = imageName {
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let imageURL = documentsPath.appendingPathComponent(imageName)
+
+            if FileManager.default.fileExists(atPath: imageURL.path),
+               let diskData = try? Data(contentsOf: imageURL) {
+                image = UIImage(data: diskData)
+            }
         }
-        
+
+        // --- Fall back to inline imageData ---
+        if image == nil, let data = imageData {
+            image = UIImage(data: data)
+        }
+
+        guard let sourceImage = image else { return nil }
+
         // Calculate new size maintaining aspect ratio
-        let size = image.size
+        let size = sourceImage.size
         let ratio = min(maxSize / size.width, maxSize / size.height)
         let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
-        
+
         // Resize image
         UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-        image.draw(in: CGRect(origin: .zero, size: newSize))
+        sourceImage.draw(in: CGRect(origin: .zero, size: newSize))
         let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
-        
+
         // Compress to JPEG with quality 0.6 (good balance of size vs quality)
         return resizedImage?.jpegData(compressionQuality: 0.6)
     }
@@ -2392,10 +2429,40 @@ class CloudKitSharingService: ObservableObject {
         }
     }
     
+    /// Decode note strings encoded as "[type] text" back into RecipeNote objects.
+    /// This is the inverse of the encoding done in shareRecipe:
+    ///     "[\(note.type.rawValue)] \(note.text)"
+    static func decodeNoteStrings(_ noteStrings: [String]?) -> [RecipeNote] {
+        guard let strings = noteStrings else { return [] }
+        return strings.compactMap { string in
+            // Expected format: "[rawValue] text"
+            guard string.hasPrefix("["),
+                  let closingIndex = string.firstIndex(of: "]") else {
+                // No valid prefix – fall back to a general note with the full string
+                return RecipeNote(type: .general, text: string)
+            }
+            let typeStart = string.index(after: string.startIndex)
+            let rawValue = String(string[typeStart..<closingIndex])
+            guard let noteType = RecipeNoteType(rawValue: rawValue) else {
+                return RecipeNote(type: .general, text: string)
+            }
+            // Text begins after "] " (skip the space if present)
+            let afterBracket = string.index(after: closingIndex)
+            let textStart = afterBracket < string.endIndex && string[afterBracket] == " "
+                ? string.index(after: afterBracket)
+                : afterBracket
+            let text = String(string[textStart...])
+            return RecipeNote(type: noteType, text: text)
+        }
+    }
+
     /// Import a shared recipe into the user's local collection
     func importSharedRecipe(_ cloudRecipe: CloudKitRecipe, modelContext: ModelContext) async throws {
         // Create RecipeX directly from CloudKitRecipe
         let encoder = JSONEncoder()
+        
+        // Encode notes directly — CloudKitRecipe.notes is already [RecipeNote].
+        let notesData = try? encoder.encode(cloudRecipe.notes)
         
         let recipe = RecipeX(
             id: UUID(), // Generate new ID (don't conflict with original)
@@ -2405,7 +2472,7 @@ class CloudKitSharingService: ObservableObject {
             reference: cloudRecipe.reference,
             ingredientSectionsData: try? encoder.encode(cloudRecipe.ingredientSections),
             instructionSectionsData: try? encoder.encode(cloudRecipe.instructionSections),
-            notesData: try? encoder.encode(cloudRecipe.notes),
+            notesData: notesData,
             imageName: cloudRecipe.imageName,
             additionalImageNames: cloudRecipe.additionalImageNames
         )
