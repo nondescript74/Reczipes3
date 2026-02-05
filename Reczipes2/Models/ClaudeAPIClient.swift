@@ -992,3 +992,55 @@ enum ClaudeAPIError: LocalizedError {
         }
     }
 }
+
+//
+//  AppClipExtractedRecipeData.swift
+//  Shared Models
+//
+//  Defines a lightweight recipe data model suitable for use in the App Clip
+//  and for serialization via App Groups.
+//
+
+
+/// A lightweight representation of an extracted recipe tailored for the App Clip.
+/// This avoids any dependency on SwiftData or app-only models.
+public struct AppClipExtractedRecipeData: Codable, Sendable, Equatable {
+    /// Recipe title (never empty in practice; callers may provide a fallback)
+    public var title: String
+
+    /// Number of servings; defaults handled by the producer if unknown
+    public var servings: Int
+
+    /// Optional prep time string (e.g., "15 min", "PT15M")
+    public var prepTime: String?
+
+    /// Optional cook time string
+    public var cookTime: String?
+
+    /// Flattened list of ingredient display strings
+    public var ingredients: [String]
+
+    /// Flattened list of instruction step texts
+    public var instructions: [String]
+
+    /// Optional concatenated notes text
+    public var notes: String?
+
+    public init(
+        title: String,
+        servings: Int,
+        prepTime: String? = nil,
+        cookTime: String? = nil,
+        ingredients: [String],
+        instructions: [String],
+        notes: String? = nil
+    ) {
+        self.title = title
+        self.servings = servings
+        self.prepTime = prepTime
+        self.cookTime = cookTime
+        self.ingredients = ingredients
+        self.instructions = instructions
+        self.notes = notes
+    }
+}
