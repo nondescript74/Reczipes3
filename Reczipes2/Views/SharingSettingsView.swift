@@ -45,6 +45,9 @@ struct SharingSettingsView: View {
                 // CloudKit Status
                 cloudKitStatusSection
                 
+                // Auto-Sync Settings
+                autoSyncSection
+                
                 // Sharing Preferences
                 sharingPreferencesSection
                 
@@ -218,6 +221,94 @@ struct SharingSettingsView: View {
             Text("Public Sharing Status")
         } footer: {
             Text("Public sharing requires iCloud. Your private sync works regardless of these settings.")
+        }
+    }
+    
+    // MARK: - Auto-Sync Section
+    
+    private var autoSyncSection: some View {
+        Section {
+            Toggle("Auto-Sync Community Content", isOn: $sharingService.autoSyncEnabled)
+                .disabled(!sharingService.isCloudKitAvailable)
+            
+            if sharingService.autoSyncEnabled {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Sync Interval")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text(sharingService.syncIntervalDescription)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Slider(
+                        value: $sharingService.syncInterval,
+                        in: 20...300,
+                        step: 10
+                    ) {
+                        Text("Sync Interval")
+                    } minimumValueLabel: {
+                        Text("20s")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } maximumValueLabel: {
+                        Text("5m")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    // Sync status indicator
+                    if sharingService.isSyncing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Syncing...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if let lastSync = sharingService.lastSyncDate {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                            Text("Last synced: \(lastSync, style: .relative) ago")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        if let timeUntilNext = sharingService.timeUntilNextSync, timeUntilNext > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .foregroundStyle(.blue)
+                                    .font(.caption)
+                                Text("Next sync in \(Int(timeUntilNext))s")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    
+                    // Manual sync button
+                    Button {
+                        Task {
+                            await sharingService.manualSync(modelContext: modelContext)
+                        }
+                    } label: {
+                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(sharingService.isSyncing)
+                }
+            }
+        } header: {
+            Text("Auto-Sync")
+        } footer: {
+            if sharingService.autoSyncEnabled {
+                Text("Automatically checks for new community recipes and books every \(sharingService.syncIntervalDescription). Adjust the interval to balance freshness with battery and data usage.")
+            } else {
+                Text("Enable to automatically sync community recipes and books in the background. You can still browse and manually sync when disabled.")
+            }
         }
     }
     

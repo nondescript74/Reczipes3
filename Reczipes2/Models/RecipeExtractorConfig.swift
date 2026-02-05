@@ -7,6 +7,7 @@
 
 import Foundation
 
+
 struct RecipeExtractorConfig {
     
     // MARK: - API Configuration
@@ -90,7 +91,7 @@ enum APIKeyStorage {
             return ProcessInfo.processInfo.environment[variableName]
             
         case .keychain(let key):
-            return KeychainManager.shared.get(key: key)
+            return _KeychainHelper.get(key: key)
             
         case .userDefaults(let key):
             return UserDefaults.standard.string(forKey: key)
@@ -100,50 +101,29 @@ enum APIKeyStorage {
         }
     }
 }
+// MARK: - Keychain Helper (local)
 
-//// MARK: - API Key Helper
-//
-//class APIKeyHelper {
-//    
-//    /// The storage method being used (configure this for your app)
-//    static var storageMethod: APIKeyStorage = .keychain(key: "claudeAPIKey")
-//    
-//    /// Get the API key from configured storage
-//    static func getAPIKey() -> String? {
-//        let key = storageMethod.retrieve()
-//        
-//        if RecipeExtractorConfig.debugLogging {
-//            if key != nil {
-//                print("✅ API Key retrieved successfully")
-//            } else {
-//                print("❌ API Key not found")
-//            }
-//        }
-//        
-//        return key
-//    }
-//    
-//    /// Set the API key (useful for first-time setup)
-//    static func setAPIKey(_ key: String) -> Bool {
-//        switch storageMethod {
-//        case .keychain(let keychainKey):
-//            return KeychainManager.shared.save(key: keychainKey, value: key)
-//            
-//        case .userDefaults(let defaultsKey):
-//            UserDefaults.standard.set(key, forKey: defaultsKey)
-//            return true
-//            
-//        default:
-//            print("⚠️ Cannot programmatically set API key for current storage method")
-//            return false
-//        }
-//    }
-//    
-//    /// Check if API key is configured
-//    static var isConfigured: Bool {
-//        guard let key = getAPIKey(), !key.isEmpty else {
-//            return false
-//        }
-//        return true
-//    }
-//}
+/// A lightweight Keychain reader used by `APIKeyStorage`.
+///
+/// If `KeychainManager` is already compiled into this target (check its
+/// *Target Membership* in the Identity & Dependencies inspector), you can
+/// replace the body of `get(key:)` with `KeychainManager.shared.get(key: key)`.
+private enum _KeychainHelper {
+    static func get(key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass      as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let data = result as? Data else { return nil }
+
+        return String(data: data, encoding: .utf8)
+    }
+}
+

@@ -2,57 +2,29 @@
 //  Reczipes2ClipApp.swift
 //  Reczipes2Clip
 //
-//  App Clip Entry Point
-//  Created by Zahirudeen Premji on 12/30/25.
-//
-//  ⚠️ IMPORTANT: This file should ONLY be included in the Reczipes2Clip (App Clip) target
-//  Do NOT add this file to the main Reczipes2 app target
+//  Created by Zahirudeen Premji on 2/4/26.
 //
 
 import SwiftUI
 
 @main
 struct Reczipes2ClipApp: App {
-    
-    @State private var extractURL: String?
-    
-    init() {
-        // Suppress Auto Layout warnings
-        UserDefaults.standard.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
-    }
-    
+
+    /// The URL passed in when the App Clip is invoked via a universal link
+    /// (e.g. ?url=https://…).  Forwarded down to AppClipContentView so it
+    /// can skip straight to extraction when present.
+    @State private var invocationURL: String?
+
     var body: some Scene {
         WindowGroup {
-            AppClipContentView(extractURL: $extractURL)
-                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
-                    handleInvocation(userActivity: userActivity)
+            AppClipContentView(invocationURL: $invocationURL)
+                .onOpenURL { url in
+                    // Extract the "url" query-string parameter if present
+                    if let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
+                       let target = components.queryItems?.first(where: { $0.name == "url" })?.value {
+                        invocationURL = target
+                    }
                 }
         }
     }
-    
-    // MARK: - App Clip Invocation
-    
-    private func handleInvocation(userActivity: NSUserActivity) {
-        guard let url = userActivity.webpageURL else {
-            print("❌ App Clip invoked without URL")
-            return
-        }
-        
-        print("✅ App Clip invoked with URL: \(url)")
-        
-        // Parse URL for recipe extraction
-        // Expected format: https://yourdomain.com/clip/extract?url=RECIPE_URL
-        // or: https://yourdomain.com/clip/extract?recipe=RECIPE_ID
-        
-        if let components = URLComponents(url: url, resolvingAgainstBaseURL: true) {
-            if let recipeURL = components.queryItems?.first(where: { $0.name == "url" })?.value {
-                extractURL = recipeURL
-                print("📝 Will extract recipe from: \(recipeURL)")
-            } else if let recipeID = components.queryItems?.first(where: { $0.name == "recipe" })?.value {
-                // Handle direct recipe ID if you have a recipe sharing system
-                print("📝 Will load recipe ID: \(recipeID)")
-            }
-        }
-    }
 }
-

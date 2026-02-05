@@ -99,20 +99,64 @@ struct AppClipDataHandler {
         )
     }
     
-    /// Share API key from main app to App Clip (if user wants)
+    // MARK: - API Key Sharing (Keychain-based)
+
+    /// The App Group identifier used for the shared Keychain.
+    /// Must match the value in AppClipAPIKeyHelper.
+    private static let appGroupID        = "group.com.headydiscy.reczipes"
+
+    /// The Keychain account label the App Clip reads from.
+    /// Must match the value in AppClipAPIKeyHelper.
+    private static let sharedKeychainKey = "claudeAPIKey"
+
+    /// Write the API key into the shared App-Group Keychain so the App Clip
+    /// can retrieve it securely — no plaintext in UserDefaults.
     static func shareAPIKeyWithAppClip(_ apiKey: String) {
-        sharedDefaults?.set(apiKey, forKey: "claudeAPIKey")
-        logInfo("Shared API key with App Clip via App Group", category: "app-clip")
+        guard let data = apiKey.data(using: .utf8) else {
+            logWarning("Could not encode API key for Keychain", category: "app-clip")
+            return
+        }
+
+        let attributes: [String: Any] = [
+            kSecClass            as String: kSecClassGenericPassword,
+            kSecAttrAccount      as String: sharedKeychainKey,
+            kSecAttrAccessGroup  as String: appGroupID,
+            kSecValueData        as String: data,
+            kSecAttrAccessible   as String: kSecAttrAccessibleWhenUnlocked
+        ]
+
+        // Delete any existing entry first
+        let deleteQuery: [String: Any] = [
+            kSecClass           as String: kSecClassGenericPassword,
+            kSecAttrAccount     as String: sharedKeychainKey,
+            kSecAttrAccessGroup as String: appGroupID
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        if status == errSecSuccess {
+            logInfo("Shared API key with App Clip via App-Group Keychain", category: "app-clip")
+        } else {
+            logWarning("Failed to share API key with App Clip (Keychain status: \(status))", category: "app-clip")
+        }
     }
-    
-    /// Check if API key is available in shared storage
+
+    /// Returns `true` when the shared App-Group Keychain already contains an
+    /// API key (written by either the main app or the App Clip).
     static func isAPIKeyShared() -> Bool {
-        return sharedDefaults?.string(forKey: "claudeAPIKey") != nil
+        let query: [String: Any] = [
+            kSecClass           as String: kSecClassGenericPassword,
+            kSecAttrAccount     as String: sharedKeychainKey,
+            kSecAttrAccessGroup as String: appGroupID,
+            kSecReturnData      as String: false,   // existence check only
+            kSecMatchLimit      as String: kSecMatchLimitOne
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 }
 
-// NOTE: AppClipExtractedRecipeData struct is defined in AppClipContentView.swift
-// and should be accessible to both the App Clip and main app targets.
+// NOTE: AppClipExtractedRecipeData is defined in AppClipSharedModels.swift
+// and is included in both the main app and App Clip targets.
 
 // MARK: - App Clip Banner View
 

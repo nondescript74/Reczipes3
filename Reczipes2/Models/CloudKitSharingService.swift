@@ -25,11 +25,56 @@ class CloudKitSharingService: ObservableObject {
     @Published var currentUserID: String?
     @Published var currentUserName: String?
     
+    // Auto-sync properties
+    private var syncTimer: Timer?
+    @Published var lastSyncDate: Date?
+    @Published var isSyncing = false
+    @Published var autoSyncEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(autoSyncEnabled, forKey: "cloudKitAutoSyncEnabled")
+            if autoSyncEnabled {
+                logInfo("🔄 Auto-sync enabled", category: "sharing")
+            } else {
+                stopAutoSync()
+                logInfo("🔄 Auto-sync disabled", category: "sharing")
+            }
+        }
+    }
+    
+    // Sync interval in seconds (20 seconds to 5 minutes)
+    @Published var syncInterval: TimeInterval {
+        didSet {
+            UserDefaults.standard.set(syncInterval, forKey: "cloudKitSyncInterval")
+            // Restart timer with new interval if auto-sync is enabled
+            if autoSyncEnabled, syncTimer != nil {
+                stopAutoSync()
+                Task {
+                    if let context = currentModelContext {
+                        await startAutoSync(modelContext: context)
+                    }
+                }
+            }
+            logInfo("🔄 Sync interval changed to \(Int(syncInterval)) seconds", category: "sharing")
+        }
+    }
+    
+    // Keep a weak reference to model context for auto-sync
+    private weak var currentModelContext: ModelContext?
+    
     private init() {
         // Use the same container as your app
         self.container = CKContainer(identifier: "iCloud.com.headydiscy.reczipes")
         self.publicDatabase = container.publicCloudDatabase
         self.privateDatabase = container.privateCloudDatabase
+        
+        // Load auto-sync preferences from UserDefaults
+        self.autoSyncEnabled = UserDefaults.standard.bool(forKey: "cloudKitAutoSyncEnabled")
+        self.syncInterval = UserDefaults.standard.double(forKey: "cloudKitSyncInterval")
+        
+        // Default to 60 seconds (1 minute) if not set
+        if self.syncInterval == 0 {
+            self.syncInterval = 60
+        }
         
         Task {
             await checkCloudKitAvailability()
@@ -1598,6 +1643,112 @@ class CloudKitSharingService: ObservableObject {
         logInfo("✅ GHOST CLEANUP COMPLETE: Deleted \(successCount) ghost recipe books, \(failCount) failures", category: "sharing")
         
         return (ghostsFound: ghostBooks.count, deleted: successCount, failed: failCount)
+    }
+    
+    // MARK: - Auto-Sync Management
+    
+    /// Start automatic background syncing
+    /// Call this when the app becomes active or when user enables auto-sync
+    func startAutoSync(modelContext: ModelContext) async {
+        guard autoSyncEnabled else {
+            logInfo("🔄 Auto-sync is disabled by user preference", category: "sharing")
+            return
+        }
+        
+        guard syncTimer == nil else {
+            logInfo("🔄 Auto-sync already running", category: "sharing")
+            return
+        }
+        
+        // Store model context reference
+        self.currentModelContext = modelContext
+        
+        logInfo("🔄 Starting auto-sync with interval: \(Int(syncInterval)) seconds", category: "sharing")
+        
+        // Sync immediately on start
+        await performBackgroundSync(modelContext: modelContext)
+        
+        // Schedule periodic sync on main thread
+        // Use weak reference to avoid retain cycle and nonisolated(unsafe) to handle non-Sendable ModelContext
+        syncTimer = Timer.scheduledTimer(withTimeInterval: syncInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                // Access currentModelContext inside the MainActor-isolated Task
+                guard let context = self.currentModelContext else { return }
+                nonisolated(unsafe) let modelContext = context
+                await self.performBackgroundSync(modelContext: modelContext)
+            }
+        }
+        
+        // Ensure timer fires even when scrolling
+        if let timer = syncTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
+    }
+    
+    /// Stop automatic background syncing
+    func stopAutoSync() {
+        syncTimer?.invalidate()
+        syncTimer = nil
+        currentModelContext = nil
+        logInfo("🔄 Stopped auto-sync", category: "sharing")
+    }
+    
+    /// Perform a background sync (checks for changes without blocking UI)
+    private func performBackgroundSync(modelContext: ModelContext) async {
+        guard !isSyncing else {
+            logInfo("🔄 Skipping sync - already in progress", category: "sharing")
+            return
+        }
+        
+        guard isCloudKitAvailable else {
+            logInfo("🔄 Skipping sync - CloudKit not available", category: "sharing")
+            return
+        }
+        
+        isSyncing = true
+        defer { isSyncing = false }
+        
+        let startTime = Date()
+        logInfo("🔄 AUTO-SYNC: Starting background sync...", category: "sharing")
+        
+        do {
+            // Sync community recipes (limit to recent 100 to keep it fast)
+            try await syncCommunityRecipesForViewing(modelContext: modelContext, limit: 100)
+            
+            // Sync community books
+            try await syncCommunityBooksToLocal(modelContext: modelContext)
+            
+            lastSyncDate = Date()
+            let duration = Date().timeIntervalSince(startTime)
+            logInfo("✅ AUTO-SYNC: Completed successfully in \(String(format: "%.2f", duration))s at \(lastSyncDate!)", category: "sharing")
+        } catch {
+            logError("❌ AUTO-SYNC: Failed: \(error)", category: "sharing")
+        }
+    }
+    
+    /// Manually trigger a sync (for user pull-to-refresh)
+    func manualSync(modelContext: ModelContext) async {
+        logInfo("🔄 MANUAL SYNC: User triggered manual sync", category: "sharing")
+        await performBackgroundSync(modelContext: modelContext)
+    }
+    
+    /// Get a human-readable description of the current sync interval
+    var syncIntervalDescription: String {
+        let seconds = Int(syncInterval)
+        if seconds < 60 {
+            return "\(seconds) second\(seconds == 1 ? "" : "s")"
+        } else {
+            let minutes = seconds / 60
+            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
+        }
+    }
+    
+    /// Get time until next sync (for display in UI)
+    var timeUntilNextSync: TimeInterval? {
+        guard autoSyncEnabled, let lastSync = lastSyncDate else { return nil }
+        let nextSyncTime = lastSync.addingTimeInterval(syncInterval)
+        return nextSyncTime.timeIntervalSinceNow
     }
     
     // MARK: - Community Recipes Sync (Temporary Cache)

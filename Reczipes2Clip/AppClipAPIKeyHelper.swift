@@ -2,163 +2,118 @@
 //  AppClipAPIKeyHelper.swift
 //  Reczipes2Clip
 //
-//  API Key management for App Clip
-//  Created by Zahirudeen Premji on 12/30/25.
+//  API key management for the App Clip.
+//  Reads from and writes to a shared App Group Keychain so the main app
+//  and the App Clip can exchange the key securely — no plaintext in UserDefaults.
 //
-//  ⚠️ This file should ONLY be in the App Clip target (Reczipes2Clip)
+//  TARGET MEMBERSHIP: Reczipes2Clip only
 //
 
-import SwiftUI
+import Foundation
 
 // MARK: - App Clip API Key Helper
 
-/// Lightweight API key helper for App Clips
-/// Uses App Group to share with main app if available
+/// Lightweight, secure API-key helper for the App Clip.
+///
+/// Storage hierarchy (tried in order on read):
+///   1. Shared App-Group Keychain  – written by the main app OR by this helper
+///   2. App Clip's own Keychain    – fallback; written here when the user enters
+///                                    a key before ever opening the main app
+///
+/// On write we always persist to *both* so the main app can pick it up later.
 struct AppClipAPIKeyHelper {
-    private static let sharedDefaults = UserDefaults(suiteName: "group.com.headydiscy.reczipes")
-    private static let apiKeyKey = "claudeAPIKey"
-    
+
+    // MARK: - Constants
+
+    /// Must match the App Group configured in Xcode for both targets.
+    private static let appGroupID = "group.com.headydiscy.reczipes"
+
+    /// Keychain account label used in the shared App-Group Keychain.
+    private static let sharedKeychainKey = "claudeAPIKey"
+
+    /// Keychain account label used in the App Clip's own (non-shared) Keychain.
+    /// A different label avoids collisions if both keychains are ever queried
+    /// on the same device in the same process.
+    private static let clipKeychainKey = "clipClaudeAPIKey"
+
+    // MARK: - Public API
+
+    /// `true` when a valid key is available from either Keychain.
     static var isConfigured: Bool {
-        if let key = sharedDefaults?.string(forKey: apiKeyKey), !key.isEmpty {
-            return true
-        }
-        // Fallback to standard UserDefaults
-        return UserDefaults.standard.string(forKey: apiKeyKey) != nil
+        getAPIKey() != nil
     }
-    
+
+    /// Retrieve the API key.  Returns `nil` when nothing has been stored yet.
     static func getAPIKey() -> String? {
-        // Try shared defaults first (might have it from main app)
-        if let key = sharedDefaults?.string(forKey: apiKeyKey) {
+        // 1. Shared App-Group Keychain (preferred – main app writes here)
+        if let key = readFromKeychain(account: sharedKeychainKey, accessGroup: appGroupID) {
             return key
         }
-        // Fallback to App Clip's own storage
-        return UserDefaults.standard.string(forKey: apiKeyKey)
+        // 2. App Clip's own Keychain (fallback – written before main app is installed)
+        return readFromKeychain(account: clipKeychainKey, accessGroup: nil)
     }
-    
-    static func setAPIKey(_ key: String) {
-        // Save to App Clip storage
-        UserDefaults.standard.set(key, forKey: apiKeyKey)
-        // Also save to shared storage
-        sharedDefaults?.set(key, forKey: apiKeyKey)
-    }
-    
-    // For demo purposes, you could provide a rate-limited demo key
-    static let demoAPIKey: String? = nil // Set to your demo key if you have one
-}
 
-// MARK: - API Key Prompt View
-
-struct AppClipAPIKeyPromptView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var apiKey = ""
-    @State private var showError = false
-    @State private var useDemoMode = false
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 12) {
-                    Image(systemName: "key.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
-                    
-                    Text("Quick Setup")
-                        .font(.title2.bold())
-                    
-                    Text("To extract recipes, enter your Claude API key or try demo mode")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .padding(.top, 40)
-                
-                // API Key Input
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Claude API Key")
-                        .font(.subheadline.weight(.medium))
-                    
-                    SecureField("sk-ant-...", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                    
-                    Text("Get your free API key from anthropic.com")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-                
-                // Action Buttons
-                VStack(spacing: 12) {
-                    Button {
-                        saveAndContinue()
-                    } label: {
-                        Text("Save & Continue")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(apiKey.isEmpty ? Color.gray : Color.accentColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                    }
-                    .disabled(apiKey.isEmpty)
-                    
-                    if let demoKey = AppClipAPIKeyHelper.demoAPIKey {
-                        Button {
-                            useDemoMode = true
-                            AppClipAPIKeyHelper.setAPIKey(demoKey)
-                            dismiss()
-                        } label: {
-                            Text("Try Demo (Limited)")
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.secondary.opacity(0.2))
-                                .foregroundColor(.primary)
-                                .cornerRadius(12)
-                        }
-                    }
-                    
-                    Button("Skip for Now") {
-                        dismiss()
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // Get Full App
-                VStack(spacing: 8) {
-                    Text("Want the full experience?")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Text("Get Reczipes")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.accentColor)
-                }
-                .padding(.bottom, 20)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("Invalid API Key", isPresented: $showError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Please enter a valid Claude API key starting with 'sk-ant-'")
-            }
-        }
+    /// Persist the API key.  Writes to both the shared and clip-local Keychains
+    /// so the main app can pick it up via App Groups, and so the clip itself can
+    /// read it back even if the shared Keychain is not yet available.
+    @discardableResult
+    static func setAPIKey(_ key: String) -> Bool {
+        let sharedOK = writeToKeychain(key, account: sharedKeychainKey, accessGroup: appGroupID)
+        let clipOK  = writeToKeychain(key, account: clipKeychainKey,   accessGroup: nil)
+        return sharedOK || clipOK   // succeed as long as at least one store worked
     }
-    
-    private func saveAndContinue() {
-        guard apiKey.hasPrefix("sk-ant-") else {
-            showError = true
-            return
+
+    // MARK: - Private Keychain Helpers
+
+    /// Read a string value from the Keychain.
+    /// - `accessGroup`: pass the App-Group identifier for shared access, or `nil`
+    ///   for the app's own Keychain.
+    private static func readFromKeychain(account: String, accessGroup: String?) -> String? {
+        var query: [String: Any] = [
+            kSecClass            as String: kSecClassGenericPassword,
+            kSecAttrAccount      as String: account,
+            kSecReturnData       as String: true,
+            kSecMatchLimit       as String: kSecMatchLimitOne
+        ]
+        if let group = accessGroup {
+            query[kSecAttrAccessGroup as String] = group
         }
-        
-        AppClipAPIKeyHelper.setAPIKey(apiKey)
-        dismiss()
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let data = result as? Data else { return nil }
+
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Write a string value to the Keychain, replacing any existing entry.
+    /// - `accessGroup`: pass the App-Group identifier for shared access, or `nil`
+    ///   for the app's own Keychain.
+    private static func writeToKeychain(_ value: String, account: String, accessGroup: String?) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
+
+        var attributes: [String: Any] = [
+            kSecClass            as String: kSecClassGenericPassword,
+            kSecAttrAccount      as String: account,
+            kSecValueData        as String: data,
+            kSecAttrAccessible   as String: kSecAttrAccessibleWhenUnlocked
+        ]
+        if let group = accessGroup {
+            attributes[kSecAttrAccessGroup as String] = group
+        }
+
+        // Delete any existing entry first (SecItemUpdate is finicky)
+        var deleteQuery: [String: Any] = [
+            kSecClass       as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: account
+        ]
+        if let group = accessGroup {
+            deleteQuery[kSecAttrAccessGroup as String] = group
+        }
+        SecItemDelete(deleteQuery as CFDictionary)
+
+        return SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess
     }
 }

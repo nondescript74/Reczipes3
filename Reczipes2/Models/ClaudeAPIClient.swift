@@ -149,6 +149,8 @@ class ClaudeAPIClient {
     /// Extract a recipe from web content using Claude's text capabilities
     /// - Parameter htmlContent: The HTML or text content containing the recipe
     /// - Returns: A RecipeX parsed from the content
+    /// - Note: Only available in the main app target (requires SwiftData / RecipeX)
+#if !APPCLIP
     func extractRecipe(from htmlContent: String) async throws -> RecipeX {
         logInfo("WEB RECIPE EXTRACTION START", category: "extraction")
         logDebug("Content length: \(htmlContent.count) characters", category: "extraction")
@@ -173,6 +175,7 @@ class ClaudeAPIClient {
         // Convert to RecipeX outside of retry closure
         return recipeResponse.toRecipeX()
     }
+#endif
     
     /// Perform the actual web extraction (wrapped by retry logic)
     /// Returns RecipeResponse (Sendable) instead of RecipeX (SwiftData model)
@@ -398,6 +401,8 @@ class ClaudeAPIClient {
     ///   - image: The UIImage containing the recipe
     ///   - usePreprocessing: Whether to apply image preprocessing for better OCR results
     /// - Returns: A RecipeX parsed from the image
+    /// - Note: Only available in the main app target (requires SwiftData / RecipeX)
+#if !APPCLIP
     func extractRecipe(from imageData: Data, usePreprocessing: Bool = true) async throws -> RecipeX {
         logInfo("RECIPE EXTRACTION START", category: "extraction")
         logDebug("Original image data size: \(imageData.count) bytes", category: "extraction")
@@ -423,7 +428,56 @@ class ClaudeAPIClient {
         // Convert to RecipeX outside of retry closure
         return recipeResponse.toRecipeX()
     }
-    
+#endif
+
+    // MARK: - App Clip extraction (returns AppClipExtractedRecipeData directly)
+    //
+    // These mirror the two extractRecipe overloads above but skip the
+    // RecipeX / SwiftData conversion.  The App Clip target cannot include
+    // RecipeX, so it calls these instead.
+
+    /// App-Clip–friendly variant: extracts from web content and returns the
+    /// lightweight Codable model that can be serialized through App Groups.
+    func extractRecipeAsClipData(from htmlContent: String) async throws -> AppClipExtractedRecipeData {
+        let operationID = "claude-extract-web-clip-\(htmlContent.prefix(100).hashValue)"
+
+        let recipeResponse = try await retryManager.withRetry(
+            operationID: operationID,
+            configuration: .init(
+                maxAttempts: 3,
+                initialDelay: 2.0,
+                maxDelay: 20.0,
+                backoffMultiplier: 2.0,
+                useJitter: true
+            )
+        ) {
+            try await self.performWebExtraction(htmlContent: htmlContent)
+        }
+
+        return recipeResponse.toClipData()
+    }
+
+    /// App-Clip–friendly variant: extracts from an image and returns the
+    /// lightweight Codable model that can be serialized through App Groups.
+    func extractRecipeAsClipData(from imageData: Data, usePreprocessing: Bool = true) async throws -> AppClipExtractedRecipeData {
+        let operationID = "claude-extract-image-clip-\(imageData.hashValue)"
+
+        let recipeResponse = try await retryManager.withRetry(
+            operationID: operationID,
+            configuration: .init(
+                maxAttempts: 3,
+                initialDelay: 2.0,
+                maxDelay: 20.0,
+                backoffMultiplier: 2.0,
+                useJitter: true
+            )
+        ) {
+            try await self.performImageExtraction(imageData: imageData, usePreprocessing: usePreprocessing)
+        }
+
+        return recipeResponse.toClipData()
+    }
+
     /// Perform the actual image extraction (wrapped by retry logic)
     /// Returns RecipeResponse (Sendable) instead of RecipeX (SwiftData model)
     private func performImageExtraction(imageData: Data, usePreprocessing: Bool) async throws -> RecipeResponse {
@@ -746,6 +800,7 @@ struct RecipeResponse: Codable, Sendable {
     let notes: [RecipeNoteResponse]?
     let reference: String?
     
+#if !APPCLIP
     func toRecipeX() -> RecipeX {
         let encoder = JSONEncoder()
         
@@ -765,6 +820,68 @@ struct RecipeResponse: Codable, Sendable {
             notesData: notesData
         )
     }
+#endif
+
+    /// Converts directly to the lightweight App Clip model without going
+    /// through RecipeX (which requires SwiftData and cannot live in the
+    /// App Clip target).
+    func toClipData(sourceURL: String? = nil) -> AppClipExtractedRecipeData {
+        // ── Ingredients: flatten all sections into plain strings ──
+        let ingredientNames: [String] = ingredientSections.flatMap { section in
+            section.ingredients.map { ingredient in
+                var parts: [String] = []
+                if let q = ingredient.quantity    { parts.append(q) }
+                if let u = ingredient.unit        { parts.append(u) }
+                parts.append(ingredient.name)
+                if let p = ingredient.preparation { parts.append("(\(p))") }
+                return parts.joined(separator: " ")
+            }
+        }
+
+        // ── Instructions: flatten all sections into plain strings ──
+        let instructionTexts: [String] = instructionSections.flatMap { section in
+            section.steps.map { $0.text }
+        }
+
+        // ── Notes ──
+        let notesString = (notes ?? []).map { $0.text }.joined(separator: "\n")
+
+        // ── Timing: parse out of headerNotes if present ──
+        var prepTime: String?
+        var cookTime: String?
+        if let header = headerNotes {
+            for line in header.split(separator: "\n") {
+                let l = String(line)
+                if l.lowercased().hasPrefix("prep") {
+                    prepTime = l.components(separatedBy: ":").dropFirst()
+                        .joined(separator: ":").trimmingCharacters(in: .whitespaces)
+                } else if l.lowercased().hasPrefix("cook") {
+                    cookTime = l.components(separatedBy: ":").dropFirst()
+                        .joined(separator: ":").trimmingCharacters(in: .whitespaces)
+                }
+            }
+        }
+
+        // ── Servings: best-effort parse from yield (e.g. "Serves 4" → 4) ──
+        let servings: Int = {
+            guard let y = yield else { return 1 }
+            let scanner = Scanner(string: y)
+            scanner.charactersToBeSkipped = .letters.union(.whitespaces)
+            var n: Int = 1
+            scanner.scanInt(&n)
+            return n
+        }()
+
+        return AppClipExtractedRecipeData(
+            title:        title.isEmpty ? "Untitled Recipe" : title,
+            servings:     servings,
+            prepTime:     prepTime,
+            cookTime:     cookTime,
+            ingredients:  ingredientNames,
+            instructions: instructionTexts,
+            notes:        notesString.isEmpty ? nil : notesString
+        )
+    }
 }
 
 struct IngredientSectionResponse: Codable, Sendable {
@@ -772,6 +889,7 @@ struct IngredientSectionResponse: Codable, Sendable {
     let ingredients: [IngredientResponse]
     let transitionNote: String?
     
+#if !APPCLIP
     func toIngredientSection() -> IngredientSection {
         IngredientSection(
             title: title,
@@ -779,6 +897,7 @@ struct IngredientSectionResponse: Codable, Sendable {
             transitionNote: transitionNote
         )
     }
+#endif
 }
 
 struct IngredientResponse: Codable, Sendable {
@@ -789,6 +908,7 @@ struct IngredientResponse: Codable, Sendable {
     let metricQuantity: String?
     let metricUnit: String?
     
+#if !APPCLIP
     func toIngredient() -> Ingredient {
         Ingredient(
             quantity: quantity,
@@ -799,40 +919,47 @@ struct IngredientResponse: Codable, Sendable {
             metricUnit: metricUnit
         )
     }
+#endif
 }
 
 struct InstructionSectionResponse: Codable, Sendable {
     let title: String?
     let steps: [InstructionStepResponse]
     
+#if !APPCLIP
     func toInstructionSection() -> InstructionSection {
         InstructionSection(
             title: title,
             steps: steps.map { $0.toInstructionStep() }
         )
     }
+#endif
 }
 
 struct InstructionStepResponse: Codable, Sendable {
     let stepNumber: Int?
     let text: String
     
+#if !APPCLIP
     func toInstructionStep() -> InstructionStep {
         InstructionStep(
             stepNumber: stepNumber ?? 1,
             text: text
         )
     }
+#endif
 }
 
 struct RecipeNoteResponse: Codable, Sendable {
     let type: String
     let text: String
     
+#if !APPCLIP
     func toRecipeNote() -> RecipeNote {
         let noteType = RecipeNoteType(rawValue: type) ?? .general
         return RecipeNote(type: noteType, text: text)
     }
+#endif
 }
 
 // MARK: - Error Types

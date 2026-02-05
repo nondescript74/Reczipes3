@@ -166,9 +166,10 @@ struct ImageCropView: View {
         
         imageSize = displaySize
         
-        // Start with 80% of image area
-        let cropWidth = displaySize.width * 0.8
-        let cropHeight = displaySize.height * 0.8
+        // Start with the image size minus a small inset on each edge
+        let inset: CGFloat = 10
+        let cropWidth = max(displaySize.width - inset * 2, minCropSize)
+        let cropHeight = max(displaySize.height - inset * 2, minCropSize)
         let x = (viewSize.width - cropWidth) / 2
         let y = (viewSize.height - cropHeight) / 2
         

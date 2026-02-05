@@ -878,12 +878,23 @@ struct BatchImageExtractorView: View {
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
+                        // Show PHAsset thumbnails
                         ForEach(0..<min(10, viewModel.remainingAssets.count), id: \.self) { index in
                             if index < viewModel.remainingAssets.count {
                                 QueuedAssetThumbnail(
                                     asset: viewModel.remainingAssets[index],
                                     index: index + viewModel.currentProgress,
                                     photoManager: photoManager
+                                )
+                            }
+                        }
+                        
+                        // Show UIImage thumbnails (if no PHAssets, or to fill remaining)
+                        ForEach(0..<min(10 - viewModel.remainingAssets.count, viewModel.remainingImages.count), id: \.self) { index in
+                            if index < viewModel.remainingImages.count {
+                                QueuedUIImageThumbnail(
+                                    image: viewModel.remainingImages[index],
+                                    index: index + viewModel.currentProgress + viewModel.remainingAssets.count
                                 )
                             }
                         }
@@ -1402,6 +1413,31 @@ struct QueuedAssetThumbnail: View {
         }
         .task {
             thumbnail = await photoManager.loadThumbnail(for: asset)
+        }
+    }
+}
+
+struct QueuedUIImageThumbnail: View {
+    let image: UIImage
+    let index: Int
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 80, height: 80)
+                .clipped()
+                .cornerRadius(8)
+            
+            HStack(spacing: 2) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 8))
+                    .foregroundColor(.purple)
+                Text("\(index + 1)")
+            }
+            .font(.caption2)
+            .foregroundColor(.secondary)
         }
     }
 }

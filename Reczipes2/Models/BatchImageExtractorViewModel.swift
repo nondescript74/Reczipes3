@@ -29,6 +29,7 @@ class BatchImageExtractorViewModel: ObservableObject {
     @Published var currentStatus = "Ready"
     
     @Published var remainingAssets: [PHAsset] = []
+    @Published var remainingImages: [UIImage] = []   // mirrors remainingAssets but for UIImage queues
     @Published var errorLog: [(imageIndex: Int, error: String)] = []
     
     // Crop integration properties
@@ -59,7 +60,7 @@ class BatchImageExtractorViewModel: ObservableObject {
     // MARK: - Computed Properties
     
     var remainingCount: Int {
-        remainingAssets.count
+        remainingAssets.count + remainingImages.count
     }
     
     // MARK: - Initialization
@@ -131,6 +132,7 @@ class BatchImageExtractorViewModel: ObservableObject {
         // Clear asset-related state
         self.allAssets = []
         self.remainingAssets = []
+        self.remainingImages = images   // seed the remaining queue for the view
         self.processedAssets = []
         
         // If cropping is disabled, use background extraction
@@ -194,6 +196,7 @@ class BatchImageExtractorViewModel: ObservableObject {
         successCount = 0
         failureCount = 0
         remainingAssets = []
+        remainingImages = []
         allAssets = []
         processedAssets = []
         errorLog = []
@@ -379,6 +382,9 @@ class BatchImageExtractorViewModel: ObservableObject {
             await extractRecipeFromImage(imageToProcess, imageIndex: index)
             
             currentProgress += 1
+            if !remainingImages.isEmpty {
+                remainingImages.removeFirst()
+            }
             
             // Process in batches of 10
             if currentProgress % 10 == 0 && currentProgress < totalToExtract {
@@ -524,6 +530,12 @@ class BatchImageExtractorViewModel: ObservableObject {
             await extractRecipeFromImage(image, imageIndex: index)
             
             currentProgress += 1
+            // Advance whichever remaining queue is active
+            if !remainingAssets.isEmpty {
+                remainingAssets.removeFirst()
+            } else if !remainingImages.isEmpty {
+                remainingImages.removeFirst()
+            }
             
             // Log progress
             if currentProgress % 5 == 0 || currentProgress == totalToExtract {

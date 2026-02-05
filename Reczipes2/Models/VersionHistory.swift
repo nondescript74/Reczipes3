@@ -39,14 +39,12 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
     
     // ⚠️ UPDATE THIS ARRAY WITH YOUR NEW CHANGES ⚠️
     let currentVersionChanges: [String] = [
-        // --- Feb 4, 2026 — Shared-recipe thumbnail fixes ---
-        "🐛 Fixed: Shared recipe thumbnails missing in community books — createThumbnail() only read from Documents by imageName and silently returned nil for any recipe whose image lived exclusively in SwiftData imageData",
-        "🐛 Fixed: mainImage CKAsset missing on individually shared recipes — uploadImage(named:) had the same Documents-only path; recipes set via setImage() (which stores inline, never writes to disk) were uploaded with no image at all",
-        "🔧 Fixed: createThumbnail() now falls back to recipe.imageData when the imageName file is not found on disk, so thumbnails are generated correctly regardless of how the image was originally stored",
-        "🔧 Fixed: uploadImage() now falls back to recipe.imageData when the file is missing from Documents, writing a temporary asset for the CKRecord upload so the full-size image travels with the shared recipe",
-        "🐛 Fixed: shareRecipeBook() thumbnail gate only entered the base64 path when imageName was non-nil — recipes with imageData but no imageName were silently skipped; gate now also checks imageData",
-        // --- Feb 4, 2026 — UTI registration for backup file types ---
-        "🔧 Fixed: Added UTExportedTypeDeclarations and CFBundleDocumentTypes to Info.plist for .reczipes and .bookbackup file types — UTType(exportedAs:) requires the identifiers to be declared and exported by the app bundle",
+        "🐛 Fixed: Crop window now offers nearly full-image size instead of 80%",
+        "🐛 Fixed: Remaining queue count now updates correctly during batch extraction",
+        "✨ Enhanced: Batch extraction remaining queue now displays thumbnails for both Photos and Files sources",
+        "✨ Added: Auto-sync for community recipes and books with configurable interval (20s-5m)",
+        "🔄 Added: Background sync of shared content from CloudKit",
+        "⚙️ Added: Auto-sync settings in Public Sharing preferences"
     ]
     
     // Only add if there are changes

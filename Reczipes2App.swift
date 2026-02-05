@@ -103,21 +103,6 @@ struct Reczipes2App: App {
                                 showLaunchScreen = appState.shouldShowLaunchScreen()
                             }
                             
-//                            // Check if images need restoration (after app reinstall)
-//                            Task {
-//                                await checkAndRestoreImages()
-//                            }
-//                            
-//                            // Migrate book cover images from Documents to SwiftData (one-time migration)
-//                            Task {
-//                                await migrateBookCoverImages()
-//                            }
-//                            
-//                            // Check for legacy data migration
-//                            Task {
-//                                await checkLegacyMigration()
-//                            }
-                            
                             // Check for App Clip data
                             checkForAppClipData()
                             
@@ -652,6 +637,9 @@ struct Reczipes2App: App {
 
 struct MainTabView: View {
     @EnvironmentObject private var appState: AppStateManager
+    @StateObject private var sharingService = CloudKitSharingService.shared
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     
     var body: some View {
         TabView(selection: $appState.currentTab) {
@@ -697,6 +685,9 @@ struct MainTabView: View {
             // This prevents blocking the UI during app launch
             await performBackgroundInitialization()
         }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
+        }
     }
     
     // MARK: - Background Initialization
@@ -707,8 +698,37 @@ struct MainTabView: View {
         // The ModelContainerManager will automatically upgrade to CloudKit if available
         await CloudKitSyncMonitor.shared.checkAccountStatus()
         
+        // Start auto-sync if enabled
+        if sharingService.autoSyncEnabled {
+            await sharingService.startAutoSync(modelContext: modelContext)
+            logInfo("🔄 Auto-sync started during app initialization", category: "sharing")
+        }
+        
         // Note: ModelContainerManager already handles CloudKit upgrade asynchronously
         // in its own init() with a 1-second delay, so we don't need to trigger it here
+    }
+    
+    // MARK: - Scene Phase Handling
+    
+    private func handleScenePhaseChange(oldPhase: ScenePhase, newPhase: ScenePhase) {
+        Task { @MainActor in
+            switch newPhase {
+            case .active:
+                // App became active - restart auto-sync if enabled
+                if sharingService.autoSyncEnabled {
+                    await sharingService.startAutoSync(modelContext: modelContext)
+                    logInfo("🔄 Auto-sync restarted (app became active)", category: "sharing")
+                }
+                
+            case .background, .inactive:
+                // App going to background/inactive - stop auto-sync to save battery
+                sharingService.stopAutoSync()
+                logInfo("🔄 Auto-sync stopped (app entering background/inactive)", category: "sharing")
+                
+            @unknown default:
+                break
+            }
+        }
     }
 }
 
