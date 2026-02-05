@@ -82,13 +82,6 @@
 			);
 			target = F8053DDC2F33DB12006A5E34 /* Reczipes2Clip */;
 		};
-		F8053E1F2F33DB51006A5E34 /* Exceptions for "Reczipes2Clip" folder in "Reczipes2Clip" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				AppClipSharedModels.swift,
-			);
-			target = F8053DDC2F33DB12006A5E34 /* Reczipes2Clip */;
-		};
 		F8053E232F33DD62006A5E34 /* Exceptions for "Reczipes2" folder in "Reczipes2Clip" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -99,13 +92,6 @@
 				Models/WebRecipeExtractor.swift,
 			);
 			target = F8053DDC2F33DB12006A5E34 /* Reczipes2Clip */;
-		};
-		F84466EE2F058D9F005AC874 /* Exceptions for "Reczipes2Clip" folder in "Reczipes2" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				AppClipSharedModels.swift,
-			);
-			target = F8C80F432EE246D200AA52E7 /* Reczipes2 */;
 		};
 		F86A2B3B2F10453300664E61 /* Exceptions for "Reczipes2Tests" folder in "Reczipes2Tests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -463,25 +449,6 @@
 			path = Reczipes2ClipUITests;
 			sourceTree = "<group>";
 		};
-		F84466B02F058B8A005AC874 /* Reczipes2Clip */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				F84466EE2F058D9F005AC874 /* Exceptions for "Reczipes2Clip" folder in "Reczipes2" target */,
-				F8053E1F2F33DB51006A5E34 /* Exceptions for "Reczipes2Clip" folder in "Reczipes2Clip" target */,
-			);
-			path = Reczipes2Clip;
-			sourceTree = "<group>";
-		};
-		F84466C22F058B8B005AC874 /* Reczipes2ClipTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Reczipes2ClipTests;
-			sourceTree = "<group>";
-		};
-		F84466CC2F058B8B005AC874 /* Reczipes2ClipUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Reczipes2ClipUITests;
-			sourceTree = "<group>";
-		};
 		F8C80F462EE246D200AA52E7 /* Reczipes2 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -558,9 +525,6 @@
 				F8C80F462EE246D200AA52E7 /* Reczipes2 */,
 				F8C80F562EE246D300AA52E7 /* Reczipes2Tests */,
 				F8C80F602EE246D300AA52E7 /* Reczipes2UITests */,
-				F84466B02F058B8A005AC874 /* Reczipes2Clip */,
-				F84466C22F058B8B005AC874 /* Reczipes2ClipTests */,
-				F84466CC2F058B8B005AC874 /* Reczipes2ClipUITests */,
 				F8053DDE2F33DB12006A5E34 /* Reczipes2Clip */,
 				F8053DF12F33DB15006A5E34 /* Reczipes2ClipTests */,
 				F8053DFB2F33DB15006A5E34 /* Reczipes2ClipUITests */,
@@ -869,11 +833,11 @@
 		F8053E032F33DB15006A5E34 /* Debug configuration for PBXNativeTarget "Reczipes2Clip" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppClip;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2Clip/Reczipes2Clip.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 113;
+				CURRENT_PROJECT_VERSION = 114;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -908,11 +872,11 @@
 		F8053E042F33DB15006A5E34 /* Release configuration for PBXNativeTarget "Reczipes2Clip" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppClip;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2Clip/Reczipes2Clip.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 113;
+				CURRENT_PROJECT_VERSION = 114;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
