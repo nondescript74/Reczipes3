@@ -49,7 +49,10 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
         "💾 Added: Specialized compression for book covers (150KB) and thumbnails (50KB)",
         "⚡️ Added: Background migration to optimize all existing images on first launch",
         "📊 Enhanced: Diagnostic logging for image compression and migration progress",
-        "⚡️ Improved: Faster CloudKit sync with smaller image sizes (50-90% storage reduction)"
+        "⚡️ Improved: Faster CloudKit sync with smaller image sizes (50-90% storage reduction)",
+        "🐛 Fixed: HTML tags no longer appear in extracted recipe text from URLs",
+        "✨ Enhanced: Image URLs from web recipes now appear as clickable links in Reference section",
+        "🧹 Improved: Removed technical metadata from Notes section after URL extraction"
     ]
     
     // Only add if there are changes

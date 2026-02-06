@@ -578,6 +578,46 @@ struct LinkExtractionView: View {
             logInfo("Total notes including tips: \(existingNotes.count)", category: "recipe")
         }
         
+        // EXTRACT AND MOVE: Move image URLs from notes to the reference field
+        var notes = recipe.notes
+        var imageURLs: [String] = []
+        
+        // Find and extract image URLs from notes
+        if let imageURLNote = notes.first(where: { $0.text.hasPrefix("Image URLs from source:") }) {
+            let lines = imageURLNote.text.components(separatedBy: .newlines)
+            imageURLs = Array(lines.dropFirst()).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        }
+        
+        // Remove the temporary image URL note
+        notes.removeAll { note in
+            note.text.hasPrefix("Image URLs from source:")
+        }
+        
+        // Update the recipe with cleaned notes
+        if let encodedNotes = try? JSONEncoder().encode(notes) {
+            recipe.notesData = encodedNotes.isEmpty ? nil : encodedNotes
+            logInfo("Moved image URLs from notes to reference field", category: "recipe")
+        }
+        
+        // Append image URLs to the reference field as clickable links
+        if !imageURLs.isEmpty {
+            var referenceText = recipe.reference ?? ""
+            
+            // Add a separator if there's already content in reference
+            if !referenceText.isEmpty {
+                referenceText += "\n\n"
+            }
+            
+            // Add image URLs section
+            referenceText += "Source Images:\n"
+            for url in imageURLs {
+                referenceText += url + "\n"
+            }
+            
+            recipe.reference = referenceText.trimmingCharacters(in: .whitespacesAndNewlines)
+            logInfo("Added \(imageURLs.count) image URL(s) to reference field", category: "recipe")
+        }
+        
         // Determine which images we'll save
         let imagesToSave = downloadedWebImages.isEmpty ? [] : downloadedWebImages
         

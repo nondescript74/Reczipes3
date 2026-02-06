@@ -30,7 +30,7 @@ enum ImageCompressionUtility {
         let resizedImage = resizeIfNeeded(image, maxDimension: maxDimension)
 
         // Try progressive compression with quality reduction
-        var compressionQuality: CGFloat = 0.85
+        let compressionQuality: CGFloat = 0.85
         var imageData = resizedImage.jpegData(compressionQuality: compressionQuality)
 
         // If already under target, return it

@@ -183,7 +183,22 @@ class WebRecipeExtractor {
             cleaned = cleaned.replacingOccurrences(of: entity, with: replacement)
         }
         
-        logInfo("🧹 ✅ HTML cleaned", category: "extraction")
+        // CRITICAL: Strip ALL remaining HTML tags to prevent them from appearing in extracted text
+        // This removes tags like <div>, <p>, <span>, <a>, etc. while keeping the text content
+        cleaned = cleaned.replacingOccurrences(
+            of: "<[^>]+>",
+            with: "",
+            options: .regularExpression
+        )
+        
+        // Clean up excessive whitespace that may result from tag removal
+        cleaned = cleaned.replacingOccurrences(
+            of: "\\s{3,}",
+            with: "\n\n",
+            options: .regularExpression
+        )
+        
+        logInfo("🧹 ✅ HTML cleaned and tags stripped", category: "extraction")
         logInfo("🧹 Cleaned length: \(cleaned.count) characters", category: "extraction")
         
         return cleaned
