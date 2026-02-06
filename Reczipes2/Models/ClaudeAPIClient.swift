@@ -23,14 +23,15 @@ class ClaudeAPIClient {
     
     // Model fallback list - try these in order for validation
     private let validationModels = [
-        "claude-sonnet-4-20250514",      // Latest Sonnet 4 (primary)
+        "claude-opus-4-5-20251101",      // Latest Opus 4.5 (primary)
+        "claude-sonnet-4-20250514",      // Sonnet 4 (fallback)
         "claude-3-7-sonnet-20250219",    // Sonnet 3.7
         "claude-3-5-sonnet-20241022",    // Sonnet 3.5 (Oct 2024)
         "claude-3-5-sonnet-20240620"     // Sonnet 3.5 (June 2024)
     ]
     
     // Primary model for recipe extraction
-    private let recipeExtractionModel = "claude-sonnet-4-20250514"
+    private let recipeExtractionModel = "claude-opus-4-5-20251101"
     
     // URLSession with custom configuration
     private lazy var urlSession: URLSession = {
@@ -194,7 +195,7 @@ class ClaudeAPIClient {
         - Multiple instruction sections (e.g., "Preparation", "Assembly", "Baking")
         - Measurements in both imperial and metric units when available
         - Preparation notes within ingredients (e.g., "finely chopped", "at room temperature")
-        - Recipe notes, tips, warnings, and variations
+        - Recipe notes, tips, warnings, and variations THAT ARE PART OF THE RECIPE ITSELF
         - Transition notes between sections
         - Header notes or descriptions
         - Yield/servings information
@@ -213,8 +214,25 @@ class ClaudeAPIClient {
         - Preserve qualifiers like "lactose-free", "vegan", "dairy-free", "gluten-free"
         - Include preparation methods: "ghee (clarified butter)" vs "butter"
         
-        Web pages often have extra navigation, ads, and unrelated content. Focus ONLY on the recipe content.
-        If JSON-LD structured data is present, use it as your primary source. Otherwise, parse the HTML.
+        **CRITICAL - WHAT TO EXCLUDE FROM NOTES:**
+        Web pages contain navigation, ads, headers, footers, and other non-recipe content. You MUST exclude:
+        - Website navigation menus, headers, footers
+        - Advertisements and promotional content
+        - Related recipe suggestions or links
+        - Website metadata, copyright notices, social media links
+        - User interface elements like "Print Recipe", "Save", "Share"
+        - Comments sections or user reviews
+        - Newsletter signup forms or marketing text
+        - Any text that is NOT directly part of the recipe instructions, ingredients, or recipe-specific tips
+        
+        **ONLY include in notes:**
+        - Chef's tips specifically about THIS recipe
+        - Substitution suggestions for ingredients
+        - Storage or reheating instructions
+        - Variations of THIS specific recipe
+        - Warnings about cooking techniques for THIS recipe
+        
+        If JSON-LD structured data is present, use it as your primary source. Otherwise, parse the HTML carefully.
         
         CRITICAL: Return ONLY valid JSON with no markdown formatting, no preamble, and no explanation.
         """
@@ -270,7 +288,9 @@ class ClaudeAPIClient {
         - If step numbers aren't visible, leave "stepNumber" as null
         - Include metric conversions when they're present in the original
         - Extract ALL ingredients and instructions - don't truncate or summarize
-        - Extract ALL text including notes, variations, and tips
+        - Only extract notes that are DIRECTLY RELATED to cooking this recipe (chef's tips, substitutions, variations)
+        - DO NOT include website navigation, ads, promotional content, or unrelated text in the notes field
+        - If there are no recipe-specific notes, tips, or variations, the notes array should be EMPTY []
         
         Here's the web content:
         

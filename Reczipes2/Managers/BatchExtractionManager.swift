@@ -423,9 +423,9 @@ class BatchExtractionManager: ObservableObject {
     
     // MARK: - Helper Methods
     
-    /// Extract image URLs from recipe notes
-    /// The RecipeExtractorViewModel stores image URLs in notes with the format:
-    /// "Image URLs from source:\nurl1\nurl2\nurl3"
+    /// Extract image URLs from recipe notes (DEPRECATED - no longer used)
+    /// This function is kept for backward compatibility with old recipes that may have
+    /// image URLs stored in notes. New extractions store URLs in the reference field instead.
     private func extractImageURLs(from recipe: RecipeX) -> [String] {
         let notes = recipe.notes
         
@@ -445,8 +445,9 @@ class BatchExtractionManager: ObservableObject {
         return []
     }
     
-    /// Remove image URL notes from recipe after images have been downloaded
-    /// This prevents cluttering the recipe with temporary extraction metadata
+    /// Remove image URL notes from recipe after images have been downloaded (DEPRECATED)
+    /// This function is kept for backward compatibility to clean up old recipes.
+    /// New extractions no longer add image URLs to notes.
     @MainActor
     private func cleanupImageURLNotes(from recipe: RecipeX) {
         var notes = recipe.notes

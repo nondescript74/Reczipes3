@@ -54,26 +54,9 @@ class RecipeExtractorViewModel: ObservableObject {
     
     private func saveRecipeDirectly(_ recipe: RecipeX, modelContext: ModelContext) {
          
-        // EXTRACT AND MOVE: Move image URLs from notes to the reference field
-        var notes = recipe.notes
-        var imageURLs: [String] = []
-        
-        // Find and extract image URLs from notes
-        if let imageURLNote = notes.first(where: { $0.text.hasPrefix("Image URLs from source:") }) {
-            let lines = imageURLNote.text.components(separatedBy: .newlines)
-            imageURLs = Array(lines.dropFirst()).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        }
-        
-        // Remove the temporary image URL note
-        notes.removeAll { note in
-            note.text.hasPrefix("Image URLs from source:")
-        }
-        
-        // Update the recipe with cleaned notes
-        if let encodedNotes = try? JSONEncoder().encode(notes) {
-            recipe.notesData = encodedNotes.isEmpty ? nil : encodedNotes
-            logInfo("Moved image URLs from notes to reference field", category: "extraction")
-        }
+        // Use image URLs from the extractedImageURLs property (set during web extraction)
+        // These were never added to notes, so no cleanup is needed
+        let imageURLs = self.extractedImageURLs
         
         // Append image URLs to the reference field as clickable links
         if !imageURLs.isEmpty {
@@ -241,22 +224,15 @@ class RecipeExtractorViewModel: ObservableObject {
                 recipe.reference = url
             }
             
-            // Store image URLs in recipe notes (or you can add a separate property if needed)
-            if !imageURLs.isEmpty {
-                let imageURLNote = "Image URLs from source:\n" + imageURLs.joined(separator: "\n")
-                var notes = recipe.notes // Get current notes (computed property)
-                notes.append(RecipeNote(type: .general, text: imageURLNote))
-                
-                // Encode and store back in notesData
-                if let encodedNotes = try? JSONEncoder().encode(notes) {
-                    recipe.notesData = encodedNotes
-                }
-            }
+            // Store image URLs separately in the viewmodel property
+            // They will be moved to the reference field when the recipe is saved
+            // DO NOT add them to notes - that causes clutter
             
             await MainActor.run {
                 self.extractedRecipe = recipe
                 self.extractedImageURLs = imageURLs // Store image URLs separately for view access
                 logInfo("URL extraction successful: \(String(describing: recipe.title))", category: "extraction")
+                logInfo("Extracted \(imageURLs.count) image URL(s) - will be added to reference on save", category: "extraction")
             }
         } catch let error as WebExtractionError {
             await MainActor.run {

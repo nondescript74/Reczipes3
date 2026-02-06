@@ -52,7 +52,9 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
         "⚡️ Improved: Faster CloudKit sync with smaller image sizes (50-90% storage reduction)",
         "🐛 Fixed: HTML tags no longer appear in extracted recipe text from URLs",
         "✨ Enhanced: Image URLs from web recipes now appear as clickable links in Reference section",
-        "🧹 Improved: Removed technical metadata from Notes section after URL extraction"
+        "🧹 Improved: Removed technical metadata from Notes section after URL extraction",
+        "🤖 Upgraded: Claude API now uses Opus 4.5 model for superior recipe extraction quality",
+        "🧹 Enhanced: Web extraction now filters out navigation, ads, and website content from Notes field"
     ]
     
     // Only add if there are changes
