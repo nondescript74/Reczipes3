@@ -75,4 +75,24 @@ class PhotoLibraryManager: ObservableObject {
     func loadThumbnail(for asset: PHAsset) async -> UIImage? {
         await loadImage(for: asset, targetSize: CGSize(width: 200, height: 200))
     }
+    
+    // Get full resolution image for detailed viewing
+    func loadFullImage(for asset: PHAsset) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            let options = PHImageRequestOptions()
+            options.deliveryMode = .highQualityFormat
+            options.isSynchronous = false
+            options.isNetworkAccessAllowed = true
+            options.resizeMode = .none // Request full resolution
+            
+            PHImageManager.default().requestImage(
+                for: asset,
+                targetSize: PHImageManagerMaximumSize,
+                contentMode: .aspectFit,
+                options: options
+            ) { image, _ in
+                continuation.resume(returning: image)
+            }
+        }
+    }
 }

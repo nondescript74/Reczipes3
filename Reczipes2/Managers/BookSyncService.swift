@@ -399,16 +399,16 @@ class BookSyncService: ObservableObject {
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("jpg")
-        
-        // Compress image if needed
+
+        // Use centralized compression utility for book covers
         let compressedData: Data
         if let uiImage = UIImage(data: imageData),
-           let jpegData = uiImage.jpegData(compressionQuality: quality) {
-            compressedData = jpegData
+           let compressed = ImageCompressionUtility.compressForBookCover(uiImage) {
+            compressedData = compressed
         } else {
             compressedData = imageData
         }
-        
+
         try compressedData.write(to: tempURL)
         return CKAsset(fileURL: tempURL)
     }

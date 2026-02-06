@@ -203,15 +203,15 @@ struct RecipeBookEditorView: View {
                 return
             }
             
-            // Compress the image
-            guard let jpegData = uiImage.jpegData(compressionQuality: 0.8) else {
+            // Compress the image using centralized utility (slightly larger for book covers)
+            guard let jpegData = ImageCompressionUtility.compressForBookCover(uiImage) else {
                 logError("Failed to compress image", category: "book")
                 return
             }
-            
+
             // Generate a name for reference
             let imageName = "book_cover_\(UUID().uuidString).jpg"
-            
+
             await MainActor.run {
                 coverImageName = imageName
                 coverImageData = jpegData
@@ -221,8 +221,8 @@ struct RecipeBookEditorView: View {
                     existingBook.coverImageName = imageName
                 }
             }
-            
-            logInfo("Prepared book cover image: \(imageName) (\(jpegData.count / 1024)KB)", category: "book")
+
+            logInfo("Prepared book cover image: \(imageName) - Size: \(ImageCompressionUtility.formatSize(jpegData.count))", category: "book")
         } catch {
             logError("Error loading image: \(error)", category: "book")
         }

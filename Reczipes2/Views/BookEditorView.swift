@@ -201,12 +201,12 @@ struct BookEditorView: View {
                 return
             }
             
-            // Compress the image
-            guard let jpegData = uiImage.jpegData(compressionQuality: 0.8) else {
+            // Compress the image using centralized utility (slightly larger for book covers)
+            guard let jpegData = ImageCompressionUtility.compressForBookCover(uiImage) else {
                 logError("Failed to compress image", category: "book")
                 return
             }
-            
+
             await MainActor.run {
                 coverImageData = jpegData
                 // Update existing book if editing
@@ -215,8 +215,8 @@ struct BookEditorView: View {
                     existingBook.coverImageHash = Book.calculateImageHash(from: jpegData)
                 }
             }
-            
-            logInfo("Prepared book cover image (\(jpegData.count / 1024)KB)", category: "book")
+
+            logInfo("Prepared book cover image - Size: \(ImageCompressionUtility.formatSize(jpegData.count))", category: "book")
         } catch {
             logError("Error loading image: \(error)", category: "book")
         }

@@ -44,7 +44,12 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
         "✨ Enhanced: Batch extraction remaining queue now displays thumbnails for both Photos and Files sources",
         "✨ Added: Auto-sync for community recipes and books with configurable interval (20s-5m)",
         "🔄 Added: Background sync of shared content from CloudKit",
-        "⚙️ Added: Auto-sync settings in Public Sharing preferences"
+        "⚙️ Added: Auto-sync settings in Public Sharing preferences",
+        "💾 Added: Automatic image compression to keep recipe images under 100KB",
+        "💾 Added: Specialized compression for book covers (150KB) and thumbnails (50KB)",
+        "⚡️ Added: Background migration to optimize all existing images on first launch",
+        "📊 Enhanced: Diagnostic logging for image compression and migration progress",
+        "⚡️ Improved: Faster CloudKit sync with smaller image sizes (50-90% storage reduction)"
     ]
     
     // Only add if there are changes

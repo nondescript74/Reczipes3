@@ -2258,19 +2258,8 @@ class CloudKitSharingService: ObservableObject {
 
         guard let sourceImage = image else { return nil }
 
-        // Calculate new size maintaining aspect ratio
-        let size = sourceImage.size
-        let ratio = min(maxSize / size.width, maxSize / size.height)
-        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
-
-        // Resize image
-        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-        sourceImage.draw(in: CGRect(origin: .zero, size: newSize))
-        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-
-        // Compress to JPEG with quality 0.6 (good balance of size vs quality)
-        return resizedImage?.jpegData(compressionQuality: 0.6)
+        // Use centralized compression utility for thumbnails
+        return ImageCompressionUtility.compressForThumbnail(sourceImage)
     }
     
     /// Remove orphaned recipes from CloudKit (recipes with invalid/missing sharedByUserID)

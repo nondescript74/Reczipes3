@@ -250,25 +250,56 @@ class WebRecipeExtractor {
             }
         }
         
-        // 3. Extract from img tags with recipe-related classes/attributes (last resort)
-        let imgPattern = "<img[^>]*src=[\"']([^\"']+)[\"'][^>]*>"
-        if let imgRegex = try? NSRegularExpression(pattern: imgPattern, options: [.caseInsensitive]) {
+        // 3. Extract from img tags with multiple attribute support
+        let imgTagPattern = "<img[^>]*>"
+        if let imgRegex = try? NSRegularExpression(pattern: imgTagPattern, options: [.caseInsensitive]) {
             let nsString = html as NSString
             let matches = imgRegex.matches(in: html, range: NSRange(location: 0, length: nsString.length))
-            
-            // Limit to first 5-10 images to avoid thumbnails/icons
-            let limitedMatches = Array(matches.prefix(10))
-            for match in limitedMatches {
-                if match.numberOfRanges > 1 {
-                    let imageURL = nsString.substring(with: match.range(at: 1))
-                    // Filter out likely thumbnails, icons, and tracking pixels
-                    if !imageURL.contains("icon") &&
-                       !imageURL.contains("logo") &&
-                       !imageURL.contains("tracking") &&
-                       !imageURL.hasSuffix(".svg") &&
-                       !imageURLs.contains(imageURL) {
-                        imageURLs.append(imageURL)
+
+            logInfo("🖼️ Found \(matches.count) img tags to process", category: "extraction")
+
+            // Process all img tags (removed arbitrary 10 image limit)
+            for match in matches {
+                let imgTag = nsString.substring(with: match.range)
+
+                // Try multiple attributes in order of preference
+                var imageURL: String?
+
+                // Prefer lazy-load attributes (often higher quality originals)
+                if let dataSrc = extractAttribute(from: imgTag, named: "data-src") {
+                    imageURL = dataSrc
+                } else if let dataLazySrc = extractAttribute(from: imgTag, named: "data-lazy-src") {
+                    imageURL = dataLazySrc
+                } else if let dataOriginal = extractAttribute(from: imgTag, named: "data-original") {
+                    imageURL = dataOriginal
+                } else if let src = extractAttribute(from: imgTag, named: "src") {
+                    imageURL = src
+                }
+
+                // Also check srcset for high-resolution versions
+                if imageURL == nil, let srcset = extractAttribute(from: imgTag, named: "srcset") {
+                    // srcset format: "url 1x, url 2x" - get last (highest resolution)
+                    let srcsetParts = srcset.components(separatedBy: ",")
+                    if let lastPart = srcsetParts.last {
+                        let urlPart = lastPart.trimmingCharacters(in: .whitespaces)
+                                              .components(separatedBy: " ").first ?? ""
+                        if !urlPart.isEmpty {
+                            imageURL = urlPart
+                        }
                     }
+                }
+
+                guard let url = imageURL, !url.isEmpty else { continue }
+
+                // Filter out only obvious non-content images (be permissive)
+                let shouldInclude = !url.contains("1x1") &&
+                                   !url.contains("pixel") &&
+                                   !url.contains("tracking") &&
+                                   !url.hasPrefix("data:") &&
+                                   !imageURLs.contains(url)
+
+                if shouldInclude {
+                    imageURLs.append(url)
                 }
             }
         }
@@ -294,6 +325,23 @@ class WebRecipeExtractor {
         return imageURLs
     }
     
+    /// Extract an attribute value from an HTML tag
+    /// - Parameters:
+    ///   - tag: The HTML tag string
+    ///   - named: The attribute name (e.g., "src", "data-src")
+    /// - Returns: The attribute value if found
+    private func extractAttribute(from tag: String, named attributeName: String) -> String? {
+        let pattern = "\(attributeName)=[\"']([^\"']+)[\"']"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+            let nsString = tag as NSString
+            if let match = regex.firstMatch(in: tag, range: NSRange(location: 0, length: nsString.length)),
+               match.numberOfRanges > 1 {
+                return nsString.substring(with: match.range(at: 1))
+            }
+        }
+        return nil
+    }
+
     /// Remove HTML tags from a string
     /// - Parameter string: String that may contain HTML tags
     /// - Returns: String with HTML tags removed and trimmed

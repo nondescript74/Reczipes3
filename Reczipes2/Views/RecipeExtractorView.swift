@@ -545,12 +545,7 @@ struct RecipeExtractorView: View {
             Text("Selected Image")
                 .font(.headline)
             
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxHeight: 400)
-                .cornerRadius(12)
-                .shadow(radius: 3)
+            ImagePreviewWithExpand(image: image)
         }
     }
     
@@ -1119,6 +1114,36 @@ struct RecipeExtractorView: View {
     }
 }
 
+// MARK: - Image Preview with Expand
 
-
-
+struct ImagePreviewWithExpand: View {
+    let image: UIImage
+    @State private var showingImageViewer = false
+    
+    var body: some View {
+        Button {
+            showingImageViewer = true
+        } label: {
+            VStack(spacing: 8) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 400)
+                    .cornerRadius(12)
+                    .shadow(radius: 3)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption)
+                    Text("Tap to expand and zoom")
+                        .font(.caption)
+                }
+                .foregroundColor(.blue)
+            }
+        }
+        .buttonStyle(.plain)
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            ExpandableImageViewer(image: image)
+        }
+    }
+}

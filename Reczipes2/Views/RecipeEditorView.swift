@@ -1269,30 +1269,20 @@ struct RecipeImagesEditorView: View {
                 return
             }
             
-            // Resize image if it's too large
-            let maxDimension: CGFloat = 2048
-            let resizedImage: UIImage
-            
-            if uiImage.size.width > maxDimension || uiImage.size.height > maxDimension {
-                let scale = min(maxDimension / uiImage.size.width, maxDimension / uiImage.size.height)
-                let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
-                
-                UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
-                resizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? uiImage
-                UIGraphicsEndImageContext()
-            } else {
-                resizedImage = uiImage
+            // Use centralized compression utility to keep images under 100KB
+            guard let jpegData = ImageCompressionUtility.compressImage(uiImage) else {
+                print("❌ Failed to compress image")
+                return
             }
-            
+
             // Save the image
             let recipeID = recipe.id ?? UUID()
             let imageName = "recipe_\(recipeID.uuidString)_\(UUID().uuidString).jpg"
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let fileURL = documentsPath.appendingPathComponent(imageName)
-            
-            // Compress and save
-            if let jpegData = resizedImage.jpegData(compressionQuality: 0.8) {
+
+            // Write compressed data
+            do {
                 try jpegData.write(to: fileURL)
                 
                 await MainActor.run {
@@ -1301,15 +1291,17 @@ struct RecipeImagesEditorView: View {
                         recipe.additionalImageNames = []
                     }
                     recipe.additionalImageNames?.append(imageName)
-                    
+
                     // Save context
                     do {
                         try modelContext.save()
-                        print("✅ Added image: \(imageName)")
+                        print("✅ Added image: \(imageName) - Size: \(ImageCompressionUtility.formatSize(jpegData.count))")
                     } catch {
                         print("❌ Failed to save context: \(error)")
                     }
                 }
+            } catch {
+                print("❌ Error writing image: \(error)")
             }
         } catch {
             print("❌ Error loading image: \(error)")

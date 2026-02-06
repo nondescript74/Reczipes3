@@ -474,8 +474,9 @@ extension RecipeX {
     /// Set main image
     @MainActor
     func setImage(_ image: UIImage, isMainImage: Bool = true) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
-        
+        // Use centralized compression utility to keep images under 100KB
+        guard let imageData = ImageCompressionUtility.compressImage(image) else { return }
+
         if isMainImage {
             self.imageData = imageData
             self.imageName = "recipe_\(safeID.uuidString).jpg"

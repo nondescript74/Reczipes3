@@ -554,14 +554,19 @@ struct BatchImageExtractorView: View {
     
     private var selectedImagesGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Selected Images")
-                .font(.headline)
+            HStack {
+                Text("Selected Images")
+                    .font(.headline)
+                Spacer()
+                Text("Tap any image to zoom")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ], spacing: 12) {
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ], spacing: 16) {
                 // First show PHAssets from Photos
                 ForEach(Array(selectedAssets.enumerated()), id: \.offset) { index, asset in
                     SelectedAssetThumbnail(
@@ -692,13 +697,8 @@ struct BatchImageExtractorView: View {
     private var currentImageCard: some View {
         VStack(spacing: 12) {
             if let image = viewModel.currentImage {
-                // Image preview
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 300)
-                    .cornerRadius(12)
-                    .shadow(radius: 3)
+                // Image preview with tap to expand
+                CurrentImagePreview(image: image)
                 
                 if let recipe = viewModel.currentRecipe {
                     // Recipe preview
@@ -1272,14 +1272,21 @@ struct SelectedImageThumbnail: View {
     let index: Int
     let onRemove: () -> Void
     
+    @State private var showingImageViewer = false
+    
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 100, height: 100)
-                .clipped()
-                .cornerRadius(8)
+            Button {
+                showingImageViewer = true
+            } label: {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 150, height: 150)
+                    .clipped()
+                    .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
             
             // Remove button
             Button {
@@ -1287,34 +1294,40 @@ struct SelectedImageThumbnail: View {
                 onRemove()
             } label: {
                 Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
                     .foregroundColor(.red)
                     .background(
                         Circle()
                             .fill(Color.white)
-                            .frame(width: 20, height: 20)
+                            .frame(width: 24, height: 24)
                     )
             }
-            .offset(x: 8, y: -8)
+            .offset(x: 10, y: -10)
+            .zIndex(1)
             
             // Index badge
             VStack {
                 Spacer()
                 HStack {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 3) {
                         Image(systemName: "folder.fill")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                         Text("\(index + 1)")
-                            .font(.caption2)
+                            .font(.caption)
                             .fontWeight(.bold)
                     }
                     .foregroundColor(.white)
-                    .padding(4)
-                    .background(Color.purple.opacity(0.8))
-                    .cornerRadius(4)
+                    .padding(6)
+                    .background(Color.purple.opacity(0.85))
+                    .cornerRadius(6)
                     Spacer()
                 }
             }
-            .padding(4)
+            .padding(6)
+            .allowsHitTesting(false)
+        }
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            ExpandableImageViewer(image: image)
         }
     }
 }
@@ -1328,21 +1341,28 @@ struct SelectedAssetThumbnail: View {
     let onRemove: () -> Void
     
     @State private var thumbnail: UIImage?
+    @State private var fullImage: UIImage?
+    @State private var showingImageViewer = false
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
             if let thumbnail = thumbnail {
-                Image(uiImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 100, height: 100)
-                    .clipped()
-                    .cornerRadius(8)
+                Button {
+                    loadFullImageAndShow()
+                } label: {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 150, height: 150)
+                        .clipped()
+                        .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
-                    .frame(width: 100, height: 100)
-                    .cornerRadius(8)
+                    .frame(width: 150, height: 150)
+                    .cornerRadius(12)
                     .overlay(ProgressView())
             }
             
@@ -1352,33 +1372,54 @@ struct SelectedAssetThumbnail: View {
                 onRemove()
             } label: {
                 Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
                     .foregroundColor(.red)
                     .background(
                         Circle()
                             .fill(Color.white)
-                            .frame(width: 20, height: 20)
+                            .frame(width: 24, height: 24)
                     )
             }
-            .offset(x: 8, y: -8)
+            .offset(x: 10, y: -10)
+            .zIndex(1)
             
             // Index badge
             VStack {
                 Spacer()
                 HStack {
-                    Text("\(index + 1)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(4)
-                        .background(Color.black.opacity(0.6))
-                        .cornerRadius(4)
+                    HStack(spacing: 3) {
+                        Image(systemName: "photo.fill")
+                            .font(.system(size: 10))
+                        Text("\(index + 1)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(6)
+                    .background(Color.blue.opacity(0.85))
+                    .cornerRadius(6)
                     Spacer()
                 }
             }
-            .padding(4)
+            .padding(6)
+            .allowsHitTesting(false)
         }
         .task {
             thumbnail = await photoManager.loadThumbnail(for: asset)
+        }
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            if let fullImage = fullImage {
+                ExpandableImageViewer(image: fullImage)
+            }
+        }
+    }
+    
+    private func loadFullImageAndShow() {
+        Task {
+            if fullImage == nil {
+                fullImage = await photoManager.loadFullImage(for: asset)
+            }
+            showingImageViewer = true
         }
     }
 }
@@ -1549,6 +1590,41 @@ struct PhotoAssetCell: View {
         .buttonStyle(.plain)
         .task {
             thumbnail = await photoManager.loadThumbnail(for: asset)
+        }
+    }
+}
+
+// MARK: - Current Image Preview with Tap to Expand
+
+struct CurrentImagePreview: View {
+    let image: UIImage
+    @State private var showingImageViewer = false
+    
+    var body: some View {
+        Button {
+            showingImageViewer = true
+        } label: {
+            VStack(spacing: 8) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 400)
+                    .cornerRadius(12)
+                    .shadow(radius: 3)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption)
+                    Text("Tap to expand and zoom")
+                        .font(.caption)
+                }
+                .foregroundColor(.blue)
+                .padding(.top, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            ExpandableImageViewer(image: image)
         }
     }
 }

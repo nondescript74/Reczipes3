@@ -555,25 +555,23 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private var recipeImageSection: some View {
-        // Recipe Image - now simplified!
-        // RecipeX has both imageData (modern) and imageName (legacy)
-        let allImageNames = getAllImageNames(for: recipe)
-        
-        if allImageNames.count > 1 {
-            // Show scrollable gallery for multiple images
+        // Recipe Image - supports multiple images stored in imageData and additionalImagesData
+        let imageCount = recipe.imageCount
+
+        if imageCount > 1 {
+            // Show scrollable gallery for multiple images using actual image data
             TabView {
-                ForEach(allImageNames, id: \.self) { imageNameItem in
-                    RecipeImageView(
-                        imageName: imageNameItem,
-                        imageData: recipe.imageData,
-                        size: nil,
-                        aspectRatio: .fit,
-                        cornerRadius: 16
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: 200)
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                    .padding(.horizontal)
+                ForEach(0..<imageCount, id: \.self) { index in
+                    if let image = recipe.getImage(at: index) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                            .frame(maxHeight: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                            .padding(.horizontal)
+                    }
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))

@@ -697,15 +697,38 @@ struct MainTabView: View {
         // Check CloudKit status (non-blocking)
         // The ModelContainerManager will automatically upgrade to CloudKit if available
         await CloudKitSyncMonitor.shared.checkAccountStatus()
-        
+
         // Start auto-sync if enabled
         if sharingService.autoSyncEnabled {
             await sharingService.startAutoSync(modelContext: modelContext)
             logInfo("🔄 Auto-sync started during app initialization", category: "sharing")
         }
-        
+
         // Note: ModelContainerManager already handles CloudKit upgrade asynchronously
         // in its own init() with a 1-second delay, so we don't need to trigger it here
+
+        // Run image optimization migration if needed
+        await runImageMigrationIfNeeded()
+    }
+
+    /// Run image optimization migration in background
+    private func runImageMigrationIfNeeded() async {
+        let migrationManager = ImageMigrationManager.shared
+
+        // Check if migration is needed
+        guard migrationManager.needsMigration() else {
+            logInfo("Image optimization migration not needed", category: "image")
+            return
+        }
+
+        logInfo("🖼️ Starting background image optimization migration...", category: "image")
+
+        // Run migration in background
+        await migrationManager.runFullMigration(modelContext: modelContext)
+
+        // Migration completed - automatic CloudKit sync will handle the rest
+        // (recipes marked with needsCloudSync will be synced by RecipeXCloudKitSyncService)
+        logInfo("✅ Image migration completed - modified recipes will sync to CloudKit automatically", category: "image")
     }
     
     // MARK: - Scene Phase Handling
