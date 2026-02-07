@@ -26,16 +26,27 @@ enum ImageCompressionUtility {
     ///   - maintainAspectRatio: Whether to maintain aspect ratio when resizing (default: true)
     /// - Returns: Compressed image data, or nil if compression fails
     static func compressImage(_ image: UIImage, targetSize: Int = targetMaxSize, maintainAspectRatio: Bool = true) -> Data? {
+        logInfo("Starting compression for image size: \(image.size), scale: \(image.scale), target: \(formatSize(targetSize))", category: "image-compression")
+        
         // First, resize if image is too large
         let resizedImage = resizeIfNeeded(image, maxDimension: maxDimension)
+        if resizedImage.size != image.size {
+            logInfo("Resized image from \(image.size) to \(resizedImage.size)", category: "image-compression")
+        }
 
         // Try progressive compression with quality reduction
         let compressionQuality: CGFloat = 0.85
         var imageData = resizedImage.jpegData(compressionQuality: compressionQuality)
+        
+        guard let initialData = imageData else {
+            logError("Failed to create initial JPEG data from image", category: "image-compression")
+            return nil
+        }
 
         // If already under target, return it
-        if let data = imageData, data.count <= targetSize {
-            return data
+        if initialData.count <= targetSize {
+            logInfo("Image fits target at quality \(compressionQuality): \(formatSize(initialData.count))", category: "image-compression")
+            return initialData
         }
 
         // Progressive quality reduction
@@ -45,12 +56,14 @@ enum ImageCompressionUtility {
             if let data = resizedImage.jpegData(compressionQuality: quality) {
                 imageData = data
                 if data.count <= targetSize {
+                    logInfo("Compressed to \(formatSize(data.count)) at quality \(quality)", category: "image-compression")
                     return data
                 }
             }
         }
 
         // If still too large, progressively resize
+        logInfo("Quality reduction insufficient, starting progressive resize", category: "image-compression")
         var scaleFactor: CGFloat = 0.9
         var currentImage = resizedImage
 
@@ -65,6 +78,7 @@ enum ImageCompressionUtility {
                 for quality in [0.75, 0.70, 0.65, 0.60, 0.55, 0.50] {
                     if let data = currentImage.jpegData(compressionQuality: quality) {
                         if data.count <= targetSize {
+                            logInfo("Compressed to \(formatSize(data.count)) at scale \(scaleFactor) and quality \(quality)", category: "image-compression")
                             return data
                         }
                     }
@@ -75,7 +89,13 @@ enum ImageCompressionUtility {
         }
 
         // Last resort: use minimum quality on current image
-        return currentImage.jpegData(compressionQuality: minQuality)
+        let finalData = currentImage.jpegData(compressionQuality: minQuality)
+        if let data = finalData {
+            logWarning("Using last resort compression: \(formatSize(data.count)) (may exceed target)", category: "image-compression")
+        } else {
+            logError("Last resort compression failed to create JPEG data", category: "image-compression")
+        }
+        return finalData
     }
 
     /// Resize image if it exceeds maximum dimension

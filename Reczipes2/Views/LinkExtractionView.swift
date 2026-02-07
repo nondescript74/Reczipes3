@@ -70,6 +70,17 @@ struct LinkExtractionView: View {
                 // Automatically start extraction when view appears
                 Task {
                     await viewModel.extractRecipe(from: link.url)
+                    
+                    // Auto-download images after extraction completes
+                    if let recipe = viewModel.extractedRecipe {
+                        let imageURLs = extractImageURLsFromNotes(recipe)
+                        if !imageURLs.isEmpty {
+                            logInfo("Auto-downloading \(imageURLs.count) images from extracted recipe", category: "image")
+                            // Take first 3 images to avoid excessive downloads
+                            let urlsToDownload = Array(imageURLs.prefix(3))
+                            await downloadImages(imageURLs: urlsToDownload)
+                        }
+                    }
                 }
             }
             .alert("Recipe Saved!", isPresented: $showingSaveConfirmation) {
@@ -524,7 +535,7 @@ struct LinkExtractionView: View {
         return Array(lines.dropFirst()).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
     
-    private func downloadAndSaveRecipe(imageURLs: [String]) async {
+    private func downloadImages(imageURLs: [String]) async {
         isDownloadingImage = true
         var downloadedImages: [UIImage] = []
         
@@ -541,9 +552,16 @@ struct LinkExtractionView: View {
         
         await MainActor.run {
             self.downloadedWebImages = downloadedImages
-            logInfo("Downloaded \(downloadedImages.count) images successfully", category: "network")
-            self.saveRecipe()
+            logInfo("Auto-downloaded \(downloadedImages.count) images successfully", category: "network")
             self.isDownloadingImage = false
+        }
+    }
+    
+    private func downloadAndSaveRecipe(imageURLs: [String]) async {
+        await downloadImages(imageURLs: imageURLs)
+        
+        await MainActor.run {
+            self.saveRecipe()
         }
     }
     

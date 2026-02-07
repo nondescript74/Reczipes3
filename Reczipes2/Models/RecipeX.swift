@@ -474,8 +474,21 @@ extension RecipeX {
     /// Set main image
     @MainActor
     func setImage(_ image: UIImage, isMainImage: Bool = true) {
-        // Use centralized compression utility to keep images under 100KB
-        guard let imageData = ImageCompressionUtility.compressImage(image) else { return }
+        // Try optimized compression first
+        var imageData = ImageCompressionUtility.compressImage(image)
+        
+        // Fallback: use basic JPEG compression if utility fails
+        if imageData == nil {
+            logWarning("Compression utility failed for '\(safeTitle)', using fallback JPEG compression (original size: \(image.size))", category: "recipe")
+            imageData = image.jpegData(compressionQuality: 0.8)
+        }
+        
+        guard let imageData else {
+            logError("Both compression methods failed for recipe '\(safeTitle)' - image size: \(image.size), scale: \(image.scale)", category: "recipe")
+            return
+        }
+        
+        logInfo("Successfully compressed image for '\(safeTitle)' to \(imageData.count) bytes", category: "recipe")
 
         if isMainImage {
             self.imageData = imageData

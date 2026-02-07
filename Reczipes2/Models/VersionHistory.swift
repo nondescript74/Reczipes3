@@ -54,7 +54,12 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
         "✨ Enhanced: Image URLs from web recipes now appear as clickable links in Reference section",
         "🧹 Improved: Removed technical metadata from Notes section after URL extraction",
         "🤖 Upgraded: Claude API now uses Opus 4.5 model for superior recipe extraction quality",
-        "🧹 Enhanced: Web extraction now filters out navigation, ads, and website content from Notes field"
+        "🧹 Enhanced: Web extraction now filters out navigation, ads, and website content from Notes field",
+        "🐛 Fixed: Batch-extracted recipes now properly download and display main images",
+        "🐛 Fixed: Single URL extraction now automatically downloads first 3 images",
+        "📊 Enhanced: Comprehensive logging for image download and compression pipeline",
+        "💾 Added: Fallback JPEG compression when optimized compression fails",
+        "✨ Added: 'Manage Links' button for easy access to saved recipe URLs"
     ]
     
     // Only add if there are changes

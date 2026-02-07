@@ -30,6 +30,7 @@ struct RecipeExtractorView: View {
     @State private var showBatchExtraction = false
     @State private var showBatchImageExtraction = false
     @State private var showImportLinks = false
+    @State private var showManageLinks = false
     @State private var importResultMessage: String?
     @State private var showingImportResult = false
     @Environment(\.modelContext) private var modelContext
@@ -364,31 +365,57 @@ struct RecipeExtractorView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Row 3: Batch Extract from URLs (full width)
-                Button {
-                    extractionSource = .batch
-                    showBatchExtraction = true
-                } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "square.stack.3d.up.fill")
-                            .font(.system(size: 40))
-                        Text("Batch Extract URLs")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        Text("Extract multiple recipes from saved links")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                // Row 3: Batch Extract URLs and Manage Links (side by side)
+                HStack(spacing: 12) {
+                    Button {
+                        extractionSource = .batch
+                        showBatchExtraction = true
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                                .font(.system(size: 36))
+                            Text("Batch Extract URLs")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Text("Extract from saved links")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(extractionSource == .batch ? Color.purple.opacity(0.2) : Color.purple.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(extractionSource == .batch ? Color.purple : Color.clear, lineWidth: 2)
+                        )
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(extractionSource == .batch ? Color.purple.opacity(0.2) : Color.purple.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(extractionSource == .batch ? Color.purple : Color.clear, lineWidth: 2)
-                    )
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        showManageLinks = true
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: "list.bullet.rectangle")
+                                .font(.system(size: 36))
+                            Text("Manage Links")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Text("View & delete links")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.teal.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.clear, lineWidth: 2)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
                 
                 // Row 4: Batch Extract from Images (full width)
                 Button {
@@ -446,6 +473,9 @@ struct RecipeExtractorView: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(radius: 2)
+        .sheet(isPresented: $showManageLinks) {
+            SavedLinksView()
+        }
         .sheet(isPresented: $showImportLinks) {
             ImportLinksSheet(
                 onImportComplete: { count in

@@ -214,6 +214,7 @@ class BatchExtractionManager: ObservableObject {
         }
     }
     
+    @MainActor
     private func extractSingleLink(_ link: SavedLink, index: Int, total: Int, modelContext: ModelContext, apiKey: String) async {
         do {
             // Step 1: Fetch and analyze
@@ -225,7 +226,10 @@ class BatchExtractionManager: ObservableObject {
                 stepProgress: 0.1
             )
             
+            // Create extractor (we're on MainActor now)
             let extractor = RecipeExtractorViewModel(apiKey: apiKey)
+            
+            // Perform extraction
             await extractor.extractRecipe(from: link.url)
             
             // Check for errors
@@ -245,6 +249,14 @@ class BatchExtractionManager: ObservableObject {
                 )
             }
             
+            // Get image URLs
+            let imageURLs = extractor.extractedImageURLs
+            logInfo("DEBUG: extractor.extractedImageURLs has \(imageURLs.count) URLs", category: "batch-extraction")
+            if !imageURLs.isEmpty {
+                let firstThree = Array(imageURLs.prefix(3))
+                logInfo("DEBUG: First 3 URLs: \(firstThree)", category: "batch-extraction")
+            }
+            
             await updateStatus(
                 currentIndex: index,
                 totalCount: total,
@@ -254,15 +266,17 @@ class BatchExtractionManager: ObservableObject {
             )
             
             // Store current recipe
-            await MainActor.run {
-                self.currentRecipe = recipe
-            }
+            self.currentRecipe = recipe
             
             // Step 2: Download images
             var downloadedImages: [UIImage] = []
             
-            // Extract image URLs from recipe notes
-            let imageURLs = extractImageURLs(from: recipe)
+            logInfo("Found \(imageURLs.count) image URL(s) from extractor for '\(link.title)'", category: "batch-extraction")
+            if imageURLs.isEmpty {
+                logWarning("No images found for '\(link.title)' - recipe will be saved without images", category: "batch-extraction")
+            } else {
+                logInfo("Image URLs: \(imageURLs.prefix(3).joined(separator: ", "))", category: "batch-extraction")
+            }
             
             if !imageURLs.isEmpty {
                 await updateStatus(
@@ -307,18 +321,17 @@ class BatchExtractionManager: ObservableObject {
             // Clean up image URL notes before saving
             cleanupImageURLNotes(from: recipe)
             
+            // Save recipe with downloaded images
             try await saveRecipe(recipe, images: downloadedImages, link: link, modelContext: modelContext)
             
             // Mark as success
-            await MainActor.run {
-                self.successCount += 1
-                self.totalProcessed += 1
-                
-                // Add to recently extracted (keep last 5)
-                self.recentlyExtracted.insert(recipe, at: 0)
-                if self.recentlyExtracted.count > 5 {
-                    self.recentlyExtracted = Array(self.recentlyExtracted.prefix(5))
-                }
+            self.successCount += 1
+            self.totalProcessed += 1
+            
+            // Add to recently extracted (keep last 5)
+            self.recentlyExtracted.insert(recipe, at: 0)
+            if self.recentlyExtracted.count > 5 {
+                self.recentlyExtracted = Array(self.recentlyExtracted.prefix(5))
             }
             
             link.isProcessed = true
@@ -328,11 +341,9 @@ class BatchExtractionManager: ObservableObject {
             
         } catch {
             // Mark as failure
-            await MainActor.run {
-                self.failureCount += 1
-                self.totalProcessed += 1
-                self.errorLog.append((link: link.title, error: error.localizedDescription, timestamp: Date()))
-            }
+            self.failureCount += 1
+            self.totalProcessed += 1
+            self.errorLog.append((link: link.title, error: error.localizedDescription, timestamp: Date()))
             
             link.isProcessed = true
             link.processingError = error.localizedDescription
@@ -383,16 +394,23 @@ class BatchExtractionManager: ObservableObject {
             if index == 0 {
                 // First image is the main thumbnail
                 recipe.setImage(image, isMainImage: true)
+                logInfo("Set main image for '\(recipe.safeTitle)' (size: \(image.size))", category: "batch-extraction")
             } else {
                 // Additional images
                 recipe.setImage(image, isMainImage: false)
             }
         }
         
+        // Verify images were saved
+        if images.isEmpty {
+            logWarning("⚠️ No images saved for '\(recipe.safeTitle)'", category: "batch-extraction")
+        } else {
+            logInfo("✅ Saved \(images.count) image(s) using setImage() (CloudKit-synced)", category: "batch-extraction")
+            logInfo("Recipe imageData is \(recipe.imageData != nil ? "set" : "nil"), imageName is '\(recipe.imageName ?? "nil")'", category: "batch-extraction")
+        }
+        
         // Calculate content fingerprint for duplicate detection
         recipe.updateContentFingerprint()
-        
-        logInfo("✅ Saved \(images.count) image(s) using setImage() (CloudKit-synced)", category: "batch-extraction")
         
         // Insert recipe into SwiftData
         modelContext.insert(recipe)

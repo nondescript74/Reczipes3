@@ -302,8 +302,12 @@ class BatchRecipeExtractorViewModel: ObservableObject {
         // Store the current recipe for display
         currentRecipe = recipe
         
-        // Extract image URLs from recipe notes (where they're stored during web extraction)
-        let imageURLs = extractImageURLsFromNotes(recipe)
+        // Get image URLs from extractor (new method - more reliable than notes)
+        let imageURLs = extractor.extractedImageURLs
+        logInfo("Found \(imageURLs.count) image URL(s) from extractor for '\(title)'", category: "batch-extraction")
+        if !imageURLs.isEmpty {
+            logInfo("First 3 image URLs: \(Array(imageURLs.prefix(3)))", category: "batch-extraction")
+        }
         
         // Download images if available
         var downloadedImages: [UIImage] = []
