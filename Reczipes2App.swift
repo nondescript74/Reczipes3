@@ -21,6 +21,10 @@ struct Reczipes2App: App {
     @AppStorage("hasCompletedCloudKitOnboarding") private var hasCompletedOnboarding = false
     @State private var showOnboardingSheet = false
     
+    // Startup state tracking
+    @State private var isInitializing = true
+    @State private var initializationComplete = false
+    
     // Document handling
     @StateObject private var documentHandler = RecipeBookDocumentHandler.shared
     
@@ -92,7 +96,8 @@ struct Reczipes2App: App {
                         .diagnosticsCapable()
                         .shakeToShowDiagnostics()
                         .onAppear {
-                            // Check license and API key status on appear
+                            // Only perform non-critical UI setup on appear
+                            // Defer async work until we're sure the app is active
                             showLicenseAgreement = !LicenseHelper.hasAcceptedLicense
                             if LicenseHelper.hasAcceptedLicense {
                                 showAPIKeySetup = !APIKeyHelper.isConfigured
@@ -102,27 +107,16 @@ struct Reczipes2App: App {
                             if LicenseHelper.hasAcceptedLicense && APIKeyHelper.isConfigured {
                                 showLaunchScreen = appState.shouldShowLaunchScreen()
                             }
-                            
-                            // Check for App Clip data
-                            checkForAppClipData()
-                            
-                            // Initialize version history system
-                            Task { @MainActor in
-                                await initializeVersionHistory()
-                            }
                         }
                         .task {
-                            // Run CloudKit diagnostics on first launch
-                            if !hasCompletedOnboarding {
-                                await onboarding.runComprehensiveDiagnostics()
-                                
-                                // Show onboarding if not ready
-                                if case .ready = onboarding.onboardingState {
-                                    hasCompletedOnboarding = true
-                                } else {
-                                    showOnboardingSheet = true
-                                }
+                            // Guard against backgrounding during startup
+                            guard scenePhase != .background else {
+                                logWarning("⚠️ Skipping startup tasks - app is in background", category: "state")
+                                return
                             }
+                            
+                            // Perform startup initialization in a structured way
+                            await performStartupInitialization()
                         }
                         .sheet(isPresented: $showOnboardingSheet) {
                             CloudKitOnboardingView()
@@ -446,6 +440,58 @@ struct Reczipes2App: App {
         await addCurrentVersionToHistory(modelContext: modelContext)
     }
     
+    // MARK: - Startup Initialization
+    
+    @MainActor
+    private func performStartupInitialization() async {
+        isInitializing = true
+        
+        logInfo("🚀 Starting app initialization...", category: "state")
+        
+        // Check scene phase before each async operation
+        guard scenePhase != .background else {
+            logWarning("⚠️ Initialization cancelled - app moved to background", category: "state")
+            isInitializing = false
+            return
+        }
+        
+        // Step 1: Check for App Clip data (quick, non-blocking)
+        checkForAppClipData()
+        
+        // Step 2: Initialize version history (async but safe to defer)
+        await initializeVersionHistory()
+        
+        // Check scene phase again
+        guard scenePhase != .background else {
+            logWarning("⚠️ Initialization cancelled - app moved to background", category: "state")
+            isInitializing = false
+            return
+        }
+        
+        // Step 3: Run CloudKit diagnostics if needed
+        if !hasCompletedOnboarding {
+            await onboarding.runComprehensiveDiagnostics()
+            
+            // Check scene phase after diagnostics
+            guard scenePhase != .background else {
+                logWarning("⚠️ Initialization cancelled - app moved to background", category: "state")
+                isInitializing = false
+                return
+            }
+            
+            // Show onboarding if not ready
+            if case .ready = onboarding.onboardingState {
+                hasCompletedOnboarding = true
+            } else {
+                showOnboardingSheet = true
+            }
+        }
+        
+        isInitializing = false
+        initializationComplete = true
+        logInfo("✅ App initialization complete", category: "state")
+    }
+    
     // MARK: - Scene Phase Handling
     
     private func handleScenePhaseChange(oldPhase: ScenePhase, newPhase: ScenePhase) {
@@ -454,9 +500,16 @@ struct Reczipes2App: App {
         
         switch newPhase {
         case .active:
-            // App is now active - check if we need to restore tasks
-            if oldPhase == .background {
-                logInfo("App returning from background", category: "state")
+            logInfo("App became active", category: "state")
+            
+            // If we were interrupted during initialization, retry it
+            if isInitializing && !initializationComplete {
+                logInfo("   Resuming interrupted initialization...", category: "state")
+                Task { @MainActor in
+                    await performStartupInitialization()
+                }
+            } else if oldPhase == .background && initializationComplete {
+                logInfo("   App returning from background", category: "state")
                 
                 // Ensure we're on main actor for all UI and state operations
                 Task { @MainActor in
@@ -479,6 +532,12 @@ struct Reczipes2App: App {
         case .background:
             // App is going to background - state is automatically saved by AppStateManager
             logInfo("App entering background", category: "state")
+            
+            // If we're still initializing, mark it as cancelled
+            if isInitializing {
+                logWarning("   App backgrounded during initialization", category: "state")
+                isInitializing = false
+            }
             
             // Save one more time before going to background
             Task { @MainActor in

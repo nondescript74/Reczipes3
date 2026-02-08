@@ -217,6 +217,18 @@ struct SettingsView: View {
                         }
                         
                         NavigationLink {
+                            EmptyRecipeCleanupView()
+                        } label: {
+                            HStack {
+                                Label("Delete Empty Recipes", systemImage: "trash.square.fill")
+                                Spacer()
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                            }
+                        }
+                        
+                        NavigationLink {
                             DatabaseMaintenanceView()
                         } label: {
                             HStack {
@@ -272,7 +284,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Developer Tools")
                     } footer: {
-                        Text("Recipe Data Diagnostics: Check for recipes with missing ingredients, instructions, or notes. Database Maintenance: Comprehensive cleanup tools. Duplicate Detector: Find and remove duplicate recipes.")
+                        Text("Recipe Data Diagnostics: Check for recipes with missing ingredients, instructions, or notes. Delete Empty Recipes: Remove recipes with no ingredients and no instructions. Database Maintenance: Comprehensive cleanup tools. Duplicate Detector: Find and remove duplicate recipes.")
                             .font(.caption)
                     }
 

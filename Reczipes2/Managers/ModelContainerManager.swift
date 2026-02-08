@@ -48,16 +48,39 @@ class ModelContainerManager: ObservableObject {
             technicalDetails: "ModelContainer created with CloudKit: \(cloudKitEnabled)"
         )
         
-        // Verify container health on startup
+        // Defer health check to avoid blocking initialization
+        // This allows the app to start even if health check takes time
         Task { @MainActor in
+            // Add a small delay to let the app fully initialize first
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // Check if task was cancelled (e.g., due to backgrounding)
+            guard !Task.isCancelled else {
+                logInfo("🔍 Startup health check cancelled (app may have been backgrounded)", category: "storage")
+                return
+            }
+            
             logInfo("🔍 Performing startup health check...", category: "storage")
             let isHealthy = await self.verifyContainerHealth()
+            
+            // Check cancellation again after async work
+            guard !Task.isCancelled else {
+                logInfo("🔍 Startup health check cancelled after verification", category: "storage")
+                return
+            }
             
             if !isHealthy {
                 logWarning("⚠️ Container health check failed on startup", category: "storage")
                 logWarning("   Attempting automatic recovery...", category: "storage")
                 
                 let recovered = await self.attemptContainerRecovery()
+                
+                // Check cancellation after recovery attempt
+                guard !Task.isCancelled else {
+                    logInfo("🔍 Container recovery cancelled", category: "storage")
+                    return
+                }
+                
                 if !recovered {
                     logCritical("❌ CRITICAL: Container recovery failed!", category: "storage")
                     logCritical("   App may not function correctly", category: "storage")
