@@ -450,6 +450,11 @@
 			path = Reczipes2ClipUITests;
 			sourceTree = "<group>";
 		};
+		F857F1C22F393CE300BB9EB6 /* Backups */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Backups;
+			sourceTree = "<group>";
+		};
 		F8C80F462EE246D200AA52E7 /* Reczipes2 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -520,6 +525,7 @@
 		F8C80F3B2EE246D200AA52E7 = {
 			isa = PBXGroup;
 			children = (
+				F857F1C22F393CE300BB9EB6 /* Backups */,
 				F82B65D12F01B60E00500EDE /* Reczipes2App.swift */,
 				F89D3B622EF60B9700B52212 /* Assets.xcassets */,
 				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
@@ -624,6 +630,7 @@
 				F8053E012F33DB15006A5E34 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				F857F1C22F393CE300BB9EB6 /* Backups */,
 				F8C80F462EE246D200AA52E7 /* Reczipes2 */,
 				F8C80F8F2EE39DFE00AA52E7 /* Docs */,
 			);
@@ -838,7 +845,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2Clip/Reczipes2Clip.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 121;
+				CURRENT_PROJECT_VERSION = 122;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -855,7 +862,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 16.3;
+				MARKETING_VERSION = 16.4;
 				OTHER_SWIFT_FLAGS = "-DAPPCLIP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2.Clip;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -877,7 +884,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2Clip/Reczipes2Clip.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 121;
+				CURRENT_PROJECT_VERSION = 122;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -894,7 +901,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 16.3;
+				MARKETING_VERSION = 16.4;
 				OTHER_SWIFT_FLAGS = "-DAPPCLIP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2.Clip;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1130,7 +1137,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 121;
+				CURRENT_PROJECT_VERSION = 122;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -1160,7 +1167,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 16.3;
+				MARKETING_VERSION = 16.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1186,7 +1193,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 121;
+				CURRENT_PROJECT_VERSION = 122;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -1216,7 +1223,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 16.3;
+				MARKETING_VERSION = 16.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
