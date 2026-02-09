@@ -25,6 +25,8 @@ struct SharingSettingsView: View {
     @State private var alertMessage = ""
     @State private var showingOnboarding = false
     @State private var currentSharingError: SharingError?
+    @State private var showingUnshareAllConfirmation = false
+    @State private var showingUnshareAllBooksConfirmation = false
     
     private var preferences: SharingPreferences {
         if let existing = sharingPreferences.first {
@@ -34,6 +36,22 @@ struct SharingSettingsView: View {
             modelContext.insert(newPrefs)
             return newPrefs
         }
+    }
+    
+    // Count of recipes shared by the current user
+    private var mySharedRecipesCount: Int {
+        guard let currentUserID = sharingService.currentUserID else {
+            return 0
+        }
+        return sharedRecipes.filter { $0.isActive && $0.sharedByUserID == currentUserID }.count
+    }
+    
+    // Count of books shared by the current user
+    private var mySharedBooksCount: Int {
+        guard let currentUserID = sharingService.currentUserID else {
+            return 0
+        }
+        return allBooks.filter { $0.isShared == true && $0.ownerUserID == currentUserID }.count
     }
     
     var body: some View {
@@ -140,6 +158,34 @@ struct SharingSettingsView: View {
         .sheet(isPresented: $showingOnboarding) {
             CloudKitOnboardingView()
         }
+        .confirmationDialog(
+            "Unshare All Recipes",
+            isPresented: $showingUnshareAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Unshare \(mySharedRecipesCount) Recipes", role: .destructive) {
+                Task {
+                    await unshareAllRecipes()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove all \(mySharedRecipesCount) recipes from public sharing. They will remain in your personal library. This action cannot be undone.")
+        }
+        .confirmationDialog(
+            "Unshare All Books",
+            isPresented: $showingUnshareAllBooksConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Unshare \(mySharedBooksCount) Books", role: .destructive) {
+                Task {
+                    await unshareAllBooks()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove all \(mySharedBooksCount) books from public sharing. They will remain in your personal library. This action cannot be undone.")
+        }
         .task {
             await sharingService.checkCloudKitAvailability()
         }
@@ -243,16 +289,16 @@ struct SharingSettingsView: View {
                     
                     Slider(
                         value: $sharingService.syncInterval,
-                        in: 20...300,
-                        step: 10
+                        in: 300...1800,
+                        step: 60
                     ) {
                         Text("Sync Interval")
                     } minimumValueLabel: {
-                        Text("20s")
+                        Text("5m")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     } maximumValueLabel: {
-                        Text("5m")
+                        Text("30m")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -305,7 +351,7 @@ struct SharingSettingsView: View {
             Text("Auto-Sync")
         } footer: {
             if sharingService.autoSyncEnabled {
-                Text("Automatically checks for new community recipes and books every \(sharingService.syncIntervalDescription). Adjust the interval to balance freshness with battery and data usage.")
+                Text("Automatically checks for new community recipes and books every \(sharingService.syncIntervalDescription). Longer intervals reduce database load and improve app performance.")
             } else {
                 Text("Enable to automatically sync community recipes and books in the background. You can still browse and manually sync when disabled.")
             }
@@ -433,14 +479,14 @@ struct SharingSettingsView: View {
     private var mySharedContentSection: some View {
         Section {
             HStack {
-                Label("\(sharedRecipes.filter { $0.isActive }.count) Recipes", systemImage: "book.fill")
+                Label("\(mySharedRecipesCount) Recipes", systemImage: "book.fill")
                 Spacer()
                 Text("Publicly Shared")
                     .foregroundStyle(.secondary)
             }
             
             HStack {
-                Label("\(allBooks.filter { $0.isShared == true }.count) Recipe Books", systemImage: "books.vertical.fill")
+                Label("\(mySharedBooksCount) Recipe Books", systemImage: "books.vertical.fill")
                 Spacer()
                 Text("Publicly Shared")
                     .foregroundStyle(.secondary)
@@ -448,6 +494,25 @@ struct SharingSettingsView: View {
             
             NavigationLink("Manage Public Shares") {
                 ManageSharedContentView()
+            }
+            
+            // Bulk unshare actions
+            if mySharedRecipesCount > 0 {
+                Button(role: .destructive) {
+                    showingUnshareAllConfirmation = true
+                } label: {
+                    Label("Unshare All Recipes (\(mySharedRecipesCount))", systemImage: "trash")
+                }
+                .disabled(!sharingService.isCloudKitAvailable)
+            }
+            
+            if mySharedBooksCount > 0 {
+                Button(role: .destructive) {
+                    showingUnshareAllBooksConfirmation = true
+                } label: {
+                    Label("Unshare All Books (\(mySharedBooksCount))", systemImage: "trash")
+                }
+                .disabled(!sharingService.isCloudKitAvailable)
             }
         } header: {
             Text("My Public Shares")
@@ -705,51 +770,74 @@ struct SharingSettingsView: View {
     
     private func unshareAllRecipes() async {
         isSharing = true
-        sharingStatus = "Unsharing all recipes..."
+        sharingStatus = "Preparing to unshare recipes..."
         
-        // Get all active shared recipes
-        let activeSharedRecipes = sharedRecipes.filter { $0.isActive }
+        // Get all active shared recipes for current user
+        guard let currentUserID = sharingService.currentUserID else {
+            alertMessage = "Not signed in to iCloud"
+            showingAlert = true
+            isSharing = false
+            return
+        }
         
-        logInfo("🔍 Found \(sharedRecipes.count) total SharedRecipe records, \(activeSharedRecipes.count) active", category: "sharing")
+        let activeSharedRecipes = sharedRecipes.filter { 
+            $0.isActive && $0.sharedByUserID == currentUserID 
+        }
+        
+        let total = activeSharedRecipes.count
+        guard total > 0 else {
+            alertMessage = "No shared recipes found"
+            showingAlert = true
+            isSharing = false
+            return
+        }
+        
+        logInfo("Starting bulk unshare: \(total) recipes", category: "sharing")
         
         var successful = 0
         var failed = 0
         var skipped = 0
         
-        for sharedRecipe in activeSharedRecipes {
-            guard let cloudRecordID = sharedRecipe.cloudRecordID else {
-                // Mark as inactive if no cloud record ID (shouldn't happen, but handle gracefully)
-                sharedRecipe.isActive = false
-                skipped += 1
-                logWarning("Recipe '\(sharedRecipe.recipeTitle)' had no cloudRecordID, marked as inactive", category: "sharing")
-                continue
-            }
-            
-            do {
-                logInfo("🗑️ Unsharing recipe: \(sharedRecipe.recipeTitle)", category: "sharing")
-                try await sharingService.unshareRecipe(cloudRecordID: cloudRecordID, modelContext: modelContext)
-                successful += 1
-            } catch {
-                logError("Failed to unshare recipe '\(sharedRecipe.recipeTitle)': \(error)", category: "sharing")
-                failed += 1
-            }
+        // Process in batches for better performance and progress updates
+        let batchSize = 10
+        let batches = stride(from: 0, to: total, by: batchSize).map { start in
+            Array(activeSharedRecipes[start..<min(start + batchSize, total)])
         }
         
-        // Save changes to SwiftData
-        try? modelContext.save()
+        for (batchIndex, batch) in batches.enumerated() {
+            // Update progress
+            let progress = Int((Double(batchIndex) / Double(batches.count)) * 100)
+            sharingStatus = "Unsharing recipes: \(successful + failed + skipped)/\(total) (\(progress)%)"
+            
+            // Process batch sequentially (CloudKit operations must be sequential)
+            for sharedRecipe in batch {
+                guard let cloudRecordID = sharedRecipe.cloudRecordID else {
+                    sharedRecipe.isActive = false
+                    skipped += 1
+                    continue
+                }
+                
+                do {
+                    try await sharingService.unshareRecipe(
+                        cloudRecordID: cloudRecordID,
+                        modelContext: modelContext
+                    )
+                    successful += 1
+                } catch {
+                    logError("Failed to unshare: \(error.localizedDescription)", category: "sharing")
+                    failed += 1
+                }
+            }
+            
+            // Save periodically after each batch
+            try? modelContext.save()
+        }
         
         isSharing = false
         
         // Build result message
-        if activeSharedRecipes.isEmpty {
-            // Check if there are any recipes at all
-            if sharedRecipes.isEmpty {
-                alertMessage = "No shared recipes found. Your recipes may not have been shared yet, or the sharing records may need to be synced."
-            } else {
-                alertMessage = "All recipes are already unshared (\(sharedRecipes.count) inactive records found)."
-            }
-        } else if failed == 0 && skipped == 0 {
-            alertMessage = "✅ Successfully unshared all \(successful) recipes"
+        if failed == 0 && skipped == 0 {
+            alertMessage = "Successfully unshared all \(successful) recipes"
         } else {
             var parts: [String] = []
             if successful > 0 {
@@ -764,61 +852,77 @@ struct SharingSettingsView: View {
             alertMessage = "Unshare completed: " + parts.joined(separator: ", ")
         }
         
-        logInfo("📊 Unshare result: \(alertMessage)", category: "sharing")
+        logInfo("Bulk unshare complete: \(alertMessage)", category: "sharing")
         showingAlert = true
     }
     
     private func unshareAllBooks() async {
         isSharing = true
-        sharingStatus = "Unsharing all books..."
+        sharingStatus = "Preparing to unshare books..."
         
-        // Get all shared books
-        let sharedBooks = allBooks.filter { $0.isShared == true }
+        // Get all shared books for current user
+        guard let currentUserID = sharingService.currentUserID else {
+            alertMessage = "Not signed in to iCloud"
+            showingAlert = true
+            isSharing = false
+            return
+        }
         
-        logInfo("🔍 Found \(sharedBooks.count) shared books to unshare", category: "sharing")
+        let sharedBooks = allBooks.filter { 
+            $0.isShared == true && $0.ownerUserID == currentUserID 
+        }
+        
+        let total = sharedBooks.count
+        guard total > 0 else {
+            alertMessage = "No shared books found"
+            showingAlert = true
+            isSharing = false
+            return
+        }
+        
+        logInfo("Starting bulk unshare: \(total) books", category: "sharing")
         
         var successful = 0
         var failed = 0
         
-        for book in sharedBooks {
-            do {
-                logInfo("🗑️ Unsharing book: \(book.displayName)", category: "sharing")
-                
-                // Delete from CloudKit if it has a record ID
-                if book.cloudRecordID != nil {
-                    let syncService = BookSyncService(modelContext: modelContext)
-                    try await syncService.deleteBookFromCloud(book)
-                } else {
-                    // Mark as not shared even without CloudKit record
-                    logWarning("Book '\(book.displayName)' has no cloudRecordID, marking as not shared", category: "sharing")
-                    book.isShared = false
-                    book.cloudRecordID = nil
-                    book.lastSyncedToCloud = nil
-                }
-                
-                successful += 1
-            } catch {
-                logError("Failed to unshare book '\(book.displayName)': \(error)", category: "sharing")
-                failed += 1
-            }
+        // Process in batches for better performance and progress updates
+        let batchSize = 5 // Books are larger, use smaller batches
+        let batches = stride(from: 0, to: total, by: batchSize).map { start in
+            Array(sharedBooks[start..<min(start + batchSize, total)])
         }
         
-        // Save changes to SwiftData
-        try? modelContext.save()
+        for (batchIndex, batch) in batches.enumerated() {
+            // Update progress
+            let progress = Int((Double(batchIndex) / Double(batches.count)) * 100)
+            sharingStatus = "Unsharing books: \(successful + failed)/\(total) (\(progress)%)"
+            
+            // Process batch sequentially (CloudKit operations must be sequential)
+            for book in batch {
+                do {
+                    if book.cloudRecordID != nil {
+                        let syncService = BookSyncService(modelContext: modelContext)
+                        try await syncService.deleteBookFromCloud(book)
+                    } else {
+                        book.isShared = false
+                        book.cloudRecordID = nil
+                        book.lastSyncedToCloud = nil
+                    }
+                    successful += 1
+                } catch {
+                    logError("Failed to unshare: \(error.localizedDescription)", category: "sharing")
+                    failed += 1
+                }
+            }
+            
+            // Save periodically after each batch
+            try? modelContext.save()
+        }
         
         isSharing = false
         
         // Build result message
-        if sharedBooks.isEmpty {
-            // Check if there are any books at all
-            let totalBooks = allBooks.count
-            if totalBooks == 0 {
-                alertMessage = "No books found in your collection."
-            } else {
-                alertMessage = "All books are already unshared (\(totalBooks) total books)."
-            }
-        } else if failed == 0 {
-            alertMessage = "✅ Successfully unshared all \(successful) books"
+        if failed == 0 {
+            alertMessage = "Successfully unshared all \(successful) books"
         } else {
             alertMessage = "Unshared \(successful) of \(sharedBooks.count) books. \(failed) failed."
         }
@@ -1252,10 +1356,10 @@ struct ManageSharedContentView: View {
     @StateObject private var sharingService = CloudKitSharingService.shared
     
     @Query(filter: #Predicate<SharedRecipe> { $0.isActive == true })
-    private var activeSharedRecipes: [SharedRecipe]
+    private var allActiveSharedRecipes: [SharedRecipe]
     
     @Query(filter: #Predicate<Book> { $0.isShared == true })
-    private var activeSharedBooks: [Book]
+    private var allActiveSharedBooks: [Book]
     
     @State private var showingAlert = false
     @State private var alertMessage = ""
@@ -1264,6 +1368,39 @@ struct ManageSharedContentView: View {
     enum UnshareType {
         case recipe
         case book
+    }
+    
+    // Filter to show only items shared by the current user
+    private var activeSharedRecipes: [SharedRecipe] {
+        guard let currentUserID = sharingService.currentUserID else {
+            logInfo("🔍 activeSharedRecipes: No currentUserID yet", category: "sharing")
+            return []
+        }
+        let filtered = allActiveSharedRecipes.filter { $0.sharedByUserID == currentUserID }
+        logInfo("🔍 activeSharedRecipes: currentUserID=\(currentUserID), total=\(allActiveSharedRecipes.count), filtered=\(filtered.count)", category: "sharing")
+        
+        // Debug: log all recipes with their sharedByUserID
+        for recipe in allActiveSharedRecipes {
+            logInfo("🔍   Recipe '\(recipe.recipeTitle)': sharedByUserID=\(recipe.sharedByUserID ?? "nil")", category: "sharing")
+        }
+        
+        return filtered
+    }
+    
+    private var activeSharedBooks: [Book] {
+        guard let currentUserID = sharingService.currentUserID else {
+            logInfo("🔍 activeSharedBooks: No currentUserID yet", category: "sharing")
+            return []
+        }
+        let filtered = allActiveSharedBooks.filter { $0.ownerUserID == currentUserID }
+        logInfo("🔍 activeSharedBooks: currentUserID=\(currentUserID), total=\(allActiveSharedBooks.count), filtered=\(filtered.count)", category: "sharing")
+        
+        // Debug: log all books with their ownerUserID
+        for book in allActiveSharedBooks {
+            logInfo("🔍   Book '\(book.displayName)': ownerUserID=\(book.ownerUserID ?? "nil")", category: "sharing")
+        }
+        
+        return filtered
     }
     
     var body: some View {
@@ -1279,16 +1416,24 @@ struct ManageSharedContentView: View {
                     Text("No Shared Content")
                         .font(.headline)
                     
-                    Text("You haven't shared any recipes or books yet.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    NavigationLink("Share Content") {
-                        SharingSettingsView()
+                    if sharingService.currentUserID == nil {
+                        Text("Loading your sharing information...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    } else {
+                        Text("You haven't shared any recipes or books yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        NavigationLink("Share Content") {
+                            SharingSettingsView()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
                     
                     Spacer()
                 }
@@ -1430,6 +1575,7 @@ struct ManageSharedContentView: View {
                 }
             }
         }
+        .id(sharingService.currentUserID) // Force view rebuild when user ID changes
         .navigationTitle("My Shared Content")
         .alert("Unshare Content", isPresented: Binding(
             get: { itemToUnshare != nil },

@@ -30,7 +30,7 @@ class BookSyncService: ObservableObject {
     
     // MARK: - Initialization
     
-    init(modelContext: ModelContext, containerIdentifier: String = "iCloud.com.reczipes2") {
+    init(modelContext: ModelContext, containerIdentifier: String = "iCloud.com.headydiscy.reczipes") {
         self.modelContext = modelContext
         self.container = CKContainer(identifier: containerIdentifier)
         self.publicDatabase = container.publicCloudDatabase

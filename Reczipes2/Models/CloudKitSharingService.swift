@@ -32,16 +32,13 @@ class CloudKitSharingService: ObservableObject {
     @Published var autoSyncEnabled: Bool {
         didSet {
             UserDefaults.standard.set(autoSyncEnabled, forKey: "cloudKitAutoSyncEnabled")
-            if autoSyncEnabled {
-                logInfo("🔄 Auto-sync enabled", category: "sharing")
-            } else {
+            if !autoSyncEnabled {
                 stopAutoSync()
-                logInfo("🔄 Auto-sync disabled", category: "sharing")
             }
         }
     }
     
-    // Sync interval in seconds (20 seconds to 5 minutes)
+    // Sync interval in seconds (5 minutes to 30 minutes)
     @Published var syncInterval: TimeInterval {
         didSet {
             UserDefaults.standard.set(syncInterval, forKey: "cloudKitSyncInterval")
@@ -54,12 +51,16 @@ class CloudKitSharingService: ObservableObject {
                     }
                 }
             }
-            logInfo("🔄 Sync interval changed to \(Int(syncInterval)) seconds", category: "sharing")
+            logInfo("Sync interval changed to \(Int(syncInterval)) seconds", category: "sharing")
         }
     }
     
     // Keep a weak reference to model context for auto-sync
     private weak var currentModelContext: ModelContext?
+    
+    // Track last sync attempt to prevent too-frequent syncs
+    private var lastSyncAttempt: Date?
+    private let minimumSyncInterval: TimeInterval = 300 // 5 minutes minimum
     
     private init() {
         // Use the same container as your app
@@ -71,9 +72,9 @@ class CloudKitSharingService: ObservableObject {
         self.autoSyncEnabled = UserDefaults.standard.bool(forKey: "cloudKitAutoSyncEnabled")
         self.syncInterval = UserDefaults.standard.double(forKey: "cloudKitSyncInterval")
         
-        // Default to 60 seconds (1 minute) if not set
-        if self.syncInterval == 0 {
-            self.syncInterval = 60
+        // Default to 5 minutes if not set or too low
+        if self.syncInterval < minimumSyncInterval {
+            self.syncInterval = 300 // 5 minutes
         }
         
         Task {
@@ -1093,51 +1094,36 @@ class CloudKitSharingService: ObservableObject {
     
     /// Diagnostic function to check CloudKit public database status and detect sync issues
     func diagnoseSharedRecipes() async {
-        logInfo("🔍 DIAGNOSTIC: Starting shared recipes check...", category: "sharing")
-        
         guard let currentUserID = currentUserID else {
-            logError("🔍 DIAGNOSTIC: Cannot run - no current user ID", category: "sharing")
+            logError("Cannot run diagnostic - no current user ID", category: "sharing")
             return
         }
         
         do {
             // Fetch ALL recipes (including current user's) for diagnostic purposes
             let recipes = try await fetchSharedRecipes(excludeCurrentUser: false)
-            logInfo("🔍 DIAGNOSTIC: Successfully fetched \(recipes.count) total recipes from CloudKit", category: "sharing")
             
             // Separate current user's recipes vs others
             let myRecipes = recipes.filter { $0.sharedByUserID == currentUserID }
             let othersRecipes = recipes.filter { $0.sharedByUserID != currentUserID }
             
-            logInfo("🔍 DIAGNOSTIC: Found \(myRecipes.count) recipes from current user", category: "sharing")
-            logInfo("🔍 DIAGNOSTIC: Found \(othersRecipes.count) recipes from other users", category: "sharing")
+            logInfo("Diagnostic: \(myRecipes.count) of my recipes, \(othersRecipes.count) from others", category: "sharing")
             
             // Group by sharer
             let groupedByUser = Dictionary(grouping: recipes) { $0.sharedByUserID }
-            logInfo("🔍 DIAGNOSTIC: Total unique sharers: \(groupedByUser.count)", category: "sharing")
-            for (userID, userRecipes) in groupedByUser.prefix(5) {
-                let userName = userRecipes.first?.sharedByUserName ?? "Unknown"
-                logInfo("🔍   User '\(userName)' (\(String(describing: userID))): \(userRecipes.count) recipes", category: "sharing")
-            }
+            logInfo("Total unique sharers: \(groupedByUser.count)", category: "sharing")
             
             // Detect duplicates by recipe ID
             let groupedByRecipeID = Dictionary(grouping: recipes) { $0.id }
             let duplicates = groupedByRecipeID.filter { $0.value.count > 1 }
             if !duplicates.isEmpty {
-                logWarning("🔍 DIAGNOSTIC: Found \(duplicates.count) duplicate recipe IDs in CloudKit!", category: "sharing")
-                for (recipeID, dupes) in duplicates.prefix(5) {
-                    logWarning("🔍   Recipe ID \(recipeID) has \(dupes.count) copies", category: "sharing")
-                }
+                logWarning("Found \(duplicates.count) duplicate recipe IDs in CloudKit", category: "sharing")
             } else {
-                logInfo("🔍 DIAGNOSTIC: No duplicates found ✅", category: "sharing")
+                logInfo("No duplicates found", category: "sharing")
             }
             
-            // Check for orphaned CloudKit records (recipes in CloudKit but not in local tracking)
-            logInfo("🔍 DIAGNOSTIC: Checking for orphaned CloudKit records...", category: "sharing")
-            logInfo("🔍   My CloudKit recipes: \(myRecipes.count)", category: "sharing")
-            
         } catch {
-            logError("🔍 DIAGNOSTIC: Failed to fetch recipes: \(error)", category: "sharing")
+            logError("Diagnostic failed: \(error)", category: "sharing")
         }
     }
     
@@ -1148,19 +1134,17 @@ class CloudKitSharingService: ObservableObject {
             throw SharingError.notAuthenticated
         }
         
-        logInfo("🔄 SYNC: Starting local tracking sync...", category: "sharing")
+        logInfo("Starting local tracking sync", category: "sharing")
         
         // Fetch ALL recipes from CloudKit (including current user's)
         let allCloudKitRecipes = try await fetchSharedRecipes(excludeCurrentUser: false)
         let myCloudKitRecipes = allCloudKitRecipes.filter { $0.sharedByUserID == currentUserID }
         
-        logInfo("🔄 SYNC: Found \(myCloudKitRecipes.count) of my recipes in CloudKit", category: "sharing")
-        
         // Fetch all local SharedRecipe tracking records
         let localTracking = try modelContext.fetch(FetchDescriptor<SharedRecipe>())
         let localRecipeIDs = Set(localTracking.compactMap { $0.recipeID })
         
-        logInfo("🔄 SYNC: Found \(localTracking.count) local tracking records", category: "sharing")
+        logInfo("Found \(myCloudKitRecipes.count) recipes in CloudKit, \(localTracking.count) local tracking records", category: "sharing")
         
         // Find CloudKit recipes that aren't tracked locally
         var missingLocalTracking: [CloudKitRecipe] = []
@@ -1168,7 +1152,6 @@ class CloudKitSharingService: ObservableObject {
         for cloudRecipe in myCloudKitRecipes {
             if !localRecipeIDs.contains(cloudRecipe.id) {
                 missingLocalTracking.append(cloudRecipe)
-                logWarning("🔄 SYNC: Recipe '\(cloudRecipe.title)' (ID: \(cloudRecipe.id)) is in CloudKit but not tracked locally", category: "sharing")
             }
         }
         
@@ -1180,28 +1163,21 @@ class CloudKitSharingService: ObservableObject {
             if let recipeID = localRecord.recipeID,
                !cloudKitRecipeIDs.contains(recipeID) {
                 orphanedLocalRecords.append(localRecord)
-                logWarning("🔄 SYNC: Local tracking for '\(localRecord.recipeTitle)' (ID: \(recipeID)) has no CloudKit record", category: "sharing")
             }
         }
         
-        logInfo("🔄 SYNC: Found \(missingLocalTracking.count) CloudKit recipes not tracked locally", category: "sharing")
-        logInfo("🔄 SYNC: Found \(orphanedLocalRecords.count) orphaned local tracking records", category: "sharing")
+        logInfo("Sync: \(missingLocalTracking.count) CloudKit recipes not tracked, \(orphanedLocalRecords.count) orphaned local records", category: "sharing")
         
-        // Option 1: Clean up orphaned local records (recipes that were unshared but local tracking wasn't cleaned)
+        // Clean up orphaned local records (recipes that were unshared but local tracking wasn't cleaned)
         if !orphanedLocalRecords.isEmpty {
-            logInfo("🔄 SYNC: Cleaning up \(orphanedLocalRecords.count) orphaned local tracking records...", category: "sharing")
             for record in orphanedLocalRecords {
                 record.isActive = false
-                logInfo("🔄   Marked '\(record.recipeTitle)' as inactive", category: "sharing")
             }
         }
         
-        // Option 2: Re-create missing local tracking records
-        // Note: This is optional - you may want to just delete the orphaned CloudKit records instead
+        // Report on missing local tracking
         if !missingLocalTracking.isEmpty {
-            logWarning("🔄 SYNC: Found \(missingLocalTracking.count) recipes in CloudKit without local tracking", category: "sharing")
-            logWarning("🔄   This suggests previous unshare operations failed to delete from CloudKit", category: "sharing")
-            logWarning("🔄   Recommendation: Run cleanupGhostRecipes() to remove these from CloudKit", category: "sharing")
+            logWarning("Found \(missingLocalTracking.count) recipes in CloudKit without local tracking - run cleanupGhostRecipes()", category: "sharing")
         }
         
         try modelContext.save()
@@ -1368,11 +1344,9 @@ class CloudKitSharingService: ObservableObject {
     /// Returns structured diagnostic data for display to user
     func diagnoseSharedRecipeBooks(modelContext: ModelContext) async -> BookDiagnosticResult? {
         guard let currentUserID = currentUserID else {
-            logError("🔍 DIAGNOSTIC: No user ID available", category: "sharing")
+            logError("No user ID available", category: "sharing")
             return nil
         }
-        
-        logInfo("🔍 DIAGNOSTIC: Starting Recipe Books Analysis", category: "sharing")
         
         var cloudKitBooks = 0
         var myCloudKitBooks = 0
@@ -1390,9 +1364,9 @@ class CloudKitSharingService: ObservableObject {
             let groupedByBookID = Dictionary(grouping: books) { $0.id }
             duplicateBookIDs = groupedByBookID.filter { $0.value.count > 1 }.count
             
-            logInfo("🔍 CloudKit: \(cloudKitBooks) total (\(myCloudKitBooks) mine, \(othersCloudKitBooks) others)", category: "sharing")
+            logInfo("CloudKit: \(cloudKitBooks) total (\(myCloudKitBooks) mine, \(othersCloudKitBooks) others)", category: "sharing")
         } catch {
-            logError("🔍 ❌ Failed to fetch from CloudKit: \(error)", category: "sharing")
+            logError("Failed to fetch from CloudKit: \(error)", category: "sharing")
         }
         
         var localBooks = 0
@@ -1420,9 +1394,9 @@ class CloudKitSharingService: ObservableObject {
             let trackedBookIDs = Set(activeTracking.compactMap { $0.bookID })
             orphanedBooks = allLocalBooks.filter { !trackedBookIDs.contains($0.id!) }.count
             
-            logInfo("🔍 Local: \(localBooks) books, \(activeCount) active tracking, \(orphanedBooks) orphaned", category: "sharing")
+            logInfo("Local: \(localBooks) books, \(activeCount) active tracking, \(orphanedBooks) orphaned", category: "sharing")
         } catch {
-            logError("🔍 ❌ Failed to fetch from local: \(error)", category: "sharing")
+            logError("Failed to fetch from local: \(error)", category: "sharing")
         }
         
         return BookDiagnosticResult(
@@ -1446,19 +1420,17 @@ class CloudKitSharingService: ObservableObject {
             throw SharingError.notAuthenticated
         }
         
-        logInfo("🔄 SYNC: Starting local recipe book tracking sync...", category: "sharing")
+        logInfo("Starting local recipe book tracking sync", category: "sharing")
         
         // Fetch ALL recipe books from CloudKit (including current user's)
         let allCloudKitBooks = try await fetchSharedRecipeBooks(excludeCurrentUser: false)
         let myCloudKitBooks = allCloudKitBooks.filter { $0.sharedByUserID == currentUserID }
         
-        logInfo("🔄 SYNC: Found \(myCloudKitBooks.count) of my recipe books in CloudKit", category: "sharing")
-        
         // Fetch all local SharedRecipeBook tracking records
         let localTracking = try modelContext.fetch(FetchDescriptor<SharedRecipeBook>())
         let localBookIDs = Set(localTracking.compactMap { $0.bookID })
         
-        logInfo("🔄 SYNC: Found \(localTracking.count) local tracking records", category: "sharing")
+        logInfo("Found \(myCloudKitBooks.count) books in CloudKit, \(localTracking.count) local tracking records", category: "sharing")
         
         // Find CloudKit recipe books that aren't tracked locally
         var missingLocalTracking: [CloudKitRecipeBook] = []
@@ -1466,7 +1438,6 @@ class CloudKitSharingService: ObservableObject {
         for cloudBook in myCloudKitBooks {
             if !localBookIDs.contains(cloudBook.id) {
                 missingLocalTracking.append(cloudBook)
-                logWarning("🔄 SYNC: Recipe book '\(cloudBook.name)' (ID: \(cloudBook.id)) is in CloudKit but not tracked locally", category: "sharing")
             }
         }
         
@@ -1478,34 +1449,26 @@ class CloudKitSharingService: ObservableObject {
             if let bookID = localRecord.bookID,
                !cloudKitBookIDs.contains(bookID) {
                 orphanedLocalRecords.append(localRecord)
-                logWarning("🔄 SYNC: Local tracking for '\(localRecord.bookName)' (ID: \(bookID)) has no CloudKit record", category: "sharing")
             }
         }
         
-        logInfo("🔄 SYNC: Found \(missingLocalTracking.count) CloudKit recipe books not tracked locally", category: "sharing")
-        logInfo("🔄 SYNC: Found \(orphanedLocalRecords.count) orphaned local tracking records", category: "sharing")
+        logInfo("Sync: \(missingLocalTracking.count) CloudKit books not tracked, \(orphanedLocalRecords.count) orphaned local records", category: "sharing")
         
         // Clean up orphaned local records (books that were unshared but local tracking wasn't cleaned)
         if !orphanedLocalRecords.isEmpty {
-            logInfo("🔄 SYNC: Cleaning up \(orphanedLocalRecords.count) orphaned local tracking records...", category: "sharing")
             for record in orphanedLocalRecords {
                 record.isActive = false
-                logInfo("🔄   Marked '\(record.bookName)' as inactive", category: "sharing")
             }
         }
         
         // Warn about missing local tracking
         if !missingLocalTracking.isEmpty {
-            logWarning("🔄 SYNC: Found \(missingLocalTracking.count) recipe books in CloudKit without local tracking", category: "sharing")
-            logWarning("🔄   This suggests previous unshare operations failed to delete from CloudKit", category: "sharing")
-            logWarning("🔄   Recommendation: Run cleanupGhostRecipeBooks() to remove these from CloudKit", category: "sharing")
+            logWarning("Found \(missingLocalTracking.count) books in CloudKit without local tracking - run cleanupGhostRecipeBooks()", category: "sharing")
         }
         
         try modelContext.save()
         
-        logInfo("✅ SYNC COMPLETE: Local recipe book tracking is now synced with CloudKit", category: "sharing")
-        logInfo("   - Deactivated \(orphanedLocalRecords.count) stale local records", category: "sharing")
-        logInfo("   - Found \(missingLocalTracking.count) ghost recipe books in CloudKit (need cleanup)", category: "sharing")
+        logInfo("Sync complete: deactivated \(orphanedLocalRecords.count) stale records, \(missingLocalTracking.count) ghost books found", category: "sharing")
     }
     
     /// Repair missing CloudKit record IDs for shared recipe books
@@ -1651,19 +1614,17 @@ class CloudKitSharingService: ObservableObject {
     /// Call this when the app becomes active or when user enables auto-sync
     func startAutoSync(modelContext: ModelContext) async {
         guard autoSyncEnabled else {
-            logInfo("🔄 Auto-sync is disabled by user preference", category: "sharing")
             return
         }
         
         guard syncTimer == nil else {
-            logInfo("🔄 Auto-sync already running", category: "sharing")
             return
         }
         
         // Store model context reference
         self.currentModelContext = modelContext
         
-        logInfo("🔄 Starting auto-sync with interval: \(Int(syncInterval)) seconds", category: "sharing")
+        logInfo("Starting auto-sync (interval: \(Int(syncInterval/60))min)", category: "sharing")
         
         // Sync immediately on start
         await performBackgroundSync(modelContext: modelContext)
@@ -1691,26 +1652,33 @@ class CloudKitSharingService: ObservableObject {
         syncTimer?.invalidate()
         syncTimer = nil
         currentModelContext = nil
-        logInfo("🔄 Stopped auto-sync", category: "sharing")
+        logInfo("Stopped auto-sync", category: "sharing")
     }
     
     /// Perform a background sync (checks for changes without blocking UI)
     private func performBackgroundSync(modelContext: ModelContext) async {
         guard !isSyncing else {
-            logInfo("🔄 Skipping sync - already in progress", category: "sharing")
             return
         }
         
+        // Debounce: prevent syncs that are too close together
+        if let lastAttempt = lastSyncAttempt {
+            let timeSinceLastSync = Date().timeIntervalSince(lastAttempt)
+            if timeSinceLastSync < minimumSyncInterval {
+                return
+            }
+        }
+        
         guard isCloudKitAvailable else {
-            logInfo("🔄 Skipping sync - CloudKit not available", category: "sharing")
             return
         }
         
         isSyncing = true
+        lastSyncAttempt = Date()
         defer { isSyncing = false }
         
         let startTime = Date()
-        logInfo("🔄 AUTO-SYNC: Starting background sync...", category: "sharing")
+        logInfo("Starting background sync", category: "sharing")
         
         do {
             // Sync community recipes (limit to recent 100 to keep it fast)
@@ -1721,16 +1689,21 @@ class CloudKitSharingService: ObservableObject {
             
             lastSyncDate = Date()
             let duration = Date().timeIntervalSince(startTime)
-            logInfo("✅ AUTO-SYNC: Completed successfully in \(String(format: "%.2f", duration))s at \(lastSyncDate!)", category: "sharing")
+            logInfo("Auto-sync completed in \(String(format: "%.1f", duration))s", category: "sharing")
         } catch {
-            logError("❌ AUTO-SYNC: Failed: \(error)", category: "sharing")
+            logError("Auto-sync failed: \(error.localizedDescription)", category: "sharing")
         }
     }
     
     /// Manually trigger a sync (for user pull-to-refresh)
     func manualSync(modelContext: ModelContext) async {
-        logInfo("🔄 MANUAL SYNC: User triggered manual sync", category: "sharing")
+        // For manual sync, bypass the debounce
+        let previousAttempt = lastSyncAttempt
+        lastSyncAttempt = nil
         await performBackgroundSync(modelContext: modelContext)
+        if lastSyncAttempt == nil {
+            lastSyncAttempt = previousAttempt
+        }
     }
     
     /// Get a human-readable description of the current sync interval

@@ -175,6 +175,7 @@ class ModelContainerManager: ObservableObject {
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
                 CookingSession.self,
+                SharedRecipe.self,              // CloudKit sharing tracking
                 SharedRecipeBook.self,          // CloudKit sharing models
                 SharingPreferences.self,        // CloudKit sharing models
                 CachedSharedRecipe.self,
@@ -242,6 +243,7 @@ class ModelContainerManager: ObservableObject {
                             CachedDiabeticAnalysis.self,
                             SavedLink.self,
                             CookingSession.self,
+                            SharedRecipe.self,              // CloudKit sharing tracking
                             SharedRecipeBook.self,          // CloudKit sharing models
                             SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
@@ -340,6 +342,7 @@ class ModelContainerManager: ObservableObject {
                             CachedDiabeticAnalysis.self,
                             SavedLink.self,
                             CookingSession.self,
+                            SharedRecipe.self,              // CloudKit sharing tracking
                             SharedRecipeBook.self,          // CloudKit sharing models
                             SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,
@@ -382,6 +385,7 @@ class ModelContainerManager: ObservableObject {
                 CachedDiabeticAnalysis.self,
                 SavedLink.self,
                 CookingSession.self,
+                SharedRecipe.self,              // CloudKit sharing tracking
                 SharedRecipeBook.self,          // CloudKit sharing models
                 SharingPreferences.self,        // CloudKit sharing models
                 CachedSharedRecipe.self,
@@ -451,6 +455,7 @@ class ModelContainerManager: ObservableObject {
                             CachedDiabeticAnalysis.self,
                             SavedLink.self,
                             CookingSession.self,
+                            SharedRecipe.self,              // CloudKit sharing tracking
                             SharedRecipeBook.self,          // CloudKit sharing models
                             SharingPreferences.self,        // CloudKit sharing models
                             CachedSharedRecipe.self,

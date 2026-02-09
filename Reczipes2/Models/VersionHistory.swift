@@ -39,29 +39,20 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
     
     // ⚠️ UPDATE THIS ARRAY WITH YOUR NEW CHANGES ⚠️
     let currentVersionChanges: [String] = [
-        "• 🐛 Fixed: Crop window now offers nearly full-image size instead of 80%",
-        "• 🐛 Fixed: Remaining queue count now updates correctly during batch extraction",
-        "• ✨ Enhanced: Batch extraction remaining queue now displays thumbnails for both Photos and Files sources",
-        "• ✨ Added: Auto-sync for community recipes and books with configurable interval (20s-5m)",
-        "• 🔄 Added: Background sync of shared content from CloudKit",
-        "• ⚙️ Added: Auto-sync settings in Public Sharing preferences",
-        "• 💾 Added: Automatic image compression to keep recipe images under 100KB",
-        "• 💾 Added: Specialized compression for book covers (150KB) and thumbnails (50KB)",
-        "• ⚡️ Added: Background migration to optimize all existing images on first launch",
-        "• 📊 Enhanced: Diagnostic logging for image compression and migration progress",
-        "• ⚡️ Improved: Faster CloudKit sync with smaller image sizes (50-90% storage reduction)",
-        "• 🐛 Fixed: HTML tags no longer appear in extracted recipe text from URLs",
-        "• ✨ Enhanced: Image URLs from web recipes now appear as clickable links in Reference section",
-        "• 🧹 Improved: Removed technical metadata from Notes section after URL extraction",
-        "• 🤖 Upgraded: Claude API now uses Opus 4.5 model for superior recipe extraction quality",
-        "• 🧹 Enhanced: Web extraction now filters out navigation, ads, and website content from Notes field",
-        "• 🐛 Fixed: Batch-extracted recipes now properly download and display main images",
-        "• 🐛 Fixed: Single URL extraction now automatically downloads first 3 images",
-        "• 📊 Enhanced: Comprehensive logging for image download and compression pipeline",
-        "• 💾 Added: Fallback JPEG compression when optimized compression fails",
-        "• ✨ Added: 'Manage Links' button for easy access to saved recipe URLs",
-        "• 🐛 Fixed: App no longer crashes when backgrounded during startup",
-        "• 🐛 Fixed: Simulator crash when app is moved to background resolved"
+        "• 🐛 Fixed: Shared recipes now correctly appear in 'My Public Shares' view",
+        "• 🐛 Fixed: Book sharing now works with correct CloudKit container",
+        "• 🔧 Fixed: SharedRecipe model now properly registered in ModelContainer",
+        "• 🧹 Improved: Reduced verbose debug logging for better app performance",
+        "• 🧹 Improved: Cleaned up excessive console logging from sharing operations",
+        "• ⚡️ Performance: Reduced database contention with optimized auto-sync intervals",
+        "• ⚡️ Performance: Auto-sync now runs every 5-30 minutes (up from 20s-5m)",
+        "• 🎯 Performance: Added debouncing to prevent concurrent sync operations",
+        "• 🎯 Performance: Batch processing for bulk unshare operations (10x faster)",
+        "• ✨ Added: 'Unshare All Recipes' button for easy bulk removal from public sharing",
+        "• ✨ Added: 'Unshare All Books' button for easy bulk removal from public sharing",
+        "• 📊 Added: Progress indicators for bulk unshare operations",
+        "• 🔒 Added: Confirmation dialogs before bulk unshare operations",
+        "• 🎯 Enhanced: Bulk unshare now processes items in batches with progress updates"
     ]
     
     // Only add if there are changes
