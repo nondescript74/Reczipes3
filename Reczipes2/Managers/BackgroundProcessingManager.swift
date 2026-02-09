@@ -331,21 +331,29 @@ class BackgroundProcessingManager: ObservableObject {
 extension BackgroundProcessingManager {
     
     /// Call this when app enters background during extraction
+    /// Note: This must complete quickly to avoid crashes. Heavy work is deferred.
     func handleAppDidEnterBackground() {
-        Task {
-            let count = await extractionQueue.count
+        // Use detached task to avoid inheriting actor context that might cause issues
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            
+            let count = await self.extractionQueue.count
             guard count > 0 else {
-                logInfo("App entering background with no pending extractions", category: "background")
+                await MainActor.run {
+                    logInfo("App entering background with no pending extractions", category: "background")
+                }
                 return
             }
             
-            logInfo("App entering background with \(count) pending extractions", category: "background")
-            
-            // Start a background task to give us more time
-            beginBackgroundTask(name: "Recipe Extraction Continuation")
-            
-            // Also schedule a background processing task for later
-            scheduleBackgroundExtraction()
+            await MainActor.run {
+                logInfo("App entering background with \(count) pending extractions", category: "background")
+                
+                // Start a background task to give us more time
+                self.beginBackgroundTask(name: "Recipe Extraction Continuation")
+                
+                // Also schedule a background processing task for later
+                self.scheduleBackgroundExtraction()
+            }
         }
     }
     
@@ -353,21 +361,27 @@ extension BackgroundProcessingManager {
     func handleAppWillEnterForeground() {
         logInfo("App entering foreground", category: "background")
         
-        Task {
-            let count = await extractionQueue.count
-            
-            // Cancel any scheduled background tasks since we're back in foreground
-            if count == 0 {
-                cancelBackgroundTasks()
-            } else {
-                logInfo("Still have \(count) pending extractions, keeping background task active", category: "background")
-            }
-        }
-        
-        // End any active background tasks since we're in foreground now
+        // End any active background tasks immediately
+        // This is safe and should be done synchronously
         if backgroundTask != .invalid {
             logInfo("Ending foreground background task since app is active again", category: "background")
             endBackgroundTask()
+        }
+        
+        // Check queue status asynchronously
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            
+            let count = await self.extractionQueue.count
+            
+            await MainActor.run {
+                // Cancel any scheduled background tasks since we're back in foreground
+                if count == 0 {
+                    self.cancelBackgroundTasks()
+                } else {
+                    logInfo("Still have \(count) pending extractions, keeping background task active", category: "background")
+                }
+            }
         }
     }
     
