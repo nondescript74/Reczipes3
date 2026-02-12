@@ -133,39 +133,18 @@ class RecipeEnhancementService {
         logInfo("Searching for \(count) similar recipes to: \(recipe.safeTitle)", category: "enhancement")
         
         let systemPrompt = """
-        You are a recipe research assistant. Your job is to search the web for similar recipes and provide detailed information about each one.
+        You are a recipe research assistant with web search access. Search the web for \(count) real recipes from popular recipe websites like AllRecipes, Food Network, Bon Appétit, NYT Cooking, Serious Eats, etc.
         
-        You have access to web search. Use it to find \(count) high-quality recipes that are similar to the user's recipe.
-        
-        Focus on:
-        - Matching the main ingredients
-        - Matching the cuisine style
-        - Matching the cooking method
-        - Finding recipes from reputable recipe websites
-        - Prioritizing recipes with images
-        
-        For each recipe you find, extract:
-        - Complete title
-        - Website name and URL
-        - Image URL if available
-        - Brief description
-        - Full ingredient list (simplified, one per line)
-        - Full instruction steps (simplified, one per line)
-        - Timing information (prep, cook, total)
-        - Servings/yield
-        - Cuisine type
-        - Why this recipe matches (specific matching points)
+        For each recipe found, extract all available details including: title, website name and URL, image URL, description, ingredients, instructions, timing, servings, and cuisine type.
         """
         
         // Extract key information from the recipe
         let recipeInfo = buildRecipeSearchQuery(recipe)
         
         let userPrompt = """
-        I have this recipe:
+        Search the web for \(count) recipes for: \(recipeInfo)
         
-        \(recipeInfo)
-        
-        Please search the web for \(count) similar recipes. For each recipe, provide complete details in this JSON format:
+        Find real recipes from popular recipe websites. For each recipe, provide complete details in this JSON format:
         
         [
           {
@@ -199,25 +178,32 @@ class RecipeEnhancementService {
         ]
         
         IMPORTANT:
-        - Use web search to find REAL recipes from actual recipe websites
-        - Prioritize well-known recipe sites: AllRecipes, Food Network, Bon Appétit, NYT Cooking, Serious Eats, etc.
-        - Include complete ingredient lists and instructions (don't truncate)
-        - Match score should reflect similarity: 1.0 = nearly identical, 0.7 = moderately similar, 0.5 = loosely similar
-        - Provide specific match reasons
-        - Include working image URLs when available
-        - Return ONLY valid JSON array with no markdown formatting
+        - Use web search to find REAL recipes from actual websites
+        - Include complete ingredient lists and instructions
+        - Match score: 1.0 = very similar, 0.7 = moderately similar, 0.5 = loosely similar
+        - If you cannot find the exact recipe, search for similar alternatives based on:
+          * Same cuisine type (e.g., if "Mani flatbread" isn't found, search for other Indian flatbreads like naan, roti, paratha)
+          * Similar ingredients or cooking methods
+          * Related dishes from the same culinary tradition
+        - Only return an empty array [] if you truly cannot find ANY related recipes
+        - Return ONLY valid JSON array with no markdown formatting or explanatory text
         """
         
         let recipesJSON = try await apiClient.callClaude(
             systemPrompt: systemPrompt,
             userPrompt: userPrompt,
-            maxTokens: 8192
+            maxTokens: 8192,
+            enableWebSearch: true
         )
         
         logInfo("Received similar recipes response", category: "enhancement")
+        logDebug("Raw response length: \(recipesJSON.count) characters", category: "enhancement")
+        logDebug("Raw response preview: \(String(recipesJSON.prefix(500)))", category: "enhancement")
         
         // Extract JSON from response (remove markdown code blocks if present)
         let cleanedJSON = extractJSON(from: recipesJSON)
+        logDebug("Cleaned JSON length: \(cleanedJSON.count) characters", category: "enhancement")
+        logDebug("Cleaned JSON preview: \(String(cleanedJSON.prefix(500)))", category: "enhancement")
         
         // Parse the similar recipes
         guard let jsonData = cleanedJSON.data(using: .utf8) else {
@@ -293,54 +279,45 @@ class RecipeEnhancementService {
     /// Extracts clean JSON from Claude's response (removes markdown code blocks)
     private func extractJSON(from text: String) -> String {
         // Remove markdown code blocks if present
-        var cleaned = text
+        let cleaned = text
             .replacingOccurrences(of: "```json", with: "")
             .replacingOccurrences(of: "```", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Find JSON object or array boundaries
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("[") {
-            // It's a JSON array
-            if let startIndex = cleaned.firstIndex(of: "["),
-               let endIndex = cleaned.lastIndex(of: "]") {
-                cleaned = String(cleaned[startIndex...endIndex])
-            }
-        } else {
-            // It's a JSON object
-            if let startIndex = cleaned.firstIndex(of: "{"),
-               let endIndex = cleaned.lastIndex(of: "}") {
-                cleaned = String(cleaned[startIndex...endIndex])
+        // Try to find JSON array first (for similar recipes list)
+        if let arrayStart = cleaned.firstIndex(of: "["),
+           let arrayEnd = cleaned.lastIndex(of: "]") {
+            // Check if this looks like a valid array by seeing if it starts at root level
+            // (not nested inside an object). We do this by checking if there's a { before [
+            // at the same nesting level
+            let beforeArray = cleaned[..<arrayStart]
+            let hasObjectBefore = beforeArray.contains("{") && !beforeArray.contains("}")
+            
+            if !hasObjectBefore {
+                // This is a root-level array, extract it
+                return String(cleaned[arrayStart...arrayEnd])
             }
         }
         
+        // Fall back to object extraction (for validation responses)
+        if let objectStart = cleaned.firstIndex(of: "{"),
+           let objectEnd = cleaned.lastIndex(of: "}") {
+            return String(cleaned[objectStart...objectEnd])
+        }
+        
+        // Return cleaned text as-is if no JSON found
         return cleaned
     }
     
     private func buildRecipeSearchQuery(_ recipe: RecipeX) -> String {
         var query = ""
         
-        // Title
-        query += "Title: \(recipe.safeTitle)\n\n"
+        // Title (primary search term)
+        query += "\(recipe.safeTitle)"
         
-        // Cuisine
+        // Cuisine (helps narrow down)
         if let cuisine = recipe.cuisine, !cuisine.isEmpty {
-            query += "Cuisine: \(cuisine)\n\n"
-        }
-        
-        // Key ingredients
-        if let ingredientData = recipe.ingredientSectionsData,
-           let sections = try? JSONDecoder().decode([IngredientSection].self, from: ingredientData) {
-            query += "Key Ingredients:\n"
-            let allIngredients = sections.flatMap { $0.ingredients }
-            for (index, ingredient) in allIngredients.prefix(10).enumerated() {
-                query += "\(index + 1). \(ingredient.name)\n"
-            }
-            query += "\n"
-        }
-        
-        // Brief description
-        if let headerNotes = recipe.headerNotes, !headerNotes.isEmpty {
-            query += "Description: \(headerNotes)\n"
+            query += " (\(cuisine) cuisine)"
         }
         
         return query

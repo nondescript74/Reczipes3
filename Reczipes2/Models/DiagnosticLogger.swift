@@ -201,6 +201,31 @@ final class DiagnosticLogger: @unchecked Sendable {
         function: String,
         line: Int
     ) {
+        // Convert OSLogType to LogLevel for checking
+        let logLevel: LogLevel
+        switch level {
+        case .debug:
+            logLevel = .debug
+        case .info:
+            logLevel = .info
+        case .error:
+            logLevel = .error
+        case .fault:
+            logLevel = .critical
+        default:
+            logLevel = .warning
+        }
+        
+        // Check if this log level should be logged (thread-safe)
+        guard LoggingHelper.shouldLog(level: logLevel) else {
+            return
+        }
+        
+        // Check if this category should be logged (thread-safe)
+        guard LoggingHelper.shouldLog(category: category) else {
+            return
+        }
+        
         let fileName = (file as NSString).lastPathComponent
         let timestamp = Date()
         let formattedTimestamp = timestamp.formatted(date: .numeric, time: .standard)
@@ -229,8 +254,10 @@ final class DiagnosticLogger: @unchecked Sendable {
         let levelString = logLevelString(level)
         let fileLogMessage = "[\(formattedTimestamp)] [\(levelString)] [\(category)] [\(fileName):\(line)] \(function)\n  → \(message)\n"
         
-        // Write to file
-        writeToFile(fileLogMessage)
+        // Write to file if enabled (thread-safe)
+        if LoggingHelper.isFileLoggingEnabled {
+            writeToFile(fileLogMessage)
+        }
     }
     
     nonisolated private func logLevelString(_ level: OSLogType) -> String {

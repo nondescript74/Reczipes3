@@ -295,7 +295,7 @@ struct RecipeExtractorView: View {
                         onFindSimilarRecipes: {
                             viewModel.showingValidation = false
                             Task {
-                                await viewModel.findSimilarRecipes()
+                                await viewModel.findSimilarRecipes(modelContext: modelContext)
                             }
                         }
                     )
@@ -886,6 +886,23 @@ struct RecipeExtractorView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
+            // Auto-save status indicator
+            if viewModel.isRecipeSaved {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text("Recipe auto-saved before enhancement")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(6)
+            }
+            
             Text("Get AI-powered suggestions to improve content placement and discover similar recipes from top recipe websites.")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -895,7 +912,7 @@ struct RecipeExtractorView: View {
                 // Validate & Enhance button
                 Button {
                     Task {
-                        await viewModel.validateRecipe()
+                        await viewModel.validateRecipe(modelContext: modelContext)
                     }
                 } label: {
                     HStack {
@@ -921,7 +938,7 @@ struct RecipeExtractorView: View {
                 // Find Similar Recipes button
                 Button {
                     Task {
-                        await viewModel.findSimilarRecipes()
+                        await viewModel.findSimilarRecipes(modelContext: modelContext)
                     }
                 } label: {
                     HStack {

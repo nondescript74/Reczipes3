@@ -39,20 +39,17 @@ func addCurrentVersionToHistory(modelContext: ModelContext) async {
     
     // ⚠️ UPDATE THIS ARRAY WITH YOUR NEW CHANGES ⚠️
     let currentVersionChanges: [String] = [
-        "• 🐛 Fixed: Shared recipes now correctly appear in 'My Public Shares' view",
-        "• 🐛 Fixed: Book sharing now works with correct CloudKit container",
-        "• 🔧 Fixed: SharedRecipe model now properly registered in ModelContainer",
-        "• 🧹 Improved: Reduced verbose debug logging for better app performance",
-        "• 🧹 Improved: Cleaned up excessive console logging from sharing operations",
-        "• ⚡️ Performance: Reduced database contention with optimized auto-sync intervals",
-        "• ⚡️ Performance: Auto-sync now runs every 5-30 minutes (up from 20s-5m)",
-        "• 🎯 Performance: Added debouncing to prevent concurrent sync operations",
-        "• 🎯 Performance: Batch processing for bulk unshare operations (10x faster)",
-        "• ✨ Added: 'Unshare All Recipes' button for easy bulk removal from public sharing",
-        "• ✨ Added: 'Unshare All Books' button for easy bulk removal from public sharing",
-        "• 📊 Added: Progress indicators for bulk unshare operations",
-        "• 🔒 Added: Confirmation dialogs before bulk unshare operations",
-        "• 🎯 Enhanced: Bulk unshare now processes items in batches with progress updates"
+        "• ✨ Added: Comprehensive Logging Settings with user control over performance",
+        "• ⚡️ Performance: Users can now disable logging for maximum speed (Settings → Diagnostics → Logging Settings)",
+        "• 🎯 Enhanced: Granular logging control with 11 categories (Network, Recipe, CloudKit, etc.)",
+        "• 🔧 Added: 5 logging levels from 'Off' to 'All (Debug Mode)' with performance indicators",
+        "• 📊 Added: Log file viewer with share and clear options",
+        "• 🎯 Added: Quick preset buttons for common scenarios (Disable All, Balanced, Full Logging)",
+        "• ⚡️ Performance: Default setting optimized for minimal overhead (Errors Only + essential categories)",
+        "• 🔧 Fixed: Similar recipes search now uses correct web search tool (web_search_20250305)",
+        "• 💾 Enhanced: Recipes are now auto-saved before validation or similar recipe search",
+        "• 🛡️ Safety: Recipe data is preserved even if enhancement features fail or timeout",
+        "• 📊 Added: Visual indicator showing when recipe has been auto-saved during enhancement"
     ]
     
     // Only add if there are changes

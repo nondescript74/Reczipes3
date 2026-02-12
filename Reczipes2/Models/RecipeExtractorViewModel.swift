@@ -41,6 +41,8 @@ class RecipeExtractorViewModel: ObservableObject {
     @Published var similarRecipes: [SimilarRecipe] = []
     @Published var isValidating = false
     @Published var isFindingSimilar = false
+    @Published var isRecipeSaved = false  // Track if recipe has been auto-saved
+    @Published var savedRecipeID: UUID?   // Reference to saved recipe
     
     private var enhancementService: RecipeEnhancementService?
     
@@ -347,6 +349,8 @@ class RecipeExtractorViewModel: ObservableObject {
         showingSimilarRecipes = false
         isValidating = false
         isFindingSimilar = false
+        isRecipeSaved = false
+        savedRecipeID = nil
     }
     
     /// Toggle preprocessing and re-extract if image is available
@@ -360,10 +364,29 @@ class RecipeExtractorViewModel: ObservableObject {
     
     // MARK: - Recipe Enhancement Methods
     
+    /// Auto-saves the recipe before enhancement to preserve state
+    private func autoSaveBeforeEnhancement(modelContext: ModelContext) async {
+        guard let recipe = extractedRecipe, !isRecipeSaved else { return }
+        
+        logInfo("Auto-saving recipe before enhancement: \(recipe.safeTitle)", category: "enhancement")
+        
+        // Save recipe directly without duplicate check (user already saw extraction)
+        await MainActor.run {
+            saveRecipeDirectly(recipe, modelContext: modelContext)
+            isRecipeSaved = true
+            savedRecipeID = recipe.id
+        }
+    }
+    
     /// Validates the extracted recipe content and shows suggestions
-    func validateRecipe() async {
+    func validateRecipe(modelContext: ModelContext? = nil) async {
         guard let recipe = extractedRecipe,
               let service = enhancementService else { return }
+        
+        // Auto-save before validation to preserve state
+        if let context = modelContext {
+            await autoSaveBeforeEnhancement(modelContext: context)
+        }
         
         await MainActor.run {
             isValidating = true
@@ -473,9 +496,14 @@ class RecipeExtractorViewModel: ObservableObject {
     }
     
     /// Finds similar recipes on the web
-    func findSimilarRecipes(count: Int = 5) async {
+    func findSimilarRecipes(count: Int = 5, modelContext: ModelContext? = nil) async {
         guard let recipe = extractedRecipe,
               let service = enhancementService else { return }
+        
+        // Auto-save before searching to preserve state
+        if let context = modelContext {
+            await autoSaveBeforeEnhancement(modelContext: context)
+        }
         
         await MainActor.run {
             isFindingSimilar = true

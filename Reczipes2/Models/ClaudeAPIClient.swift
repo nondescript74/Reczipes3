@@ -386,14 +386,15 @@ class ClaudeAPIClient {
         
         // Extract JSON from Claude's response
         logDebug("Extracting recipe JSON from response", category: "extraction")
-        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
+        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }),
+              let text = textContent.text else {
             logError("No text content found in response", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
-        logDebug("Raw text content length: \(textContent.text.count) characters", category: "extraction")
+        logDebug("Raw text content length: \(text.count) characters", category: "extraction")
         
-        guard let jsonString = extractJSON(from: textContent.text) else {
+        guard let jsonString = extractJSON(from: text) else {
             logError("Failed to extract JSON from text", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
@@ -720,17 +721,18 @@ class ClaudeAPIClient {
         
         // Extract JSON from Claude's response
         logDebug("Extracting recipe JSON from response", category: "extraction")
-        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
+        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }),
+              let text = textContent.text else {
             logError("No text content found in response", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
-        logDebug("Raw text content length: \(textContent.text.count) characters", category: "extraction")
-        logDebug("Raw text preview: \(String(textContent.text.prefix(200)))...", category: "extraction")
+        logDebug("Raw text content length: \(text.count) characters", category: "extraction")
+        logDebug("Raw text preview: \(String(text.prefix(200)))...", category: "extraction")
         
-        guard let jsonString = extractJSON(from: textContent.text) else {
+        guard let jsonString = extractJSON(from: text) else {
             logError("Failed to extract JSON from text", category: "extraction")
-            logDebug("Full text: \(textContent.text)", category: "extraction")
+            logDebug("Full text: \(text)", category: "extraction")
             throw ClaudeAPIError.noRecipeFound
         }
         
@@ -806,7 +808,13 @@ struct ClaudeResponse: Codable {
 
 struct ContentBlock: Codable {
     let type: String
-    let text: String
+    let text: String?
+    let id: String?
+    let name: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case type, text, id, name
+    }
 }
 
 // MARK: - Intermediate Recipe Response (matches Claude's JSON output)
@@ -994,11 +1002,12 @@ extension ClaudeAPIClient {
     func callClaude(
         systemPrompt: String,
         userPrompt: String,
-        maxTokens: Int = 4096
+        maxTokens: Int = 4096,
+        enableWebSearch: Bool = false
     ) async throws -> String {
-        logInfo("Calling Claude API with custom prompts", category: "api")
+        logInfo("Calling Claude API with custom prompts (web search: \(enableWebSearch))", category: "api")
         
-        let requestBody: [String: Any] = [
+        var requestBody: [String: Any] = [
             "model": recipeExtractionModel,
             "max_tokens": maxTokens,
             "system": systemPrompt,
@@ -1009,6 +1018,17 @@ extension ClaudeAPIClient {
                 ]
             ]
         ]
+        
+        // Enable web search if requested (available in newer Claude models)
+        if enableWebSearch {
+            requestBody["tools"] = [
+                [
+                    "type": "web_search_20250305",
+                    "name": "web_search"
+                ]
+            ]
+            logInfo("Web search tool enabled for this request", category: "api")
+        }
         
         guard let url = URL(string: baseURL) else {
             logError("Invalid base URL: \(baseURL)", category: "api")
@@ -1055,13 +1075,14 @@ extension ClaudeAPIClient {
         
         let claudeResponse = try JSONDecoder().decode(ClaudeResponse.self, from: data)
         
-        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
+        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }),
+              let text = textContent.text else {
             logError("No text content in response", category: "api")
             throw ClaudeAPIError.invalidResponse
         }
         
         logInfo("Successfully received Claude response", category: "api")
-        return textContent.text
+        return text
     }
 }
 

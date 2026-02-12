@@ -25,6 +25,32 @@ struct SimilarRecipe: Identifiable, Codable {
     let matchScore: Double // 0.0 to 1.0, how closely it matches the original
     let matchReasons: [String] // Why this recipe was suggested
     
+    // Custom decoding to auto-generate UUID if not provided
+    enum CodingKeys: String, CodingKey {
+        case id, title, source, sourceURL, imageURL, description
+        case ingredients, instructions, prepTime, cookTime, totalTime
+        case servings, cuisine, matchScore, matchReasons
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(UUID.self, forKey: .id)) ?? UUID()
+        self.title = try container.decode(String.self, forKey: .title)
+        self.source = try container.decode(String.self, forKey: .source)
+        self.sourceURL = try container.decode(String.self, forKey: .sourceURL)
+        self.imageURL = try? container.decode(String.self, forKey: .imageURL)
+        self.description = try? container.decode(String.self, forKey: .description)
+        self.ingredients = try container.decode([String].self, forKey: .ingredients)
+        self.instructions = try container.decode([String].self, forKey: .instructions)
+        self.prepTime = try? container.decode(String.self, forKey: .prepTime)
+        self.cookTime = try? container.decode(String.self, forKey: .cookTime)
+        self.totalTime = try? container.decode(String.self, forKey: .totalTime)
+        self.servings = try? container.decode(String.self, forKey: .servings)
+        self.cuisine = try? container.decode(String.self, forKey: .cuisine)
+        self.matchScore = try container.decode(Double.self, forKey: .matchScore)
+        self.matchReasons = try container.decode([String].self, forKey: .matchReasons)
+    }
+    
     init(
         id: UUID = UUID(),
         title: String,

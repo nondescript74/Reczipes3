@@ -518,10 +518,11 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private func referenceContentView(_ reference: String) -> some View {
-        // Check if reference is a valid URL
+        // Check if reference is a single valid URL
         if let url = URL(string: reference),
-           url.scheme == "http" || url.scheme == "https" {
-            // Clickable link button
+           url.scheme == "http" || url.scheme == "https",
+           !reference.contains("\n") {
+            // Single clickable link button
             Button {
                 safariURL = url
                 showingSafariView = true
@@ -545,12 +546,68 @@ struct RecipeDetailView: View {
             }
             .buttonStyle(.plain)
         } else {
-            // Plain text for non-URL references
-            Text(reference)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .italic()
+            // Text with embedded URLs - make URLs clickable
+            VStack(alignment: .leading, spacing: 8) {
+                let lines = reference.split(separator: "\n", omittingEmptySubsequences: false)
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    let lineString = String(line)
+                    if let url = extractURL(from: lineString) {
+                        // Line contains a URL - make it clickable
+                        Button {
+                            safariURL = url
+                            showingSafariView = true
+                        } label: {
+                            HStack(alignment: .top, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(lineString)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "safari")
+                                    .font(.caption)
+                                    .foregroundStyle(.blue)
+                            }
+                            .padding(8)
+                            .background(Color.blue.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                    } else if !lineString.trimmingCharacters(in: .whitespaces).isEmpty {
+                        // Plain text line
+                        Text(lineString)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
+    }
+    
+    // Helper function to extract URL from a line of text
+    private func extractURL(from text: String) -> URL? {
+        // Look for "URL: " prefix pattern first
+        if let urlRange = text.range(of: "URL: "),
+           let url = URL(string: String(text[urlRange.upperBound...])),
+           url.scheme == "http" || url.scheme == "https" {
+            return url
+        }
+        
+        // Otherwise try to find any http/https URL in the text
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let matches = detector?.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        
+        if let match = matches?.first,
+           let range = Range(match.range, in: text),
+           let url = URL(string: String(text[range])),
+           url.scheme == "http" || url.scheme == "https" {
+            return url
+        }
+        
+        return nil
     }
     
     @ViewBuilder

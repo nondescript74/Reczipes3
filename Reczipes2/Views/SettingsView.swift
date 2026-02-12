@@ -133,6 +133,16 @@ struct SettingsView: View {
                             Label("Database Diagnostics", systemImage: "stethoscope")
                         }
                         
+                        NavigationLink {
+                            LoggingSettingsView()
+                        } label: {
+                            HStack {
+                                Label("Logging Settings", systemImage: "text.alignleft")
+                                Spacer()
+                                LoggingStatusBadge()
+                            }
+                        }
+                        
                         Button {
                             Task {
                                 await ModelContainerManager.shared.logDiagnosticInfo()
@@ -549,6 +559,53 @@ struct LicenseDisplayView: View {
     }
 }
 
+// MARK: - Logging Status Badge
+
+struct LoggingStatusBadge: View {
+    @State private var settings = LoggingSettings.shared
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+            
+            Text(statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private var statusColor: Color {
+        switch settings.loggingLevel {
+        case .off:
+            return .gray
+        case .errors:
+            return .green
+        case .warnings:
+            return .yellow
+        case .info:
+            return .orange
+        case .debug:
+            return .red
+        }
+    }
+    
+    private var statusText: String {
+        switch settings.loggingLevel {
+        case .off:
+            return "Off"
+        case .errors:
+            return "Errors"
+        case .warnings:
+            return "Warnings"
+        case .info:
+            return "Info"
+        case .debug:
+            return "Debug"
+        }
+    }
+}
 
 #Preview {
     SettingsView()
