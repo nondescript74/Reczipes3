@@ -280,6 +280,38 @@ struct RecipeExtractorView: View {
             .sheet(isPresented: $showBatchImageExtraction) {
                 BatchImageExtractorView(apiKey: apiKey, modelContext: modelContext)
             }
+            .sheet(isPresented: $viewModel.showingValidation) {
+                if let recipe = viewModel.extractedRecipe,
+                   let validationResult = viewModel.validationResult {
+                    RecipeValidationView(
+                        recipe: recipe,
+                        validationResult: validationResult,
+                        onApplyCorrections: { result in
+                            viewModel.applyValidationCorrections(result)
+                        },
+                        onSkipValidation: {
+                            viewModel.showingValidation = false
+                        },
+                        onFindSimilarRecipes: {
+                            viewModel.showingValidation = false
+                            Task {
+                                await viewModel.findSimilarRecipes()
+                            }
+                        }
+                    )
+                }
+            }
+            .sheet(isPresented: $viewModel.showingSimilarRecipes) {
+                if let recipe = viewModel.extractedRecipe {
+                    SimilarRecipesView(
+                        originalRecipe: recipe,
+                        similarRecipes: viewModel.similarRecipes,
+                        onDismiss: {
+                            viewModel.showingSimilarRecipes = false
+                        }
+                    )
+                }
+            }
         }
     }
     
@@ -650,6 +682,11 @@ struct RecipeExtractorView: View {
                 imageSelectionSection(imageURLs: viewModel.extractedImageURLs)
             }
             
+            // Enhancement buttons (for image-based extractions)
+            if extractionSource == .camera || extractionSource == .library {
+                enhancementButtonsSection
+            }
+            
             saveButton
             
             Divider()
@@ -841,6 +878,76 @@ struct RecipeExtractorView: View {
             .cornerRadius(8)
         }
         .buttonStyle(.plain)
+    }
+    
+    private var enhancementButtonsSection: some View {
+        VStack(spacing: 12) {
+            Text("Enhance Your Recipe")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Text("Get AI-powered suggestions to improve content placement and discover similar recipes from top recipe websites.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            HStack(spacing: 12) {
+                // Validate & Enhance button
+                Button {
+                    Task {
+                        await viewModel.validateRecipe()
+                    }
+                } label: {
+                    HStack {
+                        if viewModel.isValidating {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "wand.and.stars")
+                        }
+                        Text(viewModel.isValidating ? "Validating..." : "Validate Content")
+                    }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.purple)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(viewModel.isValidating || viewModel.isFindingSimilar)
+                .buttonStyle(.plain)
+                
+                // Find Similar Recipes button
+                Button {
+                    Task {
+                        await viewModel.findSimilarRecipes()
+                    }
+                } label: {
+                    HStack {
+                        if viewModel.isFindingSimilar {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                        }
+                        Text(viewModel.isFindingSimilar ? "Searching..." : "Find Similar")
+                    }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(viewModel.isValidating || viewModel.isFindingSimilar)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding()
+        .background(Color.purple.opacity(0.1))
+        .cornerRadius(12)
     }
     
     private var saveButton: some View {

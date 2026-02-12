@@ -982,6 +982,89 @@ struct RecipeNoteResponse: Codable, Sendable {
 #endif
 }
 
+// MARK: - Generic Claude API Call
+
+extension ClaudeAPIClient {
+    /// Generic method to call Claude API with custom prompts
+    /// - Parameters:
+    ///   - systemPrompt: System instruction for Claude
+    ///   - userPrompt: User message to Claude
+    ///   - maxTokens: Maximum tokens in response
+    /// - Returns: Raw text response from Claude
+    func callClaude(
+        systemPrompt: String,
+        userPrompt: String,
+        maxTokens: Int = 4096
+    ) async throws -> String {
+        logInfo("Calling Claude API with custom prompts", category: "api")
+        
+        let requestBody: [String: Any] = [
+            "model": recipeExtractionModel,
+            "max_tokens": maxTokens,
+            "system": systemPrompt,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": userPrompt
+                ]
+            ]
+        ]
+        
+        guard let url = URL(string: baseURL) else {
+            logError("Invalid base URL: \(baseURL)", category: "api")
+            throw ClaudeAPIError.invalidResponse
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.timeoutInterval = requestTimeout
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        } catch {
+            logError("Failed to serialize request body: \(error)", category: "api")
+            throw ClaudeAPIError.invalidJSON
+        }
+        
+        logInfo("Sending request to Anthropic", category: "network")
+        
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            logError("Request timed out", category: "network")
+            throw ClaudeAPIError.timeout
+        } catch {
+            logError("Network error: \(error)", category: "network")
+            throw ClaudeAPIError.networkError(error)
+        }
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            logError("Response is not HTTPURLResponse", category: "network")
+            throw ClaudeAPIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = parseAPIError(from: data)
+            logError("API Error: \(errorMessage)", category: "network")
+            throw ClaudeAPIError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+        }
+        
+        let claudeResponse = try JSONDecoder().decode(ClaudeResponse.self, from: data)
+        
+        guard let textContent = claudeResponse.content.first(where: { $0.type == "text" }) else {
+            logError("No text content in response", category: "api")
+            throw ClaudeAPIError.invalidResponse
+        }
+        
+        logInfo("Successfully received Claude response", category: "api")
+        return textContent.text
+    }
+}
+
 // MARK: - Error Types
 
 enum ClaudeAPIError: LocalizedError {

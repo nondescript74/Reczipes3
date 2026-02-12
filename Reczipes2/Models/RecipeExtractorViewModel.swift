@@ -33,6 +33,17 @@ class RecipeExtractorViewModel: ObservableObject {
     private var duplicateDetectionService: DuplicateDetectionService?
     private let imageHashService = ImageHashService()
     
+    // MARK: - Recipe Enhancement
+    
+    @Published var showingValidation = false
+    @Published var validationResult: RecipeValidationResult?
+    @Published var showingSimilarRecipes = false
+    @Published var similarRecipes: [SimilarRecipe] = []
+    @Published var isValidating = false
+    @Published var isFindingSimilar = false
+    
+    private var enhancementService: RecipeEnhancementService?
+    
     func saveRecipe(modelContext: ModelContext) {
         guard let recipe = extractedRecipe else { return }
         
@@ -178,6 +189,7 @@ class RecipeExtractorViewModel: ObservableObject {
     
     init(apiKey: String) {
         self.apiClient = ClaudeAPIClient(apiKey: apiKey)
+        self.enhancementService = RecipeEnhancementService(apiKey: apiKey)
     }
     
     /// Extract recipe from a web URL
@@ -329,6 +341,12 @@ class RecipeExtractorViewModel: ObservableObject {
         isLoading = false
         recipeURL = ""
         extractedImageURLs = []
+        validationResult = nil
+        similarRecipes = []
+        showingValidation = false
+        showingSimilarRecipes = false
+        isValidating = false
+        isFindingSimilar = false
     }
     
     /// Toggle preprocessing and re-extract if image is available
@@ -338,5 +356,165 @@ class RecipeExtractorViewModel: ObservableObject {
         if let image = selectedImage {
             await extractRecipe(from: image)
         }
+    }
+    
+    // MARK: - Recipe Enhancement Methods
+    
+    /// Validates the extracted recipe content and shows suggestions
+    func validateRecipe() async {
+        guard let recipe = extractedRecipe,
+              let service = enhancementService else { return }
+        
+        await MainActor.run {
+            isValidating = true
+            errorMessage = nil
+        }
+        
+        logInfo("Starting recipe validation for: \(recipe.safeTitle)", category: "enhancement")
+        
+        do {
+            let result = try await service.validateRecipeContent(recipe)
+            
+            await MainActor.run {
+                self.validationResult = result
+                self.showingValidation = true
+                logInfo("Validation complete. Valid: \(result.isValid)", category: "enhancement")
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Validation failed: \(error.localizedDescription)"
+                logError("Validation error: \(error.localizedDescription)", category: "enhancement")
+            }
+        }
+        
+        await MainActor.run {
+            isValidating = false
+        }
+    }
+    
+    /// Applies validation corrections to the recipe
+    func applyValidationCorrections(_ result: RecipeValidationResult) {
+        guard let recipe = extractedRecipe,
+              let corrections = result.corrections else { return }
+        
+        logInfo("Applying validation corrections to recipe", category: "enhancement")
+        
+        // Apply title correction
+        if let newTitle = corrections.title {
+            recipe.title = newTitle
+        }
+        
+        // Apply cuisine correction
+        if let newCuisine = corrections.cuisine {
+            recipe.cuisine = newCuisine
+        }
+        
+        // Apply yield correction
+        if let newYield = corrections.recipeYield {
+            recipe.recipeYield = newYield
+        }
+        
+        // Apply header notes correction
+        if let newHeaderNotes = corrections.headerNotes {
+            recipe.headerNotes = newHeaderNotes
+        }
+        
+        // Apply ingredient sections correction
+        if let simplifiedIngredients = corrections.ingredientSections {
+            // Convert simplified format to full IngredientSection models
+            let fullSections = simplifiedIngredients.map { simplified -> IngredientSection in
+                let ingredients = simplified.ingredients.map { ingredientString -> Ingredient in
+                    // Parse the string (e.g., "1 cup flour" or just "salt")
+                    let parts = ingredientString.split(separator: " ", maxSplits: 2)
+                    if parts.count >= 3 {
+                        return Ingredient(
+                            quantity: String(parts[0]),
+                            unit: String(parts[1]),
+                            name: String(parts[2])
+                        )
+                    } else if parts.count == 2 {
+                        return Ingredient(
+                            quantity: String(parts[0]),
+                            name: String(parts[1])
+                        )
+                    } else {
+                        return Ingredient(name: ingredientString)
+                    }
+                }
+                return IngredientSection(title: simplified.title, ingredients: ingredients)
+            }
+            
+            let encoder = JSONEncoder()
+            if let data = try? encoder.encode(fullSections) {
+                recipe.updateIngredients(data)
+            }
+        }
+        
+        // Apply instruction sections correction
+        if let simplifiedInstructions = corrections.instructionSections {
+            // Convert simplified format to full InstructionSection models
+            let fullSections = simplifiedInstructions.map { simplified -> InstructionSection in
+                let steps = simplified.steps.enumerated().map { index, stepText in
+                    InstructionStep(stepNumber: index + 1, text: stepText)
+                }
+                return InstructionSection(title: simplified.title, steps: steps)
+            }
+            
+            let encoder = JSONEncoder()
+            if let data = try? encoder.encode(fullSections) {
+                recipe.updateInstructions(data)
+            }
+        }
+        
+        // Update content fingerprint after corrections
+        recipe.updateContentFingerprint()
+        
+        logInfo("Validation corrections applied successfully", category: "enhancement")
+    }
+    
+    /// Finds similar recipes on the web
+    func findSimilarRecipes(count: Int = 5) async {
+        guard let recipe = extractedRecipe,
+              let service = enhancementService else { return }
+        
+        await MainActor.run {
+            isFindingSimilar = true
+            errorMessage = nil
+            similarRecipes = []
+        }
+        
+        logInfo("Searching for \(count) similar recipes", category: "enhancement")
+        
+        do {
+            let recipes = try await service.findSimilarRecipes(recipe, count: count)
+            
+            await MainActor.run {
+                self.similarRecipes = recipes
+                self.showingSimilarRecipes = true
+                logInfo("Found \(recipes.count) similar recipes", category: "enhancement")
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to find similar recipes: \(error.localizedDescription)"
+                logError("Similar recipes search error: \(error.localizedDescription)", category: "enhancement")
+            }
+        }
+        
+        await MainActor.run {
+            isFindingSimilar = false
+        }
+    }
+    
+    /// Enhanced extraction workflow for images - includes validation and similar recipe search
+    func extractRecipeWithEnhancement(from image: UIImage) async {
+        // First, do the normal extraction
+        await extractRecipe(from: image)
+        
+        // If extraction was successful and this is an image-based extraction
+        // (which typically has less structured content), offer validation
+        guard extractedRecipe != nil, errorMessage == nil else { return }
+        
+        // Automatically trigger validation for image-based extractions
+        await validateRecipe()
     }
 }
