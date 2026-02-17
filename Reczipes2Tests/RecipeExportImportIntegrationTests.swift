@@ -15,9 +15,21 @@ import SwiftData
 struct RecipeExportImportIntegrationTests {
     
     /// Helper to get the Reczipes2 backup directory path
+    /// Uses the same logic as RecipeBackupManager to handle test environments
     func getBackupDirectory() -> URL {
+        // Use the same logic as RecipeBackupManager
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        
+        // Check if Documents directory is accessible
+        var isDir: ObjCBool = false
+        let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
+        
+        if docsExists && isDir.boolValue {
+            return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        } else {
+            // Fall back to temp directory (common in test environments)
+            return FileManager.default.temporaryDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        }
     }
     
     /// Helper to create ingredient sections data

@@ -180,67 +180,16 @@ class RecipeBackupManager {
             throw RecipeBackupError.encodingFailed(error)
         }
         
-        // Get or create Reczipes2 folder - try Documents first, fall back to tmp
-        var reczipesDirectory: URL
-        
-        // First, try to verify Documents directory exists and is accessible
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        
-        // Verify we can actually access the documents directory
-        var isDir: ObjCBool = false
-        let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
-        
-        logDebug("Documents directory check: exists=\(docsExists), isDir=\(isDir.boolValue), path=\(documentsDirectory.path)", category: "backup")
-        
-        if docsExists && isDir.boolValue {
-            // Documents exists, use it
-            reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2")
-        } else {
-            // Documents doesn't exist or isn't accessible - use temporary directory
-            logWarning("Documents directory not accessible, using temporary directory for backups", category: "backup")
-            let tmpDirectory = FileManager.default.temporaryDirectory
-            reczipesDirectory = tmpDirectory.appendingPathComponent("Reczipes2")
-        }
-        
-        // Try to create the backup directory
-        do {
-            try FileManager.default.createDirectory(at: reczipesDirectory, withIntermediateDirectories: true, attributes: nil)
-            logDebug("Backup directory ready at: \(reczipesDirectory.path)", category: "backup")
-        } catch let error as NSError {
-            logError("Failed to create backup directory: \(error) (domain: \(error.domain), code: \(error.code))", category: "backup")
-            
-            // Final fallback - just use temp directory root
-            logWarning("Using fallback: temporary directory root", category: "backup")
-            reczipesDirectory = FileManager.default.temporaryDirectory
-        }
-        
-        // Create backup file in Reczipes2 folder
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let currentDate = Date()
-        let dateString = dateFormatter.string(from: currentDate)
-        
-        // Add milliseconds to ensure uniqueness when creating multiple backups quickly
-        let milliseconds = Int((currentDate.timeIntervalSince1970.truncatingRemainder(dividingBy: 1)) * 1000)
-        let fileName = "RecipeBackup_\(dateString)_\(String(format: "%03d", milliseconds)).reczipes"
-        let fileURL = reczipesDirectory.appendingPathComponent(fileName)
-        
-        do {
-            try jsonData.write(to: fileURL)
-            logInfo("Backup created successfully: \(fileName) (\(jsonData.count) bytes) at \(fileURL.path)", category: "backup")
-            return fileURL
-        } catch {
-            logError("Failed to write backup file: \(error)", category: "backup")
-            throw RecipeBackupError.fileCreationFailed
-        }
+        // Use the helper method to save the backup file
+        return try await saveBackupFile(jsonData: jsonData, prefix: "RecipeBackup")
     }
     
     // MARK: - List Backups
     
     /// Lists all available backup files in the Reczipes2 folder
     func listAvailableBackups() throws -> [BackupFileInfo] {
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        // Use the same directory resolution logic as createBackup
+        let reczipesDirectory = getBackupDirectory()
         
         // Check if directory exists
         guard FileManager.default.fileExists(atPath: reczipesDirectory.path) else {
@@ -617,11 +566,13 @@ class RecipeBackupManager {
     
     // MARK: - Helper Methods
     
-    /// Saves backup data to a file with the given prefix and extension
-    private func saveBackupFile(jsonData: Data, prefix: String, fileExtension: String = "reczipes") async throws -> URL {
-        // Get or create Reczipes2 folder - try Documents first, fall back to tmp
-        var reczipesDirectory: URL
-        
+    /// Gets the backup directory, with fallback logic for test environments
+    private func getBackupDirectory() -> URL {
+        return getBackupDirectoryShared()
+    }
+    
+    /// Shared method to get the backup directory (accessible to BookBackupManager)
+    func getBackupDirectoryShared() -> URL {
         // First, try to verify Documents directory exists and is accessible
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         
@@ -629,17 +580,21 @@ class RecipeBackupManager {
         var isDir: ObjCBool = false
         let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
         
-        logDebug("Documents directory check: exists=\(docsExists), isDir=\(isDir.boolValue), path=\(documentsDirectory.path)", category: "backup")
-        
         if docsExists && isDir.boolValue {
             // Documents exists, use it
-            reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2")
+            return documentsDirectory.appendingPathComponent("Reczipes2")
         } else {
             // Documents doesn't exist or isn't accessible - use temporary directory
-            logWarning("Documents directory not accessible, using temporary directory for backups", category: "backup")
+            // This is common in test environments with in-memory containers
             let tmpDirectory = FileManager.default.temporaryDirectory
-            reczipesDirectory = tmpDirectory.appendingPathComponent("Reczipes2")
+            return tmpDirectory.appendingPathComponent("Reczipes2")
         }
+    }
+    
+    /// Saves backup data to a file with the given prefix and extension
+    private func saveBackupFile(jsonData: Data, prefix: String, fileExtension: String = "reczipes") async throws -> URL {
+        // Get backup directory using shared logic
+        var reczipesDirectory = getBackupDirectory()
         
         // Try to create the backup directory
         do {
@@ -949,27 +904,8 @@ class BookBackupManager {
     
     /// Saves book backup data to a file with .bookbackup extension
     private func saveBookBackupFile(jsonData: Data, prefix: String) async throws -> URL {
-        // Get or create Reczipes2 folder - try Documents first, fall back to tmp
-        var reczipesDirectory: URL
-        
-        // First, try to verify Documents directory exists and is accessible
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        
-        // Verify we can actually access the documents directory
-        var isDir: ObjCBool = false
-        let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
-        
-        logDebug("Documents directory check: exists=\(docsExists), isDir=\(isDir.boolValue), path=\(documentsDirectory.path)", category: "backup")
-        
-        if docsExists && isDir.boolValue {
-            // Documents exists, use it
-            reczipesDirectory = documentsDirectory.appendingPathComponent("Reczipes2")
-        } else {
-            // Documents doesn't exist or isn't accessible - use temporary directory
-            logWarning("Documents directory not accessible, using temporary directory for backups", category: "backup")
-            let tmpDirectory = FileManager.default.temporaryDirectory
-            reczipesDirectory = tmpDirectory.appendingPathComponent("Reczipes2")
-        }
+        // Get backup directory using shared logic from RecipeBackupManager
+        let reczipesDirectory = RecipeBackupManager.shared.getBackupDirectoryShared()
         
         // Try to create the backup directory
         do {
@@ -977,10 +913,7 @@ class BookBackupManager {
             logDebug("Backup directory ready at: \(reczipesDirectory.path)", category: "backup")
         } catch let error as NSError {
             logError("Failed to create backup directory: \(error) (domain: \(error.domain), code: \(error.code))", category: "backup")
-            
-            // Final fallback - just use temp directory root
-            logWarning("Using fallback: temporary directory root", category: "backup")
-            reczipesDirectory = FileManager.default.temporaryDirectory
+            throw RecipeBackupError.fileCreationFailed
         }
         
         // Create backup file with .bookbackup extension

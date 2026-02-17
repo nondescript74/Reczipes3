@@ -17,9 +17,21 @@ struct RecipeExportImportBackupTests {
     // MARK: - Test Configuration
     
     /// Helper to get the Reczipes2 backup directory path
+    /// Uses the same logic as RecipeBackupManager to handle test environments
     func getBackupDirectory() -> URL {
+        // Use the same logic as RecipeBackupManager
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        
+        // Check if Documents directory is accessible
+        var isDir: ObjCBool = false
+        let docsExists = FileManager.default.fileExists(atPath: documentsDirectory.path, isDirectory: &isDir)
+        
+        if docsExists && isDir.boolValue {
+            return documentsDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        } else {
+            // Fall back to temp directory (common in test environments)
+            return FileManager.default.temporaryDirectory.appendingPathComponent("Reczipes2", isDirectory: true)
+        }
     }
     
     /// Helper to wait for file to be fully written and accessible
@@ -137,7 +149,9 @@ struct RecipeExportImportBackupTests {
     func testBackupDirectoryPath() {
         let backupDir = getBackupDirectory()
         #expect(backupDir.lastPathComponent == "Reczipes2", "Backup directory should be named Reczipes2")
-        #expect(backupDir.path.contains("Documents"), "Backup directory should be in Documents folder")
+        // In test environments, might be in Documents or tmp directory
+        let pathContainsValidLocation = backupDir.path.contains("Documents") || backupDir.path.contains("tmp")
+        #expect(pathContainsValidLocation, "Backup directory should be in Documents or tmp folder, got: \(backupDir.path)")
     }
     
     @Test("Backup directory is created when it doesn't exist")
@@ -178,7 +192,7 @@ struct RecipeExportImportBackupTests {
     @Test("Backup files are saved to Files/Reczipes2 folder")
     @MainActor
     func testBackupSavedToCorrectLocation() async throws {
-        _ = getBackupDirectory()
+        let backupDir = getBackupDirectory()
         
         // Create a test recipe
         let schema = Schema([RecipeX.self, Book.self, VersionHistoryRecord.self])
@@ -192,9 +206,11 @@ struct RecipeExportImportBackupTests {
         // Create backup
         let backupURL = try await RecipeBackupManager.shared.createBackup(from: [testRecipe])
         
-        // Verify it's in the correct location
-        #expect(backupURL.path.contains("Documents/Reczipes2"), 
-                "Backup should be in Documents/Reczipes2 folder, but was at: \(backupURL.path)")
+        // Verify it's in the correct location (either Documents/Reczipes2 or temp/Reczipes2)
+        #expect(backupURL.path.contains("Reczipes2"), 
+                "Backup should be in Reczipes2 folder, but was at: \(backupURL.path)")
+        #expect(backupURL.deletingLastPathComponent() == backupDir,
+                "Backup should be in the expected backup directory")
         
         // Verify file exists
         #expect(FileManager.default.fileExists(atPath: backupURL.path), 

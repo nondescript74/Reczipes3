@@ -13,7 +13,7 @@ import UIKit
 struct ImageCompressionUtilityTests {
 
     /// Test that compression produces data under target size
-    @Test("Compress image under 100KB")
+    @MainActor @Test("Compress image under 100KB")
     func testCompressImageUnderTarget() throws {
         // Create a large test image
         let size = CGSize(width: 3000, height: 3000)
@@ -44,7 +44,7 @@ struct ImageCompressionUtilityTests {
     }
 
     /// Test that small images are not unnecessarily compressed
-    @Test("Small image stays small")
+    @MainActor @Test("Small image stays small")
     func testSmallImageStaysSmall() throws {
         // Create a small test image
         let size = CGSize(width: 200, height: 200)
@@ -65,7 +65,7 @@ struct ImageCompressionUtilityTests {
     }
 
     /// Test thumbnail compression
-    @Test("Thumbnail compression under 50KB")
+    @MainActor @Test("Thumbnail compression under 50KB")
     func testThumbnailCompression() throws {
         // Create a test image
         let size = CGSize(width: 2000, height: 2000)
@@ -86,7 +86,7 @@ struct ImageCompressionUtilityTests {
     }
 
     /// Test book cover compression
-    @Test("Book cover compression under 150KB")
+    @MainActor @Test("Book cover compression under 150KB")
     func testBookCoverCompression() throws {
         // Create a test image
         let size = CGSize(width: 2000, height: 2000)
@@ -114,7 +114,7 @@ struct ImageCompressionUtilityTests {
     }
 
     /// Test resize if needed
-    @Test("Resize large image dimensions")
+    @MainActor @Test("Resize large image dimensions")
     func testResizeIfNeeded() throws {
         // Create a very large test image
         let size = CGSize(width: 5000, height: 3000)
@@ -139,7 +139,7 @@ struct ImageCompressionUtilityTests {
     }
 
     /// Test format size helper
-    @Test("Format size string")
+    @MainActor @Test("Format size string")
     func testFormatSize() throws {
         let size1 = ImageCompressionUtility.formatSize(1024)
         #expect(size1.contains("KB") || size1.contains("bytes"))

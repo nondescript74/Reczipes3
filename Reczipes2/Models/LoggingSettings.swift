@@ -15,7 +15,7 @@ final class LoggingSettings {
     
     // MARK: - Singleton
     
-    static let shared = LoggingSettings()
+    @MainActor static let shared = LoggingSettings()
     
     // MARK: - UserDefaults Keys
     

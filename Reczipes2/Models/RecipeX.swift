@@ -240,12 +240,6 @@ final class RecipeX {
 
 // MARK: - Computed Properties
 
-//extension RecipeX {
-//    func convertFromCloudKitRecipe(cloudKitRecipe: CKRecord) -> Self {
-//        
-//    }
-//}
-
 extension RecipeX {
     
     /// Safe ID accessor (returns UUID() if nil)

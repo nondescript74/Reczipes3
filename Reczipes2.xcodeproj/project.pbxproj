@@ -116,6 +116,7 @@
 			membershipExceptions = (
 				Models/DiagnosticLogger.swift,
 				Models/ImagePreprocessor.swift,
+				Models/LoggingSettings.swift,
 			);
 			target = F8C80F522EE246D300AA52E7 /* Reczipes2Tests */;
 		};
@@ -858,7 +859,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 16.4;
+				MARKETING_VERSION = 16.5;
 				OTHER_SWIFT_FLAGS = "-DAPPCLIP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2.Clip;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -897,7 +898,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 16.4;
+				MARKETING_VERSION = 16.5;
 				OTHER_SWIFT_FLAGS = "-DAPPCLIP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2.Clip;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1133,7 +1134,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 128;
+				CURRENT_PROJECT_VERSION = 129;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -1163,7 +1164,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 16.4;
+				MARKETING_VERSION = 16.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1189,7 +1190,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Reczipes2/Reczipes2.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 128;
+				CURRENT_PROJECT_VERSION = 129;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = YKHW2TJ32G;
 				ENABLE_APP_SANDBOX = YES;
@@ -1219,7 +1220,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 16.4;
+				MARKETING_VERSION = 16.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.headydiscy.reczipes2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
