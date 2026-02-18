@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2620"
-   version = "2.2">
+   version = "2.1">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
@@ -36,7 +36,7 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "F8D967362F100B16000126D7"
+               BlueprintIdentifier = "F8C80F522EE246D300AA52E7"
                BuildableName = "Reczipes2Tests.xctest"
                BlueprintName = "Reczipes2Tests"
                ReferencedContainer = "container:Reczipes2.xcodeproj">
