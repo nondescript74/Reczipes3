@@ -1,8 +1,34 @@
-# Claude Recipe Extractor for iOS
+# Reczipes
+
+AI-powered recipe extraction for iOS.
+
+Reczipes converts photos of recipes into structured, searchable data using Apple Vision OCR and LLM reasoning.
+
+## Key capabilities
+
+• OCR extraction using Apple Vision  
+• LLM-assisted interpretation of recipe structure  
+• Allergen and FODMAP dietary analysis  
+• Structured recipe data for storage and retrieval  
+• Modern SwiftUI architecture with CloudKit synchronization
+
+## Architecture
+
+Pipeline:
+
+Image → OCR extraction → LLM interpretation → structured recipe model → user interface
+
+Technologies:
+
+- Swift / SwiftUI
+- Apple Vision
+- Claude API
+- CloudKit
 
 **Transform recipe card photos into structured, digital recipes using Claude's vision AI.**
 
 Built with SwiftUI for iOS 17+ | Uses Claude Sonnet 4 | Integrates with your existing RecipeModel
+
 
 ---
 
