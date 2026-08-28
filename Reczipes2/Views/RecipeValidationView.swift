@@ -240,10 +240,15 @@ struct RecipeValidationView: View {
     
     private var actionButtonsSection: some View {
         VStack(spacing: 12) {
-            // Apply corrections
+            // Apply corrections — dismiss first so the sheet's view update
+            // finishes before @Model mutations propagate (avoids "Publishing
+            // changes from within view updates" warning).
             Button {
-                onApplyCorrections(validationResult)
+                let result = validationResult
                 dismiss()
+                DispatchQueue.main.async {
+                    onApplyCorrections(result)
+                }
             } label: {
                 HStack {
                     Image(systemName: "wand.and.stars")

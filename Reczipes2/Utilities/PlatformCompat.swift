@@ -138,7 +138,9 @@ extension PlatformImage {
 
 extension View {
     /// Cross-platform full-screen cover. Uses `.fullScreenCover` on iOS,
-    /// falls back to `.sheet` on macOS where the modifier is unavailable.
+    /// falls back to a minimum-sized `.sheet` on macOS where the modifier is
+    /// unavailable. The minimum frame prevents NavigationStack-rooted sheets
+    /// from collapsing to zero on macOS.
     @ViewBuilder
     func platformFullScreenCover<Content: View>(
         isPresented: Binding<Bool>,
@@ -148,7 +150,21 @@ extension View {
         #if os(iOS)
         self.fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
         #else
-        self.sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        self.sheet(isPresented: isPresented, onDismiss: onDismiss) {
+            content().macOSSheetFrame()
+        }
+        #endif
+    }
+
+    /// Applies a minimum 700×700 frame on macOS so that sheets whose root
+    /// view is a NavigationStack (ideal size = zero) don't collapse.
+    /// No-op on iOS.
+    @ViewBuilder
+    func macOSSheetFrame() -> some View {
+        #if os(macOS)
+        self.frame(minWidth: 700, minHeight: 700)
+        #else
+        self
         #endif
     }
 }

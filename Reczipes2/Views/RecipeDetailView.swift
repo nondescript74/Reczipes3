@@ -39,6 +39,7 @@ struct RecipeDetailView: View {
     @State private var safariURL: URL?
     @State private var showingDataInspector = false
     @State private var showingMashup = false
+    @State private var expandedImage: PlatformImage?
 
     // Diabetic analysis
     @State private var diabeticInfo: DiabeticInfo?
@@ -685,14 +686,19 @@ struct RecipeDetailView: View {
             TabView {
                 ForEach(0..<imageCount, id: \.self) { index in
                     if let image = recipe.getImage(at: index) {
-                        Image(platformImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity)
-                            .frame(maxHeight: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                            .padding(.horizontal)
+                        Button {
+                            expandedImage = image
+                        } label: {
+                            Image(platformImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: .infinity)
+                                .frame(maxHeight: 200)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                .padding(.horizontal)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -701,30 +707,40 @@ struct RecipeDetailView: View {
             .platformPageIndexViewStyle(backgroundDisplayMode: .always)
         } else if let imageName = recipe.imageName {
             // Show single image
-            RecipeImageView(
-                imageName: imageName,
-                imageData: recipe.imageData,
-                size: nil,
-                aspectRatio: .fit,
-                cornerRadius: 16
-            )
-            .frame(maxWidth: .infinity)
-            .frame(maxHeight: 200)
-            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            .padding(.horizontal)
+            Button {
+                expandedImage = recipe.getImage(at: 0)
+            } label: {
+                RecipeImageView(
+                    imageName: imageName,
+                    imageData: recipe.imageData,
+                    size: nil,
+                    aspectRatio: .fit,
+                    cornerRadius: 16
+                )
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 200)
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                .padding(.horizontal)
+            }
+            .buttonStyle(.plain)
         } else if let imageData = recipe.imageData {
             // Direct imageData display
-            RecipeImageView(
-                imageName: nil,
-                imageData: imageData,
-                size: nil,
-                aspectRatio: .fit,
-                cornerRadius: 16
-            )
-            .frame(maxWidth: .infinity)
-            .frame(maxHeight: 200)
-            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            .padding(.horizontal)
+            Button {
+                expandedImage = PlatformImage(data: imageData)
+            } label: {
+                RecipeImageView(
+                    imageName: nil,
+                    imageData: imageData,
+                    size: nil,
+                    aspectRatio: .fit,
+                    cornerRadius: 16
+                )
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 200)
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                .padding(.horizontal)
+            }
+            .buttonStyle(.plain)
         }
     }
     
@@ -968,27 +984,39 @@ struct RecipeDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: Binding(
+            get: { expandedImage != nil },
+            set: { if !$0 { expandedImage = nil } }
+        )) {
+            if let image = expandedImage {
+                ExpandableImageViewer(image: image)
+                    .macOSSheetFrame()
+            }
+        }
         .sheet(isPresented: $showingEditor) {
-            RecipeEditorView(recipe: recipe)
+            RecipeEditorView(recipe: recipe).macOSSheetFrame()
         }
         .sheet(isPresented: $showingCookingMode) {
             NavigationStack {
                 CookingModeView(recipe: recipe)
             }
+            .macOSSheetFrame()
         }
         .sheet(isPresented: $showingMashup) {
             RecipeMashupView(
                 baseRecipe: recipe,
                 apiKey: APIKeyHelper.getAPIKey() ?? ""
             )
+            .macOSSheetFrame()
         }
         .sheet(isPresented: $showingAllergenDetail) {
             if let score = allergenScore {
                 RecipeAllergenDetailView(recipe: recipe, score: score)
+                    .macOSSheetFrame()
             }
         }
         .sheet(isPresented: $showingFODMAPGuide) {
-            FODMAPQuickReferenceView()
+            FODMAPQuickReferenceView().macOSSheetFrame()
         }
         .sheet(isPresented: $showingDataInspector) {
             NavigationStack {

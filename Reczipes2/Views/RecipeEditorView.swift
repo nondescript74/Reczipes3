@@ -1304,13 +1304,20 @@ struct RecipeImagesEditorView: View {
             // Write compressed data
             do {
                 try jpegData.write(to: fileURL)
-                
+
                 await MainActor.run {
-                    // Add to recipe's additional images
-                    if recipe.additionalImageNames == nil {
-                        recipe.additionalImageNames = []
+                    let hasMainImage = recipe.imageData != nil || recipe.imageName != nil
+                    if hasMainImage {
+                        // Append as an additional image
+                        if recipe.additionalImageNames == nil {
+                            recipe.additionalImageNames = []
+                        }
+                        recipe.additionalImageNames?.append(imageName)
+                    } else {
+                        // No main image yet — promote this one to main
+                        recipe.imageName = imageName
+                        recipe.imageData = jpegData
                     }
-                    recipe.additionalImageNames?.append(imageName)
 
                     // Save context
                     do {

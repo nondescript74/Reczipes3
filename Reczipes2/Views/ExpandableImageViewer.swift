@@ -140,6 +140,9 @@ struct ExpandableImageViewer: View {
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             #endif
         }
+        #if os(macOS)
+        .frame(minWidth: 700, minHeight: 700)
+        #endif
     }
     
     /// Limits the offset to prevent dragging the image too far offscreen

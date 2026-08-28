@@ -25,121 +25,104 @@ struct ImageCropView: View {
     private let minCropSize: CGFloat = 100
     
     var body: some View {
-        NavigationView {
-            GeometryReader { geometry in
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    
-                    VStack(spacing: 0) {
-                        // Instructions
-                        Text("Drag corners to crop")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.onTint)
-                            .padding(.vertical, 8)
-                        
-                        // Image with crop overlay
-                        ZStack {
-                            // The image
-                            Image(platformImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .scaleEffect(scale)
-                                .offset(offset)
-                                .allowsHitTesting(false) // Let gestures pass through to overlay
-                                .gesture(
-                                    MagnificationGesture()
-                                        .onChanged { value in
-                                            scale = lastScale * value
-                                        }
-                                        .onEnded { value in
-                                            lastScale = scale
-                                        }
-                                )
-                                .gesture(
-                                    DragGesture(minimumDistance: 0)
-                                        .onChanged { value in
-                                            offset = CGSize(
-                                                width: lastOffset.width + value.translation.width,
-                                                height: lastOffset.height + value.translation.height
-                                            )
-                                        }
-                                        .onEnded { value in
-                                            lastOffset = offset
-                                        }
-                                )
-                            
-                            // Crop rectangle overlay
-                            CropOverlayView(
-                                cropRect: $cropRect,
-                                imageSize: imageSize,
-                                viewSize: viewSize,
-                                minSize: minCropSize
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Instructions
+                Text("Drag corners to crop")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.onTint)
+                    .padding(.vertical, 8)
+
+                // Image with crop overlay — GeometryReader fills remaining VStack space
+                GeometryReader { geometry in
+                    ZStack {
+                        // The image
+                        Image(platformImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .scaleEffect(scale)
+                            .offset(offset)
+                            .allowsHitTesting(false)
+                            .gesture(
+                                MagnificationGesture()
+                                    .onChanged { value in scale = lastScale * value }
+                                    .onEnded { _ in lastScale = scale }
                             )
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        offset = CGSize(
+                                            width: lastOffset.width + value.translation.width,
+                                            height: lastOffset.height + value.translation.height
+                                        )
+                                    }
+                                    .onEnded { _ in lastOffset = offset }
+                            )
+
+                        // Crop rectangle overlay
+                        CropOverlayView(
+                            cropRect: $cropRect,
+                            imageSize: imageSize,
+                            viewSize: viewSize,
+                            minSize: minCropSize
+                        )
+                    }
+                    .onAppear {
+                        viewSize = geometry.size
+                        calculateInitialCropRect(in: geometry.size)
+                        DispatchQueue.main.async { let _ = self.cropRect }
+                    }
+                    .onChange(of: geometry.size) { _, newSize in
+                        viewSize = newSize
+                        if cropRect == .zero {
+                            calculateInitialCropRect(in: newSize)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black)
-                        .onAppear {
-                            viewSize = geometry.size
-                            calculateInitialCropRect(in: geometry.size)
-                            
-                            // Pre-warm the gesture recognizers
-                            // This eliminates first-touch lag by forcing gesture setup
-                            DispatchQueue.main.async {
-                                // Touch the binding to trigger gesture initialization
-                                let _ = self.cropRect
-                            }
-                        }
-                        .onChange(of: geometry.size) { _, newSize in
-                            viewSize = newSize
-                            if cropRect == .zero {
-                                calculateInitialCropRect(in: newSize)
-                            }
-                        }
-                        
-                        // Control buttons
-                        HStack(spacing: 20) {
-                            Button(action: {
-                                resetCrop()
-                            }) {
-                                Label("Reset", systemImage: "arrow.counterclockwise")
-                                    .foregroundStyle(Color.onTint)
-                                    .font(.subheadline)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: onCancel) {
-                                Text("Cancel")
-                                    .foregroundStyle(Color.onTint)
-                                    .font(.subheadline)
-                            }
-                            
-                            Button(action: {
-                                // Skip cropping, use original image
-                                onCrop(image)
-                            }) {
-                                Text("Skip")
-                                    .foregroundStyle(Color.onTint)
-                                    .font(.subheadline)
-                            }
-                            
-                            Button(action: performCrop) {
-                                Text("Crop & Use")
-                                    .bold()
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(Color.white)
-                                    .cornerRadius(8)
-                            }
-                        }
-                        .padding()
-                        .background(Color.black.opacity(0.8))
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+
+                // Control buttons
+                HStack(spacing: 20) {
+                    Button(action: resetCrop) {
+                        Label("Reset", systemImage: "arrow.counterclockwise")
+                            .foregroundStyle(Color.onTint)
+                            .font(.subheadline)
+                    }
+
+                    Spacer()
+
+                    Button(action: onCancel) {
+                        Text("Cancel")
+                            .foregroundStyle(Color.onTint)
+                            .font(.subheadline)
+                    }
+
+                    Button(action: { onCrop(image) }) {
+                        Text("Skip")
+                            .foregroundStyle(Color.onTint)
+                            .font(.subheadline)
+                    }
+
+                    Button(action: performCrop) {
+                        Text("Crop & Use")
+                            .bold()
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.white)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+                .background(Color.black.opacity(0.8))
             }
-            .platformNavigationBarHidden(true)
         }
+        #if os(macOS)
+        .frame(minWidth: 700, minHeight: 700)
+        #endif
     }
     
     // MARK: - Helper Methods

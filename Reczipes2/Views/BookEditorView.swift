@@ -179,6 +179,9 @@ struct BookEditorView: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 700, minHeight: 700)
+        #endif
     }
     
     // MARK: - Helper Methods

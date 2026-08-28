@@ -14,7 +14,7 @@ struct RecipeExtractorView: View {
     @StateObject private var viewModel: RecipeExtractorViewModel
     @State private var keepAwakeManager = KeepAwakeManager.shared
     @EnvironmentObject private var appState: AppStateManager
-    @State private var showImagePicker = false
+    @State private var selectedLibraryItem: PhotosPickerItem?
     @State private var showCamera = false
     @State private var showImageCrop = false
     @State private var imageToCrop: PlatformImage?
@@ -205,25 +205,6 @@ struct RecipeExtractorView: View {
             } message: {
                 Text("This recipe matches \(duplicateMatchCount) existing recipe\(duplicateMatchCount == 1 ? "" : "s") in your collection (same URL, title, or content). You can keep both, review duplicates, or undo the save.")
             }
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker(
-                    sourceType: .photoLibrary,
-                    onImageSelected: { image in
-                        AppLog.info("Image selected from library, size: \(image.size)", category: .ui)
-                        // Store the image and wait for sheet to dismiss before showing crop
-                        imageToCrop = image
-                        // Delay to ensure sheet dismisses before fullScreenCover presents
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                            AppLog.info("Presenting crop view", category: .ui)
-                            showImageCrop = true
-                        }
-                    },
-                    onCancel: {
-                        AppLog.info("Image picker cancelled", category: .ui)
-                        // User cancelled, do nothing
-                    }
-                )
-            }
             .sheet(isPresented: $showCamera) {
                 ImagePicker(
                     sourceType: .camera,
@@ -290,6 +271,21 @@ struct RecipeExtractorView: View {
             }
             .onChange(of: appState.pendingExtractURL) { _, _ in
                 consumePendingExtractURL()
+            }
+            .onChange(of: selectedLibraryItem) { _, newItem in
+                guard let item = newItem else { return }
+                extractionSource = .library
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = PlatformImage(data: data) {
+                        AppLog.info("Image selected from library, size: \(image.size)", category: .ui)
+                        imageToCrop = image
+                        try? await Task.sleep(for: .seconds(0.6))
+                        AppLog.info("Presenting crop view", category: .ui)
+                        showImageCrop = true
+                    }
+                    selectedLibraryItem = nil
+                }
             }
             .trackTask(
                 type: .extraction,
@@ -363,10 +359,7 @@ struct RecipeExtractorView: View {
                     }
                     .buttonStyle(.plain)
                     
-                    Button {
-                        extractionSource = .library
-                        showImagePicker = true
-                    } label: {
+                    PhotosPicker(selection: $selectedLibraryItem, matching: .images) {
                         VStack(spacing: 4) {
                             Image(systemName: "photo.on.rectangle")
                                 .font(.system(size: 18))
@@ -376,14 +369,13 @@ struct RecipeExtractorView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(6)
-                        .background(extractionSource == .library ? Color.blue.opacity(0.2) : Color.blue.opacity(0.1))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(extractionSource == .library ? Color.blue : Color.clear, lineWidth: 2)
-                        )
                     }
-                    .buttonStyle(.plain)
+                    .background(extractionSource == .library ? Color.blue.opacity(0.2) : Color.blue.opacity(0.1))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(extractionSource == .library ? Color.blue : Color.clear, lineWidth: 2)
+                    )
                 }
                 
                 // Row 2: Web URL (full width)
@@ -1182,11 +1174,17 @@ struct RecipeExtractorView: View {
             }
         }
         
+        // Update state and save in separate passes so SwiftUI isn't
+        // notified about model changes while it's still processing the
+        // @State update (avoids "Publishing changes from within view updates").
         await MainActor.run {
             self.downloadedWebImages = downloadedImages
-            AppLog.info("Downloaded \(downloadedImages.count) images successfully", category: .network)
-            self.saveRecipe()
             self.isDownloadingImage = false
+            AppLog.info("Downloaded \(downloadedImages.count) images successfully", category: .network)
+        }
+        await Task.yield()
+        await MainActor.run {
+            self.saveRecipe()
         }
     }
     

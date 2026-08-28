@@ -6,18 +6,20 @@
 //
 
 import SwiftUI
+import PhotosUI
 #if os(iOS)
 import UIKit
 
-struct ImagePicker: UIViewControllerRepresentable {
-    let sourceType: ImagePickerSourceType
+// MARK: - Camera Picker
+
+private struct CameraPickerView: UIViewControllerRepresentable {
     let onImageSelected: (PlatformImage) -> Void
     let onCancel: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
-        picker.sourceType = (sourceType == .camera) ? .camera : .photoLibrary
+        picker.sourceType = .camera
         picker.delegate = context.coordinator
         picker.allowsEditing = false
         return picker
@@ -25,22 +27,14 @@ struct ImagePicker: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: ImagePicker
+        let parent: CameraPickerView
+        init(_ parent: CameraPickerView) { self.parent = parent }
 
-        init(_ parent: ImagePicker) {
-            self.parent = parent
-        }
-
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            // Dismiss immediately
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             parent.dismiss()
-
-            // Then handle the image after dismiss completes
             if let image = info[.originalImage] as? PlatformImage {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.parent.onImageSelected(image)
@@ -56,12 +50,74 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
     }
 }
+
+// MARK: - Photo Library Picker (PHPickerViewController)
+
+private struct PHLibraryPickerView: UIViewControllerRepresentable {
+    let onImageSelected: (PlatformImage) -> Void
+    let onCancel: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration()
+        config.selectionLimit = 1
+        config.filter = .images
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: PHLibraryPickerView
+        init(_ parent: PHLibraryPickerView) { self.parent = parent }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            parent.dismiss()
+            guard let result = results.first else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.parent.onCancel()
+                }
+                return
+            }
+            result.itemProvider.loadObject(ofClass: UIImage.self) { object, _ in
+                if let image = object as? UIImage {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.parent.onImageSelected(image)
+                    }
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.parent.onCancel()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Unified ImagePicker
+
+struct ImagePicker: View {
+    let sourceType: ImagePickerSourceType
+    let onImageSelected: (PlatformImage) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        if sourceType == .camera {
+            CameraPickerView(onImageSelected: onImageSelected, onCancel: onCancel)
+        } else {
+            PHLibraryPickerView(onImageSelected: onImageSelected, onCancel: onCancel)
+        }
+    }
+}
+
 #else
 import AppKit
 
-/// macOS fallback: presents an `NSOpenPanel` to choose an image file. Keeps the
-/// same initializer signature as the iOS `UIImagePickerController` wrapper.
-/// (There is no camera-capture equivalent on macOS; both source types open the panel.)
+/// macOS fallback: presents an `NSOpenPanel` to choose an image file.
 struct ImagePicker: View {
     let sourceType: ImagePickerSourceType
     let onImageSelected: (PlatformImage) -> Void
